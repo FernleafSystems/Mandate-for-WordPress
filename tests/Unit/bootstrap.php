@@ -72,6 +72,9 @@ function aps_test_reset_state() :void {
 	$GLOBALS[ 'aps_test_rest_uuid' ] = null;
 	$GLOBALS[ 'aps_test_is_multisite' ] = false;
 	$GLOBALS[ 'aps_test_super_admins' ] = [];
+	if ( class_exists( 'WP_Application_Passwords' ) ) {
+		WP_Application_Passwords::$passwordsByUser = [];
+	}
 }
 
 if ( !function_exists( 'sanitize_key' ) ) {
@@ -129,6 +132,20 @@ if ( !function_exists( 'rest_get_authenticated_app_password' ) ) {
 if ( !function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $tag, mixed $value, mixed ...$args ) :mixed {
 		return $value;
+	}
+}
+
+if ( !class_exists( 'WP_Application_Passwords' ) ) {
+	final class WP_Application_Passwords {
+
+		/**
+		 * @var array<int,mixed>
+		 */
+		public static array $passwordsByUser = [];
+
+		public static function get_user_application_passwords( int $userId ) :mixed {
+			return self::$passwordsByUser[ $userId ] ?? [];
+		}
 	}
 }
 

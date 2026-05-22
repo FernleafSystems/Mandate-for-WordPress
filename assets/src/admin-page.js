@@ -9,6 +9,16 @@ function submitForm( form ) {
 	HTMLFormElement.prototype.submit.call( form );
 }
 
+function setSelectionLoading( form ) {
+	form.classList.add( 'is-aps-loading' );
+	form.setAttribute( 'aria-busy', 'true' );
+
+	const status = form.querySelector( '[data-aps-selection-status]' );
+	if ( status ) {
+		status.hidden = false;
+	}
+}
+
 function enhanceSelectionForm( root ) {
 	const form = root.querySelector( '[data-aps-selection-form]' );
 	if ( !form ) {
@@ -20,6 +30,7 @@ function enhanceSelectionForm( root ) {
 
 	if ( userSelect ) {
 		userSelect.addEventListener( 'change', () => {
+			setSelectionLoading( form );
 			if ( passwordSelect ) {
 				passwordSelect.value = '';
 				passwordSelect.disabled = true;
@@ -29,7 +40,10 @@ function enhanceSelectionForm( root ) {
 	}
 
 	if ( passwordSelect ) {
-		passwordSelect.addEventListener( 'change', () => submitForm( form ) );
+		passwordSelect.addEventListener( 'change', () => {
+			setSelectionLoading( form );
+			submitForm( form );
+		} );
 	}
 }
 

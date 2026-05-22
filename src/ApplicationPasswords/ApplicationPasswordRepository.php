@@ -8,10 +8,13 @@ if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * @phpstan-type ApplicationPasswordRecord array{uuid:string,name:string,app_id:string,created:int,last_used:int}
+ */
 class ApplicationPasswordRepository {
 
 	/**
-	 * @return array<int,array<string,mixed>>
+	 * @return list<ApplicationPasswordRecord>
 	 */
 	public function forUser( int $userId ) :array {
 		if ( $userId < 1 || !class_exists( '\WP_Application_Passwords' ) ) {
@@ -19,11 +22,27 @@ class ApplicationPasswordRepository {
 		}
 
 		$passwords = \WP_Application_Passwords::get_user_application_passwords( $userId );
-		return is_array( $passwords ) ? array_values( $passwords ) : [];
+		if ( !is_array( $passwords ) ) {
+			return [];
+		}
+
+		$records = [];
+		foreach ( $passwords as $password ) {
+			if ( !is_array( $password ) ) {
+				continue;
+			}
+
+			$record = $this->normalizePasswordRecord( $password );
+			if ( $record !== null ) {
+				$records[] = $record;
+			}
+		}
+
+		return $records;
 	}
 
 	/**
-	 * @return array<string,mixed>|null
+	 * @return ApplicationPasswordRecord|null
 	 */
 	public function findForUser( int $userId, string $uuid ) :?array {
 		$uuid = self::normalizeUuid( $uuid );
@@ -32,7 +51,7 @@ class ApplicationPasswordRepository {
 		}
 
 		foreach ( $this->forUser( $userId ) as $password ) {
-			if ( isset( $password[ 'uuid' ] ) && self::normalizeUuid( (string)$password[ 'uuid' ] ) === $uuid ) {
+			if ( $password[ 'uuid' ] === $uuid ) {
 				return $password;
 			}
 		}
@@ -42,6 +61,43 @@ class ApplicationPasswordRepository {
 
 	public function userOwnsPassword( int $userId, string $uuid ) :bool {
 		return $this->findForUser( $userId, $uuid ) !== null;
+	}
+
+	/**
+	 * @param array<string,mixed> $password
+	 * @return ApplicationPasswordRecord|null
+	 */
+	private function normalizePasswordRecord( array $password ) :?array {
+		$uuid = self::normalizeUuid( $this->stringField( $password, 'uuid' ) );
+		if ( $uuid === '' ) {
+			return null;
+		}
+
+		$name = $this->stringField( $password, 'name' );
+
+		return [
+			'uuid'      => $uuid,
+			'name'      => $name === '' ? $uuid : $name,
+			'app_id'    => $this->stringField( $password, 'app_id' ),
+			'created'   => $this->timestampField( $password, 'created' ),
+			'last_used' => $this->timestampField( $password, 'last_used' ),
+		];
+	}
+
+	/**
+	 * @param array<string,mixed> $source
+	 */
+	private function stringField( array $source, string $key ) :string {
+		$value = $source[ $key ] ?? '';
+		return is_scalar( $value ) ? (string)$value : '';
+	}
+
+	/**
+	 * @param array<string,mixed> $source
+	 */
+	private function timestampField( array $source, string $key ) :int {
+		$value = $source[ $key ] ?? 0;
+		return is_numeric( $value ) ? max( 0, (int)$value ) : 0;
 	}
 
 	public static function normalizeUuid( string $uuid ) :string {

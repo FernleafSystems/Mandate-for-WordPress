@@ -2,6 +2,7 @@
 
 declare( strict_types=1 );
 
+use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityCandidateProvider;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityGroupProvider;
@@ -76,6 +77,37 @@ final class ScoperTest extends Aps_Test_Case {
 		$this->assertSame( [ 'edit_posts' => true, 'read' => true ], $candidates );
 		$this->assertArrayNotHasKey( 'manage_options', $candidates );
 		$this->assertArrayNotHasKey( 'delete_posts', $candidates );
+	}
+
+	public function testApplicationPasswordRepositoryOwnsNormalizedPasswordRecordContract() :void {
+		WP_Application_Passwords::$passwordsByUser = [
+			5 => [
+				[
+					'uuid'      => '11111111-1111-4111-8111-111111111111',
+					'name'      => 'Client App',
+					'app_id'    => 123,
+					'created'   => '10',
+					'last_used' => null,
+				],
+				[
+					'uuid' => 'not-a-uuid',
+					'name' => 'Broken',
+				],
+			],
+		];
+
+		$this->assertSame(
+			[
+				[
+					'uuid'      => '11111111-1111-4111-8111-111111111111',
+					'name'      => 'Client App',
+					'app_id'    => '123',
+					'created'   => 10,
+					'last_used' => 0,
+				],
+			],
+			( new ApplicationPasswordRepository() )->forUser( 5 )
+		);
 	}
 
 	public function testCapabilityGroupsClassifyWordpressPrimitiveCaps() :void {

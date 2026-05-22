@@ -16,6 +16,9 @@ if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * @phpstan-import-type ApplicationPasswordRecord from ApplicationPasswordRepository
+ */
 class AdminPage {
 
 	private const REQUIRED_CAPABILITY = 'manage_options';
@@ -100,9 +103,13 @@ class AdminPage {
 	}
 
 	public function handlePost() :void {
-		if ( $this->requestMethod() !== 'POST'
-			|| $this->postScalar( 'application_password_scoper_action' ) === ''
-		) {
+		if ( $this->requestMethod() !== 'POST' ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only detects whether this plugin form was submitted before verifying the nonce.
+		$hasFormAction = isset( $_POST[ 'application_password_scoper_action' ] );
+		if ( !$hasFormAction ) {
 			return;
 		}
 
@@ -112,9 +119,9 @@ class AdminPage {
 
 		check_admin_referer( self::NONCE_ACTION, self::NONCE_NAME );
 
-		$userId = absint( $this->postScalar( 'user_id' ) );
-		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->postScalar( 'app_password_uuid' ) );
-		$action = sanitize_key( $this->postScalar( 'application_password_scoper_action' ) );
+		$userId = absint( $this->verifiedPostScalar( 'user_id' ) );
+		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->verifiedPostScalar( 'app_password_uuid' ) );
+		$action = sanitize_key( $this->verifiedPostScalar( 'application_password_scoper_action' ) );
 		$message = 'invalid';
 
 		if ( $userId > 0 && $uuid !== '' && $this->passwordRepository->userOwnsPassword( $userId, $uuid ) ) {
@@ -128,8 +135,8 @@ class AdminPage {
 				}
 				else {
 					$candidates = $this->candidateProvider->forUser( $userId );
-					$submittedCaps = $this->postScalarList( 'allowed_caps' );
-					$submittedMetaCaps = $this->postScalarList( 'allowed_meta_caps' );
+					$submittedCaps = $this->verifiedPostScalarList( 'allowed_caps' );
+					$submittedMetaCaps = $this->verifiedPostScalarList( 'allowed_meta_caps' );
 
 					$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
 					$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
@@ -214,29 +221,25 @@ class AdminPage {
 	}
 
 	/**
-	 * @param array<int,array<string,mixed>> $passwords
+	 * @param list<ApplicationPasswordRecord> $passwords
 	 */
 	private function selectedPasswordUuid( array $passwords ) :string {
+		if ( $passwords === [] ) {
+			return '';
+		}
+
 		$requested = ApplicationPasswordRepository::normalizeUuid( $this->getScalar( 'app_password_uuid' ) );
 		foreach ( $passwords as $password ) {
-			$uuid = isset( $password[ 'uuid' ] ) ? ApplicationPasswordRepository::normalizeUuid( (string)$password[ 'uuid' ] ) : '';
-			if ( $uuid !== '' && $uuid === $requested ) {
-				return $uuid;
+			if ( $password[ 'uuid' ] === $requested ) {
+				return $password[ 'uuid' ];
 			}
 		}
 
-		foreach ( $passwords as $password ) {
-			$uuid = isset( $password[ 'uuid' ] ) ? ApplicationPasswordRepository::normalizeUuid( (string)$password[ 'uuid' ] ) : '';
-			if ( $uuid !== '' ) {
-				return $uuid;
-			}
-		}
-
-		return '';
+		return $passwords[ 0 ][ 'uuid' ];
 	}
 
 	/**
-	 * @param array<int,array<string,mixed>> $passwords
+	 * @param list<ApplicationPasswordRecord> $passwords
 	 * @param array<string,mixed>|null $scope
 	 */
 	private function renderSelectionForm( int $selectedUserId, array $passwords, string $selectedUuid, ?array $scope ) :void {
@@ -264,12 +267,7 @@ class AdminPage {
 		if ( !empty( $passwords ) ) {
 			echo '<select id="application-password-scoper-password" name="app_password_uuid">';
 			foreach ( $passwords as $password ) {
-				$uuid = isset( $password[ 'uuid' ] ) ? ApplicationPasswordRepository::normalizeUuid( (string)$password[ 'uuid' ] ) : '';
-				if ( $uuid === '' ) {
-					continue;
-				}
-				$name = isset( $password[ 'name' ] ) ? (string)$password[ 'name' ] : $uuid;
-				echo '<option value="'.esc_attr( $uuid ).'" '.selected( $selectedUuid, $uuid, false ).'>'.esc_html( $name ).'</option>';
+				echo '<option value="'.esc_attr( $password[ 'uuid' ] ).'" '.selected( $selectedUuid, $password[ 'uuid' ], false ).'>'.esc_html( $password[ 'name' ] ).'</option>';
 			}
 			echo '</select>';
 		}
@@ -280,13 +278,15 @@ class AdminPage {
 		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope );
 		echo '</div>';
 		echo '</div>';
-		submit_button( __( 'Load Selection', 'application-password-scoper' ), 'secondary', 'submit', false );
+		echo '<p class="application-password-scoper-selection-status" data-aps-selection-status hidden>'.esc_html__( 'Loading selection...', 'application-password-scoper' ).'</p>';
+		echo '<noscript><p class="application-password-scoper-selection-fallback"><button type="submit" class="button button-secondary">'.esc_html__( 'Apply Selection', 'application-password-scoper' ).'</button></p></noscript>';
 		echo '</form>';
 	}
 
 	private function renderRoleSummary( int $selectedUserId ) :void {
 		$roles = $this->roleSummaries( $selectedUserId );
 		echo '<div id="application-password-scoper-role-summary" class="application-password-scoper-role-summary">';
+		echo '<p class="application-password-scoper-role-summary-label">'.esc_html__( 'Roles for selected user', 'application-password-scoper' ).'</p>';
 		if ( empty( $roles ) ) {
 			echo '<p class="description">'.esc_html__( 'No roles assigned.', 'application-password-scoper' ).'</p>';
 			echo '</div>';
@@ -295,7 +295,10 @@ class AdminPage {
 
 		echo '<ul>';
 		foreach ( $roles as $role ) {
-			echo '<li>'.esc_html( $role[ 'name' ] ).' <code>'.esc_html( $role[ 'slug' ] ).'</code></li>';
+			echo '<li>';
+			echo esc_html( $role[ 'name' ] ).' ';
+			echo '<span class="application-password-scoper-role-slug">('.esc_html__( 'slug:', 'application-password-scoper' ).' <code>'.esc_html( $role[ 'slug' ] ).'</code>)</span>';
+			echo '</li>';
 		}
 		echo '</ul>';
 		echo '</div>';
@@ -339,7 +342,7 @@ class AdminPage {
 	}
 
 	/**
-	 * @param array<int,array<string,mixed>> $passwords
+	 * @param list<ApplicationPasswordRecord> $passwords
 	 * @param array<string,mixed>|null $scope
 	 */
 	private function renderPasswordSummary( array $passwords, string $selectedUuid, ?array $scope ) :void {
@@ -351,11 +354,11 @@ class AdminPage {
 		echo '<div id="application-password-scoper-password-summary" class="application-password-scoper-password-summary">';
 		echo '<h2>'.esc_html__( 'Selected Password', 'application-password-scoper' ).'</h2>';
 		echo '<dl>';
-		$this->renderDetailItem( __( 'Name', 'application-password-scoper' ), (string)( $password[ 'name' ] ?? '' ) );
-		$this->renderDetailItem( __( 'UUID', 'application-password-scoper' ), $selectedUuid );
-		$this->renderDetailItem( __( 'App ID', 'application-password-scoper' ), (string)( $password[ 'app_id' ] ?? '' ) );
-		$this->renderDetailItem( __( 'Created', 'application-password-scoper' ), $this->formatTimestamp( $password[ 'created' ] ?? null ) );
-		$this->renderDetailItem( __( 'Last Used', 'application-password-scoper' ), $this->formatTimestamp( $password[ 'last_used' ] ?? null ) );
+		$this->renderDetailItem( __( 'Name', 'application-password-scoper' ), $password[ 'name' ] );
+		$this->renderDetailItem( __( 'UUID', 'application-password-scoper' ), $password[ 'uuid' ] );
+		$this->renderDetailItem( __( 'App ID', 'application-password-scoper' ), $password[ 'app_id' ] );
+		$this->renderDetailItem( __( 'Created', 'application-password-scoper' ), $this->formatTimestamp( $password[ 'created' ] ) );
+		$this->renderDetailItem( __( 'Last Used', 'application-password-scoper' ), $this->formatTimestamp( $password[ 'last_used' ] ) );
 		$this->renderDetailItem(
 			__( 'Scope', 'application-password-scoper' ),
 			$scope === null ? __( 'Unrestricted', 'application-password-scoper' ) : __( 'Restricted', 'application-password-scoper' )
@@ -365,14 +368,12 @@ class AdminPage {
 	}
 
 	/**
-	 * @param array<int,array<string,mixed>> $passwords
-	 * @return array<string,mixed>|null
+	 * @param list<ApplicationPasswordRecord> $passwords
+	 * @return ApplicationPasswordRecord|null
 	 */
 	private function selectedPassword( array $passwords, string $selectedUuid ) :?array {
 		foreach ( $passwords as $password ) {
-			if ( isset( $password[ 'uuid' ] )
-				&& ApplicationPasswordRepository::normalizeUuid( (string)$password[ 'uuid' ] ) === $selectedUuid
-			) {
+			if ( $password[ 'uuid' ] === $selectedUuid ) {
 				return $password;
 			}
 		}
@@ -412,8 +413,8 @@ class AdminPage {
 		$this->renderTabButton( 'other', __( 'Everything Else', 'application-password-scoper' ), false );
 		echo '</div>';
 
-		$this->renderCapabilityPanel( 'wordpress', __( 'WordPress', 'application-password-scoper' ), $capabilityGroups[ 'wordpress' ], $selectedCaps, $selectedMetaCaps );
-		$this->renderCapabilityPanel( 'other', __( 'Everything Else', 'application-password-scoper' ), $capabilityGroups[ 'other' ], $selectedCaps, $selectedMetaCaps );
+		$this->renderCapabilityPanel( 'wordpress', $capabilityGroups[ 'wordpress' ], $selectedCaps, $selectedMetaCaps );
+		$this->renderCapabilityPanel( 'other', $capabilityGroups[ 'other' ], $selectedCaps, $selectedMetaCaps );
 
 		echo '<p class="submit application-password-scoper-actions">';
 		echo '<button type="submit" class="button button-primary" name="application_password_scoper_action" value="save_scope" '.disabled( $this->isSuperAdminUser( $selectedUserId ), true, false ).'>'.esc_html__( 'Save Scope', 'application-password-scoper' ).'</button> ';
@@ -431,10 +432,9 @@ class AdminPage {
 	 * @param array<string,true> $selectedCaps
 	 * @param array<string,true> $selectedMetaCaps
 	 */
-	private function renderCapabilityPanel( string $groupKey, string $label, array $capabilities, array $selectedCaps, array $selectedMetaCaps ) :void {
+	private function renderCapabilityPanel( string $groupKey, array $capabilities, array $selectedCaps, array $selectedMetaCaps ) :void {
 		echo '<section id="application-password-scoper-panel-'.esc_attr( $groupKey ).'" class="application-password-scoper-capability-panel" data-aps-panel="'.esc_attr( $groupKey ).'" aria-labelledby="application-password-scoper-tab-'.esc_attr( $groupKey ).'">';
 		echo '<div class="application-password-scoper-panel-heading">';
-		echo '<h3>'.esc_html( $label ).'</h3>';
 		echo '<p>';
 		echo '<button type="button" class="button" data-aps-select-group="'.esc_attr( $groupKey ).'" data-aps-select-state="checked">'.esc_html__( 'Select All', 'application-password-scoper' ).'</button> ';
 		echo '<button type="button" class="button" data-aps-select-group="'.esc_attr( $groupKey ).'" data-aps-select-state="unchecked">'.esc_html__( 'Deselect All', 'application-password-scoper' ).'</button>';
@@ -487,8 +487,7 @@ class AdminPage {
 		echo '<div class="notice notice-'.esc_attr( $type ).' is-dismissible"><p>'.esc_html( $text ).'</p></div>';
 	}
 
-	private function formatTimestamp( mixed $timestamp ) :string {
-		$timestamp = is_numeric( $timestamp ) ? (int)$timestamp : 0;
+	private function formatTimestamp( int $timestamp ) :string {
 		if ( $timestamp < 1 ) {
 			return __( 'Never', 'application-password-scoper' );
 		}
@@ -504,10 +503,12 @@ class AdminPage {
 	}
 
 	private function getScalar( string $key ) :string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Sanitized non-mutating admin view-state query arg.
 		return $this->requestScalar( $_GET, $key );
 	}
 
-	private function postScalar( string $key ) :string {
+	private function verifiedPostScalar( string $key ) :string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce is verified in handlePost() before scoped POST values are read.
 		return $this->requestScalar( $_POST, $key );
 	}
 
@@ -522,7 +523,8 @@ class AdminPage {
 	/**
 	 * @return string[]
 	 */
-	private function postScalarList( string $key ) :array {
+	private function verifiedPostScalarList( string $key ) :array {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce is verified in handlePost(); each list item is sanitized below.
 		$value = isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : [];
 		if ( !is_array( $value ) ) {
 			return [];

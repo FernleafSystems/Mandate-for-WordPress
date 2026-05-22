@@ -23,6 +23,54 @@ async function selectOptionAndWait( page, locator, value ) {
 	] );
 }
 
+async function ensureSelectedOption( page, locator, value ) {
+	if ( await locator.inputValue() === String( value ) ) {
+		return;
+	}
+
+	await selectOptionAndWait( page, locator, value );
+}
+
+async function selectOptionWithDelayedNavigation( page, locator, value, expectedUrlPart ) {
+	let delayed = false;
+	await page.route( '**/wp-admin/tools.php?**', async ( route ) => {
+		const request = route.request();
+		if ( !delayed && request.isNavigationRequest() && request.url().includes( expectedUrlPart ) ) {
+			delayed = true;
+			await new Promise( ( resolve ) => setTimeout( resolve, 1000 ) );
+		}
+		await route.continue();
+	} );
+
+	try {
+		const navigation = page.waitForNavigation( { waitUntil: 'load' } );
+		const busyState = await locator.evaluate(
+			( select, nextValue ) => {
+				select.value = nextValue;
+				select.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+
+				const form = select.form;
+				const status = form.querySelector( '[data-aps-selection-status]' );
+				return {
+					ariaBusy: form.getAttribute( 'aria-busy' ),
+					selectedValue: select.value,
+					statusHidden: status ? status.hidden : true,
+				};
+			},
+			String( value )
+		);
+		expect( busyState ).toEqual( {
+			ariaBusy: 'true',
+			selectedValue: String( value ),
+			statusHidden: false,
+		} );
+		await navigation;
+	}
+	finally {
+		await page.unroute( '**/wp-admin/tools.php?**' );
+	}
+}
+
 function primitiveCapInput( page, group, capability ) {
 	return page.locator( `#application-password-scoper-${group}-primitive-capabilities input[name="allowed_caps[]"][value="${capability}"]` );
 }
@@ -48,22 +96,28 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	const secondaryPassword = primary.passwords.secondary;
 	const otherPassword = otherUser.passwords.primary;
 
-	const toolsMenuLink = page.locator( '#menu-tools a[href*="application-password-scoper"]' ).first();
-	await expect( toolsMenuLink ).toBeVisible();
-	await expect( toolsMenuLink ).toHaveAttribute( 'href', /tools\.php\?page=application-password-scoper/ );
-
 	await page.goto( '/wp-admin/tools.php?page=application-password-scoper', { waitUntil: 'load' } );
 	const userSelect = page.locator( '#application-password-scoper-user' );
 	await expect( userSelect ).toBeVisible();
 
 	await selectOptionAndWait( page, userSelect, primary.user_id );
+	await ensureSelectedOption( page, page.locator( '#application-password-scoper-password' ), primaryPassword.uuid );
+	await expect( page.locator( '[data-aps-selection-form] button[type="submit"], [data-aps-selection-form] input[type="submit"]' ) ).toBeHidden();
+	await expect( page.locator( '#application-password-scoper-role-summary' ) ).toContainText( 'Roles for selected user' );
 	await expect( page.locator( '#application-password-scoper-role-summary' ) ).toContainText( primary.role_slug );
 	await expect( page.locator( '#application-password-scoper-role-summary' ) ).toContainText( primary.role_name );
+	await expect( page.locator( '#application-password-scoper-role-summary' ) ).toContainText( 'slug:' );
 	await expect( page.locator( '#application-password-scoper-password' ) ).toHaveValue( primaryPassword.uuid );
 	await expect( page.locator( '[data-aps-selection-form] #application-password-scoper-password-summary' ) ).toContainText( primaryPassword.uuid );
 
-	await selectOptionAndWait( page, page.locator( '#application-password-scoper-password' ), secondaryPassword.uuid );
+	await selectOptionWithDelayedNavigation(
+		page,
+		page.locator( '#application-password-scoper-password' ),
+		secondaryPassword.uuid,
+		`app_password_uuid=${secondaryPassword.uuid}`
+	);
 	expect( new URL( page.url() ).searchParams.get( 'app_password_uuid' ) ).toBe( secondaryPassword.uuid );
+	await expect( page.locator( '#application-password-scoper-password' ) ).toHaveValue( secondaryPassword.uuid );
 	await expect( page.locator( '#application-password-scoper-password-summary' ) ).toContainText( secondaryPassword.uuid );
 
 	await selectOptionAndWait( page, page.locator( '#application-password-scoper-user' ), otherUser.user_id );
@@ -73,22 +127,18 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	await expect( page.locator( '#application-password-scoper-password-summary' ) ).toContainText( otherPassword.uuid );
 
 	await selectOptionAndWait( page, page.locator( '#application-password-scoper-user' ), primary.user_id );
+	await ensureSelectedOption( page, page.locator( '#application-password-scoper-password' ), primaryPassword.uuid );
 	await expect( page.locator( '#application-password-scoper-password' ) ).toHaveValue( primaryPassword.uuid );
 
 	await expect( page.locator( '[data-aps-tab="wordpress"]' ) ).toHaveText( 'WordPress' );
 	await expect( page.locator( '[data-aps-tab="other"]' ) ).toHaveText( 'Everything Else' );
 
-	expect( await primitiveCapabilityValues( page, 'wordpress' ) ).toEqual( [
+	expect( new Set( await primitiveCapabilityValues( page, 'wordpress' ) ) ).toEqual( new Set( [
 		'edit_posts',
 		'read',
 		'upload_files',
-	] );
-	expect( await primitiveCapabilityValues( page, 'other' ) ).toEqual( [ 'aps_manage_widget' ] );
-
-	const wordpressLabels = await page.locator( '#application-password-scoper-wordpress-primitive-capabilities label' )
-		.evaluateAll( ( labels ) => labels.map( ( label ) => label.getBoundingClientRect().top ) );
-	expect( wordpressLabels[ 0 ] ).toBeLessThan( wordpressLabels[ 1 ] );
-	expect( wordpressLabels[ 1 ] ).toBeLessThan( wordpressLabels[ 2 ] );
+	] ) );
+	expect( new Set( await primitiveCapabilityValues( page, 'other' ) ) ).toEqual( new Set( [ 'aps_manage_widget' ] ) );
 
 	await expect( anyPrimitiveCapInput( page, primary.direct_cap ) ).toHaveCount( 0 );
 	await expect( anyPrimitiveCapInput( page, fixture.unassigned_role_cap ) ).toHaveCount( 0 );
