@@ -2,6 +2,10 @@
 
 declare( strict_types=1 );
 
+if ( !defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', dirname( __DIR__, 2 ).'/' );
+}
+
 $apsTestAutoload = dirname( __DIR__, 2 ).'/vendor/autoload.php';
 if ( !is_file( $apsTestAutoload ) ) {
 	throw new RuntimeException( 'Composer autoload files are missing. Run composer dump-autoload before running tests.' );

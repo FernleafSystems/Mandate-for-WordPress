@@ -4,6 +4,7 @@ declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\ScopeRepository;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\MetaCaps\MetaCapabilityRegistry;
@@ -75,6 +76,67 @@ final class ScoperTest extends Aps_Test_Case {
 		$this->assertSame( [ 'edit_posts' => true, 'read' => true ], $candidates );
 		$this->assertArrayNotHasKey( 'manage_options', $candidates );
 		$this->assertArrayNotHasKey( 'delete_posts', $candidates );
+	}
+
+	public function testCapabilityGroupsClassifyWordpressPrimitiveCaps() :void {
+		$groups = ( new CapabilityGroupProvider() )->group(
+			[
+				'read'              => true,
+				'edit_posts'        => true,
+				'aps_manage_widget' => true,
+			],
+			[]
+		);
+
+		$this->assertSame(
+			[ 'edit_posts' => true, 'read' => true ],
+			$groups[ 'wordpress' ][ 'primitive' ]
+		);
+		$this->assertSame(
+			[ 'aps_manage_widget' => true ],
+			$groups[ 'other' ][ 'primitive' ]
+		);
+	}
+
+	public function testCapabilityGroupsSortCapabilitiesAlphabetically() :void {
+		$groups = ( new CapabilityGroupProvider() )->group(
+			[
+				'upload_files' => true,
+				'read'         => true,
+				'edit_posts'   => true,
+			],
+			[
+				'read_post'   => true,
+				'delete_post' => true,
+				'edit_post'   => true,
+			]
+		);
+
+		$this->assertSame(
+			[ 'edit_posts', 'read', 'upload_files' ],
+			array_keys( $groups[ 'wordpress' ][ 'primitive' ] )
+		);
+		$this->assertSame(
+			[ 'delete_post', 'edit_post', 'read_post' ],
+			array_keys( $groups[ 'wordpress' ][ 'meta' ] )
+		);
+	}
+
+	public function testCapabilityGroupsClassifyRegisteredMetaCaps() :void {
+		$defaultMetaCaps = ( new MetaCapabilityRegistry() )->registered();
+		$groups = ( new CapabilityGroupProvider() )->group(
+			[],
+			$defaultMetaCaps + [ 'aps_manage_meta' => true ]
+		);
+
+		$this->assertSame(
+			$defaultMetaCaps,
+			$groups[ 'wordpress' ][ 'meta' ]
+		);
+		$this->assertSame(
+			[ 'aps_manage_meta' => true ],
+			$groups[ 'other' ][ 'meta' ]
+		);
 	}
 
 	public function testNormalRequestWithoutApplicationPasswordContextIsUnchanged() :void {

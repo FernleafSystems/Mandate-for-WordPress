@@ -2,7 +2,7 @@
 
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Plugin;
 
-if ( !\defined( 'ABSPATH' ) ) {
+if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
@@ -10,7 +10,7 @@ if ( !\defined( 'ABSPATH' ) ) {
 	$application_password_scoper_autoload = __DIR__.'/vendor/autoload.php';
 	if ( \is_file( $application_password_scoper_autoload ) ) {
 		require_once $application_password_scoper_autoload;
-		Plugin::boot();
+		Plugin::boot( __DIR__.'/plugin.php' );
 	}
 	else {
 		global $application_password_scoper_unsupported_reason;

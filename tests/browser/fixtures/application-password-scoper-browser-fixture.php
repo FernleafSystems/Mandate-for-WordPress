@@ -31,6 +31,7 @@ add_action(
 							'upload_files'   => current_user_can( 'upload_files' ),
 							'delete_posts'   => current_user_can( 'delete_posts' ),
 							'manage_options' => current_user_can( 'manage_options' ),
+							'aps_manage_widget' => current_user_can( 'aps_manage_widget' ),
 						]
 					);
 				},

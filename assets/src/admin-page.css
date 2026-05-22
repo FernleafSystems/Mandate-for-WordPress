@@ -1,0 +1,168 @@
+.application-password-scoper {
+	max-width: 1180px;
+}
+
+.application-password-scoper-selection {
+	margin: 1rem 0 1.5rem;
+}
+
+.application-password-scoper-selection-grid {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: minmax( 0, 1fr ) minmax( 18rem, .9fr );
+}
+
+.application-password-scoper-password-summary,
+.application-password-scoper-capability-panel {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	box-sizing: border-box;
+	padding: 1rem;
+}
+
+.application-password-scoper-selection-column {
+	box-sizing: border-box;
+	min-width: 0;
+}
+
+.application-password-scoper-field {
+	margin-bottom: .75rem;
+}
+
+.application-password-scoper-field label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: .35rem;
+}
+
+.application-password-scoper-field select {
+	max-width: 100%;
+	min-width: min( 100%, 18rem );
+}
+
+.application-password-scoper-role-summary ul {
+	margin: .35rem 0 0;
+}
+
+.application-password-scoper-role-summary li {
+	margin: 0 0 .35rem;
+}
+
+.application-password-scoper-password-summary {
+	margin-top: .75rem;
+}
+
+.application-password-scoper-password-summary h2 {
+	font-size: 1rem;
+	margin: 0 0 .75rem;
+}
+
+.application-password-scoper-password-summary dl {
+	display: grid;
+	gap: .35rem .75rem;
+	grid-template-columns: max-content minmax( 0, 1fr );
+	margin: 0;
+}
+
+.application-password-scoper-password-summary div {
+	display: contents;
+}
+
+.application-password-scoper-password-summary dt {
+	color: #50575e;
+	font-weight: 600;
+}
+
+.application-password-scoper-password-summary dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.application-password-scoper-tabs {
+	border-bottom: 1px solid #c3c4c7;
+	margin: 1rem 0 0;
+	padding-top: .25rem;
+}
+
+.application-password-scoper-tabs .nav-tab {
+	cursor: pointer;
+	margin-bottom: -1px;
+}
+
+.application-password-scoper-capability-panel {
+	border-top: 0;
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+	margin-bottom: 1rem;
+}
+
+.application-password-scoper-panel-heading {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: .75rem;
+	justify-content: space-between;
+	margin-bottom: .75rem;
+}
+
+.application-password-scoper-panel-heading h3,
+.application-password-scoper-panel-heading p {
+	margin: 0;
+}
+
+.application-password-scoper-capability-scroll {
+	border: 1px solid #dcdcde;
+	max-height: 28rem;
+	overflow: auto;
+	padding: .75rem 1rem;
+}
+
+.application-password-scoper-capability-section {
+	border: 0;
+	margin: 0 0 1rem;
+	padding: 0;
+}
+
+.application-password-scoper-capability-section:last-child {
+	margin-bottom: 0;
+}
+
+.application-password-scoper-capability-section legend {
+	font-weight: 600;
+	margin-bottom: .5rem;
+	padding: 0;
+}
+
+.application-password-scoper-capability-list {
+	display: grid;
+	gap: .4rem;
+}
+
+.application-password-scoper-capability-list label {
+	align-items: flex-start;
+	display: flex;
+	gap: .4rem;
+	line-height: 1.4;
+	margin: 0;
+}
+
+.application-password-scoper-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+}
+
+@media screen and ( max-width: 782px ) {
+	.application-password-scoper-selection-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.application-password-scoper-password-summary dl {
+		grid-template-columns: 1fr;
+	}
+
+	.application-password-scoper-password-summary dt {
+		margin-top: .35rem;
+	}
+}

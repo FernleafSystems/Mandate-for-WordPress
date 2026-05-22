@@ -2,9 +2,12 @@
   "name": "application-password-scoper",
   "private": true,
   "devDependencies": {
-    "@playwright/test": "^1.54.2"
+    "@playwright/test": "^1.54.2",
+    "vite": "^7.2.4"
   },
   "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
     "playwright:install": "playwright install chromium",
     "test:browser": "playwright test"
   }

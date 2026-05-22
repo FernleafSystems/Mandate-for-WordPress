@@ -83,61 +83,103 @@ add_role(
 	$limitedRole,
 	'APS Limited',
 	[
-		'read'         => true,
-		'edit_posts'   => true,
-		'upload_files' => true,
+		'read'              => true,
+		'edit_posts'        => true,
+		'upload_files'      => true,
+		'aps_manage_widget' => true,
 	]
 );
 add_role(
 	$otherRole,
 	'APS Other',
 	[
+		'read'           => true,
 		'delete_posts'   => true,
 		'manage_options' => true,
 	]
 );
 
-$login = 'aps_user';
-$email = 'aps-user@example.com';
-$user = get_user_by( 'login', $login );
-if ( !$user instanceof WP_User ) {
+function aps_browser_fixture_user( string $login, string $email, string $role ) :WP_User {
+	$user = get_user_by( 'login', $login );
+	if ( $user instanceof WP_User ) {
+		$user->set_role( $role );
+		return $user;
+	}
+
 	$userId = wp_insert_user(
 		[
 			'user_login' => $login,
 			'user_pass'  => 'password',
 			'user_email' => $email,
-			'role'       => $limitedRole,
+			'role'       => $role,
 		]
 	);
 	if ( is_wp_error( $userId ) ) {
 		fwrite( STDERR, $userId->get_error_message().PHP_EOL );
 		exit( 1 );
 	}
+
 	$user = get_user_by( 'id', (int)$userId );
+	if ( !$user instanceof WP_User ) {
+		fwrite( STDERR, 'Fixture user could not be loaded.'.PHP_EOL );
+		exit( 1 );
+	}
+
+	return $user;
 }
 
-$user->set_role( $limitedRole );
-$user->add_cap( 'delete_posts', true );
+function aps_browser_fixture_password( int $userId, string $name ) :array {
+	[ $plainPassword, $item ] = WP_Application_Passwords::create_new_application_password(
+		$userId,
+		[
+			'name'   => $name,
+			'app_id' => wp_generate_uuid4(),
+		]
+	);
 
-WP_Application_Passwords::delete_all_application_passwords( (int)$user->ID );
-[ $plainPassword, $item ] = WP_Application_Passwords::create_new_application_password(
-	(int)$user->ID,
-	[
-		'name'   => 'APS Browser Test',
-		'app_id' => wp_generate_uuid4(),
-	]
-);
+	return [
+		'uuid'         => $item[ 'uuid' ],
+		'app_password' => $plainPassword,
+		'name'         => $name,
+	];
+}
+
+$primaryUser = aps_browser_fixture_user( 'aps_user', 'aps-user@example.com', $limitedRole );
+$primaryUser->add_cap( 'delete_posts', true );
+$otherUser = aps_browser_fixture_user( 'aps_other_user', 'aps-other-user@example.com', $otherRole );
+
+WP_Application_Passwords::delete_all_application_passwords( (int)$primaryUser->ID );
+WP_Application_Passwords::delete_all_application_passwords( (int)$otherUser->ID );
+
+$primaryPassword = aps_browser_fixture_password( (int)$primaryUser->ID, 'APS Browser Primary' );
+$secondaryPassword = aps_browser_fixture_password( (int)$primaryUser->ID, 'APS Browser Secondary' );
+$otherPassword = aps_browser_fixture_password( (int)$otherUser->ID, 'APS Browser Other' );
 
 update_option( 'application_password_scoper_scopes', [], false );
 update_option(
 	'application_password_scoper_browser_fixture',
 	[
-		'user_id'      => (int)$user->ID,
-		'user_login'   => $login,
-		'uuid'         => $item[ 'uuid' ],
-		'app_password' => $plainPassword,
-		'role_caps'    => [ 'read', 'edit_posts', 'upload_files' ],
-		'direct_cap'   => 'delete_posts',
+		'primary' => [
+			'user_id'      => (int)$primaryUser->ID,
+			'user_login'   => 'aps_user',
+			'role_slug'    => $limitedRole,
+			'role_name'    => 'APS Limited',
+			'passwords'    => [
+				'primary'   => $primaryPassword,
+				'secondary' => $secondaryPassword,
+			],
+			'role_caps'    => [ 'read', 'edit_posts', 'upload_files', 'aps_manage_widget' ],
+			'direct_cap'   => 'delete_posts',
+		],
+		'secondary_user' => [
+			'user_id'      => (int)$otherUser->ID,
+			'user_login'   => 'aps_other_user',
+			'role_slug'    => $otherRole,
+			'role_name'    => 'APS Other',
+			'passwords'    => [
+				'primary' => $otherPassword,
+			],
+		],
 		'unassigned_role_cap' => 'manage_options',
 	],
 	false
