@@ -1,37 +1,37 @@
 <?php
 /*
- * Plugin Name: Application Password Scoper
- * Plugin URI: https://github.com/FernleafSystems/WP_Plugin-Application_Password_Scoper
- * Description: Restrict WordPress Application Passwords to a saved capability allowlist.
+ * Plugin Name: Mandate
+ * Plugin URI: https://wpmandate.com
+ * Description: Scoping AI access for WordPress by controlling Application Password capabilities.
  * Version: 0.1.0
  * Author: FernleafSystems
  * Requires at least: 7.0
  * Requires PHP: 8.2
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: application-password-scoper
+ * Text Domain: mandate
  */
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-global $application_password_scoper_plugin_file, $application_password_scoper_unsupported_reason;
-$application_password_scoper_plugin_file = plugin_basename( __FILE__ );
+global $mandate_plugin_file, $mandate_unsupported_reason;
+$mandate_plugin_file = plugin_basename( __FILE__ );
 
-$application_password_scoper_unsupported_reason = '';
+$mandate_unsupported_reason = '';
 if ( \version_compare( PHP_VERSION, '8.2', '<' ) ) {
-	$application_password_scoper_unsupported_reason = 'php';
+	$mandate_unsupported_reason = 'php';
 }
 elseif ( !\function_exists( 'wp_get_wp_version' ) || \version_compare( wp_get_wp_version(), '7.0', '<' ) ) {
-	$application_password_scoper_unsupported_reason = 'wordpress';
+	$mandate_unsupported_reason = 'wordpress';
 }
 
-if ( empty( $application_password_scoper_unsupported_reason ) ) {
+if ( empty( $mandate_unsupported_reason ) ) {
 	\call_user_func( function () {
-		$application_password_scoper_init = __DIR__.'/init.php';
-		if ( is_file( $application_password_scoper_init ) ) {
-			require_once $application_password_scoper_init;
+		$mandate_init = __DIR__.'/init.php';
+		if ( is_file( $mandate_init ) ) {
+			require_once $mandate_init;
 		}
 	} );
 }

@@ -2,10 +2,10 @@
 
 declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;

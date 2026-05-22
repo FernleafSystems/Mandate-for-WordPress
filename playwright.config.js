@@ -12,7 +12,7 @@ module.exports = defineConfig( {
 	retries: process.env.CI ? 1 : 0,
 	reporter: process.env.CI ? [ [ 'github' ], [ 'html', { open: 'never' } ] ] : 'list',
 	use: {
-		baseURL: process.env.APS_BROWSER_BASE_URL || 'http://127.0.0.1:8898',
+		baseURL: process.env.WPM_BROWSER_BASE_URL || 'http://127.0.0.1:8898',
 		headless: true,
 		trace: 'retain-on-failure',
 		screenshot: 'only-on-failure',

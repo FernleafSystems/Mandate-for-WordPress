@@ -3,11 +3,11 @@
 declare( strict_types=1 );
 
 require __DIR__.'/bootstrap.php';
-require __DIR__.'/ScoperTest.php';
+require __DIR__.'/MandateTest.php';
 require __DIR__.'/ToolingTest.php';
 
 $classes = [
-	ScoperTest::class,
+	MandateTest::class,
 	ToolingTest::class,
 ];
 $failures = 0;

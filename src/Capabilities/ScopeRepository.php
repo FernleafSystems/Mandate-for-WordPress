@@ -2,20 +2,23 @@
 
 declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * @phpstan-type CapabilityScopeRecord array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,updated_at:int,updated_by:int}
+ */
 class ScopeRepository {
 
-	public const OPTION_NAME = 'application_password_scoper_scopes';
+	public const OPTION_NAME = 'mandate_scopes';
 
 	/**
-	 * @return array<string,array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,updated_at:int,updated_by:int}>
+	 * @return array<string,CapabilityScopeRecord>
 	 */
 	public function all() :array {
 		$raw = function_exists( 'get_option' ) ? get_option( self::OPTION_NAME, [] ) : [];
@@ -36,7 +39,7 @@ class ScopeRepository {
 	}
 
 	/**
-	 * @return array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,updated_at:int,updated_by:int}|null
+	 * @return CapabilityScopeRecord|null
 	 */
 	public function find( string $uuid ) :?array {
 		$uuid = ApplicationPasswordRepository::normalizeUuid( $uuid );
@@ -101,7 +104,7 @@ class ScopeRepository {
 
 	/**
 	 * @param array<string,mixed> $record
-	 * @return array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,updated_at:int,updated_by:int}|null
+	 * @return CapabilityScopeRecord|null
 	 */
 	public function normalizeRecord( array $record ) :?array {
 		$userId = isset( $record[ 'user_id' ] ) ? (int)$record[ 'user_id' ] : 0;
@@ -126,7 +129,7 @@ class ScopeRepository {
 	}
 
 	/**
-	 * @param array<string,array<string,mixed>> $scopes
+	 * @param array<string,CapabilityScopeRecord> $scopes
 	 */
 	private function persist( array $scopes ) :bool {
 		if ( function_exists( 'update_option' ) ) {

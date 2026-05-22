@@ -1,24 +1,57 @@
-=== Application Password Scoper ===
+=== Mandate ===
 Contributors: fernleafsystems
-Tags: application passwords, rest api, security, capabilities
+Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
-Tested up to: 7.1
+Tested up to: 7.0
 Requires PHP: 8.2
 Stable tag: 0.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Restrict WordPress application passwords to a selected capability allowlist.
+Scoping AI access for WordPress by controlling what each Application Password is allowed to do.
 
 == Description ==
 
-Application Password Scoper lets administrators save a capability allowlist for individual application passwords. Requests authenticated with a scoped application password are limited to the selected capabilities while the user's normal admin session remains unchanged.
+Mandate for WordPress helps administrators control WordPress API access for external tools, REST API clients, automations, Model Context Protocol (MCP) servers, and AI agents that authenticate with Application Passwords instead of a user's normal login password.
+
+The tradeoff is that an Application Password normally inherits the user's broad WordPress access. If the user can edit posts, upload files, manage options, or perform other privileged actions, an API client using that Application Password can usually attempt those actions too.
+
+Mandate adds a small least-privilege guardrail inside WordPress itself: per-password access control for Application Passwords.
+
+Instead of treating every Application Password for a user as equally trusted, Mandate lets an administrator control each password's authorisation by saving a capability allowlist.
+
+An administrator can choose:
+
+* a WordPress user
+* one of that user's Application Passwords
+* the capabilities that password should be allowed to use
+
+When a request is authenticated with that Application Password, Mandate checks the saved allowlist and removes capabilities that are not allowed for that password.
+
+Mandate never grants new permissions. It only narrows an Application Password to capabilities the selected user already receives from assigned roles. Normal browser and wp-admin sessions for the same user are not changed.
+
+This is especially useful when WordPress is connected to lower-level API tooling, automation systems, MCP layers, or AI/agent workflows. Even if a tool calls the WordPress REST API or other WordPress API endpoints directly, WordPress capability checks still run, so the password itself becomes more constrained.
+
+= Current scope =
+
+This release focuses on the core safety mechanism:
+
+* Tools admin page for selecting a user and Application Password
+* user role summary and selected password summary
+* role-derived capability allowlist
+* grouped WordPress and Everything Else capability lists
+* per-Application-Password scope storage
+* primitive capability enforcement
+* registered meta-capability enforcement
+* cleanup when an Application Password is deleted
+
+It does not create or delete Application Passwords, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords.
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/application-password-scoper` directory, or install the plugin through the WordPress plugins screen.
+1. Upload the plugin files to the `/wp-content/plugins/mandate` directory, or install the plugin through the WordPress plugins screen.
 2. Activate the plugin through the Plugins screen in WordPress.
-3. Open Tools > Application Password Scoper to select an application password and save its allowed capabilities.
+3. Open Tools > Mandate to select an application password and save its allowed capabilities.
 
 == Frequently Asked Questions ==
 
@@ -29,6 +62,26 @@ No. Scope enforcement only applies to requests authenticated by a scoped applica
 = What happens when no scope is saved for an application password? =
 
 The application password keeps its normal WordPress behavior until an administrator saves a scope for it.
+
+= Can this grant new permissions to an application password? =
+
+No. Mandate can only remove capabilities from an authenticated application-password request. It does not grant capabilities the selected user does not already receive from assigned roles.
+
+= Does this replace careful roles and integration security? =
+
+No. It is an extra layer for reducing the blast radius of broad Application Password access. You should still use appropriate user roles, secure integrations, and normal operational controls.
+
+= Does this scope multisite super-admin passwords? =
+
+No. Scopes for multisite super admins are not supported.
+
+== Source Code ==
+
+Mandate is available at https://wpmandate.com.
+
+The public development repository is available at https://github.com/FernleafSystems/Mandate-for-WordPress.
+
+The distributed plugin includes built admin assets in `assets/dist`. To rebuild those assets from source, install the development dependencies with `composer install` and `npm ci`, run `npm run build`, and then run `composer build-zip` to create the release package.
 
 == Changelog ==
 

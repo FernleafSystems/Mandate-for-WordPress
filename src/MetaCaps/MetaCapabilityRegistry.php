@@ -2,9 +2,9 @@
 
 declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\MetaCaps;
+namespace FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps;
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityName;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityName;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -32,7 +32,7 @@ class MetaCapabilityRegistry {
 	public function registered() :array {
 		$capabilities = self::DEFAULT_META_CAPABILITIES;
 		if ( function_exists( 'apply_filters' ) ) {
-			$filtered = apply_filters( 'application_password_scoper_meta_capabilities', $capabilities );
+			$filtered = apply_filters( 'mandate_meta_capabilities', $capabilities );
 			if ( is_array( $filtered ) ) {
 				$capabilities = $filtered;
 			}

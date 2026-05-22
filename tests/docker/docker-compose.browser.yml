@@ -6,7 +6,7 @@ services:
       MYSQL_DATABASE: wordpress
     command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
     volumes:
-      - aps-browser-db:/var/lib/mysql
+      - wpm-browser-db:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "mysql -h localhost -uroot -ptestpass -e 'USE wordpress; SELECT 1;' >/dev/null 2>&1"]
       interval: 2s
@@ -27,10 +27,10 @@ services:
       WORDPRESS_CONFIG_EXTRA: |
         define( 'WP_ENVIRONMENT_TYPE', 'local' );
     ports:
-      - "${APS_BROWSER_PORT:-8898}:80"
+      - "${WPM_BROWSER_PORT:-8898}:80"
     volumes:
-      - aps-browser-wp:/var/www/html
-      - ../../:/var/www/html/wp-content/plugins/application-password-scoper
+      - wpm-browser-wp:/var/www/html
+      - ../../:/var/www/html/wp-content/plugins/mandate
 
   wp-cli:
     image: wordpress:cli-php8.2
@@ -46,11 +46,11 @@ services:
       WORDPRESS_CONFIG_EXTRA: |
         define( 'WP_ENVIRONMENT_TYPE', 'local' );
     volumes:
-      - aps-browser-wp:/var/www/html
+      - wpm-browser-wp:/var/www/html
       - ../../../../../Libraries/wordpress:/wordpress-src:ro
-      - ../../:/var/www/html/wp-content/plugins/application-password-scoper
+      - ../../:/var/www/html/wp-content/plugins/mandate
       - ../../:/app
 
 volumes:
-  aps-browser-db:
-  aps-browser-wp:
+  wpm-browser-db:
+  wpm-browser-wp:

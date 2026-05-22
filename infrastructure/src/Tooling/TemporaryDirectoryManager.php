@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling;
+namespace FernleafSystems\Wordpress\Plugin\Mandate\Tooling;
 
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;

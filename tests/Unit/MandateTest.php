@@ -2,15 +2,15 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityGroupProvider;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityScopeEnforcer;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 
-final class ScoperTest extends Aps_Test_Case {
+final class MandateTest extends Wpm_Test_Case {
 
 	private const UUID = '11111111-1111-4111-8111-111111111111';
 
@@ -54,21 +54,21 @@ final class ScoperTest extends Aps_Test_Case {
 	}
 
 	public function testCapabilityCandidatesComeFromAssignedRolesOnly() :void {
-		$GLOBALS[ 'aps_test_roles' ] = new Aps_Test_Roles(
+		$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles(
 			[
-				'aps_editor' => [
+				'wpm_editor' => [
 					'read'         => true,
 					'edit_posts'   => true,
 					'delete_posts' => false,
 				],
-				'aps_admin'  => [
+				'wpm_admin'  => [
 					'manage_options' => true,
 				],
 			]
 		);
-		$GLOBALS[ 'aps_test_users' ][ 5 ] = (object)[
+		$GLOBALS[ 'wpm_test_users' ][ 5 ] = (object)[
 			'ID'    => 5,
-			'roles' => [ 'aps_editor' ],
+			'roles' => [ 'wpm_editor' ],
 			'caps'  => [ 'manage_options' => true ],
 		];
 
@@ -115,7 +115,7 @@ final class ScoperTest extends Aps_Test_Case {
 			[
 				'read'              => true,
 				'edit_posts'        => true,
-				'aps_manage_widget' => true,
+				'wpm_manage_widget' => true,
 			],
 			[]
 		);
@@ -125,7 +125,7 @@ final class ScoperTest extends Aps_Test_Case {
 			$groups[ 'wordpress' ][ 'primitive' ]
 		);
 		$this->assertSame(
-			[ 'aps_manage_widget' => true ],
+			[ 'wpm_manage_widget' => true ],
 			$groups[ 'other' ][ 'primitive' ]
 		);
 	}
@@ -158,7 +158,7 @@ final class ScoperTest extends Aps_Test_Case {
 		$defaultMetaCaps = ( new MetaCapabilityRegistry() )->registered();
 		$groups = ( new CapabilityGroupProvider() )->group(
 			[],
-			$defaultMetaCaps + [ 'aps_manage_meta' => true ]
+			$defaultMetaCaps + [ 'wpm_manage_meta' => true ]
 		);
 
 		$this->assertSame(
@@ -166,7 +166,7 @@ final class ScoperTest extends Aps_Test_Case {
 			$groups[ 'wordpress' ][ 'meta' ]
 		);
 		$this->assertSame(
-			[ 'aps_manage_meta' => true ],
+			[ 'wpm_manage_meta' => true ],
 			$groups[ 'other' ][ 'meta' ]
 		);
 	}
@@ -206,8 +206,8 @@ final class ScoperTest extends Aps_Test_Case {
 	}
 
 	public function testRestAuthenticatedApplicationPasswordFallbackIsScoped() :void {
-		$GLOBALS[ 'aps_test_rest_uuid' ] = self::UUID;
-		$GLOBALS[ 'aps_test_current_user_id' ] = 5;
+		$GLOBALS[ 'wpm_test_rest_uuid' ] = self::UUID;
+		$GLOBALS[ 'wpm_test_current_user_id' ] = 5;
 
 		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'read' => true ] );
 		$this->extractContext( $enforcer )->setContext( 0, '' );
@@ -311,9 +311,9 @@ final class ScoperTest extends Aps_Test_Case {
 		array $allowedCaps,
 		array $allowedMetaCaps = []
 	) :CapabilityScopeEnforcer {
-		$GLOBALS[ 'aps_test_roles' ] = new Aps_Test_Roles(
+		$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles(
 			[
-				'aps_editor' => [
+				'wpm_editor' => [
 					'read'         => true,
 					'edit_posts'   => true,
 					'upload_files' => true,
@@ -321,9 +321,9 @@ final class ScoperTest extends Aps_Test_Case {
 				],
 			]
 		);
-		$GLOBALS[ 'aps_test_users' ][ $userId ] = (object)[
+		$GLOBALS[ 'wpm_test_users' ][ $userId ] = (object)[
 			'ID'    => $userId,
-			'roles' => [ 'aps_editor' ],
+			'roles' => [ 'wpm_editor' ],
 		];
 
 		$repository = new ScopeRepository();

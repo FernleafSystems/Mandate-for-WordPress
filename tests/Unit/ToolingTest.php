@@ -2,15 +2,15 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
-final class ToolingTest extends Aps_Test_Case {
+final class ToolingTest extends Wpm_Test_Case {
 
 	public function testTemporaryDirectoryManagerCreatesDirectoryInsideSystemTemp() :void {
 		$manager = new TemporaryDirectoryManager();
-		$directory = $manager->create( 'application-password-scoper-test' );
+		$directory = $manager->create( 'mandate-test' );
 
 		try {
 			$tempRoot = Path::normalize( \realpath( \sys_get_temp_dir() ) ?: \sys_get_temp_dir() );
@@ -25,7 +25,7 @@ final class ToolingTest extends Aps_Test_Case {
 
 	public function testTemporaryDirectoryManagerRemovesTempDirectory() :void {
 		$manager = new TemporaryDirectoryManager();
-		$directory = $manager->create( 'application-password-scoper-test' );
+		$directory = $manager->create( 'mandate-test' );
 		\file_put_contents( Path::join( $directory, 'fixture.txt' ), 'fixture' );
 
 		$manager->remove( $directory );
@@ -45,7 +45,7 @@ final class ToolingTest extends Aps_Test_Case {
 
 	public function testTemporaryDirectoryManagerRefusesTempFile() :void {
 		$manager = new TemporaryDirectoryManager();
-		$file = \tempnam( \sys_get_temp_dir(), 'application-password-scoper-file-test-' );
+		$file = \tempnam( \sys_get_temp_dir(), 'mandate-file-test-' );
 		if ( !\is_string( $file ) ) {
 			throw new RuntimeException( 'Failed to create temp file fixture.' );
 		}

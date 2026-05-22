@@ -3,14 +3,14 @@ set -eu
 
 cd /var/www/html
 
-SITE_URL="${APS_BROWSER_SITE_URL:-http://127.0.0.1:8898}"
-ADMIN_USER="${APS_BROWSER_ADMIN_USER:-admin}"
-ADMIN_PASSWORD="${APS_BROWSER_ADMIN_PASSWORD:-password}"
-ADMIN_EMAIL="${APS_BROWSER_ADMIN_EMAIL:-devnull@example.com}"
-PLUGIN_SLUG="application-password-scoper"
+SITE_URL="${WPM_BROWSER_SITE_URL:-http://127.0.0.1:8898}"
+ADMIN_USER="${WPM_BROWSER_ADMIN_USER:-admin}"
+ADMIN_PASSWORD="${WPM_BROWSER_ADMIN_PASSWORD:-password}"
+ADMIN_EMAIL="${WPM_BROWSER_ADMIN_EMAIL:-devnull@example.com}"
+PLUGIN_SLUG="mandate"
 PLUGIN_MAIN="${PLUGIN_SLUG}/plugin.php"
-FIXTURE_SOURCE="/app/tests/browser/fixtures/application-password-scoper-browser-fixture.php"
-FIXTURE_TARGET="wp-content/mu-plugins/application-password-scoper-browser-fixture.php"
+FIXTURE_SOURCE="/app/tests/browser/fixtures/mandate-browser-fixture.php"
+FIXTURE_TARGET="wp-content/mu-plugins/mandate-browser-fixture.php"
 
 for _ in $(seq 1 60); do
 	if wp core version --allow-root >/dev/null 2>&1; then
@@ -33,7 +33,7 @@ fi
 if ! wp core is-installed --allow-root >/dev/null 2>&1; then
 	wp core install \
 		--url="${SITE_URL}" \
-		--title="Application Password Scoper Browser Test" \
+		--title="Mandate Browser Test" \
 		--admin_user="${ADMIN_USER}" \
 		--admin_password="${ADMIN_PASSWORD}" \
 		--admin_email="${ADMIN_EMAIL}" \
@@ -72,10 +72,10 @@ EOF
 
 wp option update permalink_structure '/%postname%/' --allow-root >/dev/null
 
-cat > /tmp/application-password-scoper-fixture.php <<'PHP'
+cat > /tmp/mandate-fixture.php <<'PHP'
 <?php
-$limitedRole = 'aps_limited';
-$otherRole = 'aps_other';
+$limitedRole = 'wpm_limited';
+$otherRole = 'wpm_other';
 
 remove_role( $limitedRole );
 remove_role( $otherRole );
@@ -86,7 +86,7 @@ add_role(
 		'read'              => true,
 		'edit_posts'        => true,
 		'upload_files'      => true,
-		'aps_manage_widget' => true,
+		'wpm_manage_widget' => true,
 	]
 );
 add_role(
@@ -99,7 +99,7 @@ add_role(
 	]
 );
 
-function aps_browser_fixture_user( string $login, string $email, string $role ) :WP_User {
+function wpm_browser_fixture_user( string $login, string $email, string $role ) :WP_User {
 	$user = get_user_by( 'login', $login );
 	if ( $user instanceof WP_User ) {
 		$user->set_role( $role );
@@ -128,7 +128,7 @@ function aps_browser_fixture_user( string $login, string $email, string $role ) 
 	return $user;
 }
 
-function aps_browser_fixture_password( int $userId, string $name ) :array {
+function wpm_browser_fixture_password( int $userId, string $name ) :array {
 	[ $plainPassword, $item ] = WP_Application_Passwords::create_new_application_password(
 		$userId,
 		[
@@ -144,36 +144,36 @@ function aps_browser_fixture_password( int $userId, string $name ) :array {
 	];
 }
 
-$primaryUser = aps_browser_fixture_user( 'aps_user', 'aps-user@example.com', $limitedRole );
+$primaryUser = wpm_browser_fixture_user( 'wpm_user', 'wpm-user@example.com', $limitedRole );
 $primaryUser->add_cap( 'delete_posts', true );
-$otherUser = aps_browser_fixture_user( 'aps_other_user', 'aps-other-user@example.com', $otherRole );
+$otherUser = wpm_browser_fixture_user( 'wpm_other_user', 'wpm-other-user@example.com', $otherRole );
 
 WP_Application_Passwords::delete_all_application_passwords( (int)$primaryUser->ID );
 WP_Application_Passwords::delete_all_application_passwords( (int)$otherUser->ID );
 
-$primaryPassword = aps_browser_fixture_password( (int)$primaryUser->ID, 'APS Browser Primary' );
-$secondaryPassword = aps_browser_fixture_password( (int)$primaryUser->ID, 'APS Browser Secondary' );
-$otherPassword = aps_browser_fixture_password( (int)$otherUser->ID, 'APS Browser Other' );
+$primaryPassword = wpm_browser_fixture_password( (int)$primaryUser->ID, 'WPM Browser Primary' );
+$secondaryPassword = wpm_browser_fixture_password( (int)$primaryUser->ID, 'WPM Browser Secondary' );
+$otherPassword = wpm_browser_fixture_password( (int)$otherUser->ID, 'WPM Browser Other' );
 
-update_option( 'application_password_scoper_scopes', [], false );
+update_option( 'mandate_scopes', [], false );
 update_option(
-	'application_password_scoper_browser_fixture',
+	'mandate_browser_fixture',
 	[
 		'primary' => [
 			'user_id'      => (int)$primaryUser->ID,
-			'user_login'   => 'aps_user',
+			'user_login'   => 'wpm_user',
 			'role_slug'    => $limitedRole,
 			'role_name'    => 'APS Limited',
 			'passwords'    => [
 				'primary'   => $primaryPassword,
 				'secondary' => $secondaryPassword,
 			],
-			'role_caps'    => [ 'read', 'edit_posts', 'upload_files', 'aps_manage_widget' ],
+			'role_caps'    => [ 'read', 'edit_posts', 'upload_files', 'wpm_manage_widget' ],
 			'direct_cap'   => 'delete_posts',
 		],
 		'secondary_user' => [
 			'user_id'      => (int)$otherUser->ID,
-			'user_login'   => 'aps_other_user',
+			'user_login'   => 'wpm_other_user',
 			'role_slug'    => $otherRole,
 			'role_name'    => 'APS Other',
 			'passwords'    => [
@@ -186,4 +186,4 @@ update_option(
 );
 PHP
 
-wp eval-file /tmp/application-password-scoper-fixture.php --allow-root
+wp eval-file /tmp/mandate-fixture.php --allow-root

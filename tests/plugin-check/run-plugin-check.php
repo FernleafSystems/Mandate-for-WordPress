@@ -2,13 +2,13 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\CommandRunner;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\RuntimePackageBuilder;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
-const APS_PLUGIN_CHECK_DEFAULT_VERSION = '1.9.0';
+const WPM_PLUGIN_CHECK_DEFAULT_VERSION = '1.9.0';
 
 $rootDir = dirname( __DIR__, 2 );
 $autoload = $rootDir.'/vendor/autoload.php';
@@ -22,7 +22,7 @@ require $autoload;
 $args = array_slice( $_SERVER[ 'argv' ] ?? [], 1 );
 $mode = in_array( '--clean', $args, true ) ? 'clean' : 'warm';
 $keepPackage = in_array( '--keep-package', $args, true );
-$pluginCheckVersion = getenv( 'APS_PLUGIN_CHECK_VERSION' ) ?: APS_PLUGIN_CHECK_DEFAULT_VERSION;
+$pluginCheckVersion = getenv( 'WPM_PLUGIN_CHECK_VERSION' ) ?: WPM_PLUGIN_CHECK_DEFAULT_VERSION;
 $filesystem = new Filesystem();
 $temporaryDirectoryManager = new TemporaryDirectoryManager( $filesystem );
 $temporaryRoot = null;
@@ -33,27 +33,27 @@ $compose = [
 	'docker',
 	'compose',
 	'-p',
-	'application-password-scoper-plugin-check',
+	'mandate-plugin-check',
 	'-f',
 	'tests/docker/docker-compose.plugin-check.yml',
 ];
 
 try {
-	$temporaryRoot = $temporaryDirectoryManager->create( 'application-password-scoper-plugin-check' );
+	$temporaryRoot = $temporaryDirectoryManager->create( 'mandate-plugin-check' );
 	$packageDir = Path::join( $temporaryRoot, RuntimePackageBuilder::PLUGIN_SLUG );
 	$filesystem->mkdir( $packageDir );
 	$composeEnv = [
-		'APS_PLUGIN_CHECK_PACKAGE_DIR' => $packageDir,
+		'WPM_PLUGIN_CHECK_PACKAGE_DIR' => $packageDir,
 	];
 
 	if ( $mode === 'clean' ) {
-		aps_plugin_check_run( array_merge( $compose, [ 'down', '-v', '--remove-orphans' ] ), $rootDir, $composeEnv );
+		wpm_plugin_check_run( array_merge( $compose, [ 'down', '-v', '--remove-orphans' ] ), $rootDir, $composeEnv );
 	}
 
-	aps_plugin_check_build_package( $rootDir, $temporaryRoot, $packageDir );
+	wpm_plugin_check_build_package( $rootDir, $temporaryRoot, $packageDir );
 
-	aps_plugin_check_run( array_merge( $compose, [ 'up', '-d', 'db' ] ), $rootDir, $composeEnv );
-	aps_plugin_check_run(
+	wpm_plugin_check_run( array_merge( $compose, [ 'up', '-d', 'db' ] ), $rootDir, $composeEnv );
+	wpm_plugin_check_run(
 		array_merge(
 			$compose,
 			[
@@ -70,7 +70,7 @@ try {
 		$rootDir,
 		$composeEnv
 	);
-	aps_plugin_check_run(
+	wpm_plugin_check_run(
 		array_merge(
 			$compose,
 			[
@@ -78,7 +78,7 @@ try {
 				'--rm',
 				'-T',
 				'--env',
-				'APS_PLUGIN_CHECK_VERSION='.$pluginCheckVersion,
+				'WPM_PLUGIN_CHECK_VERSION='.$pluginCheckVersion,
 				'wp-cli',
 				'sh',
 				'/app/tests/plugin-check/provision-site.sh',
@@ -88,7 +88,7 @@ try {
 		$composeEnv
 	);
 
-	$result = aps_plugin_check_run_capture(
+	$result = wpm_plugin_check_run_capture(
 		array_merge(
 			$compose,
 			[
@@ -99,10 +99,10 @@ try {
 				'wp',
 				'plugin',
 				'check',
-				'application-password-scoper',
+				'mandate',
 				'--format=json',
 				'--require=./wp-content/plugins/plugin-check/cli.php',
-				'--slug=application-password-scoper',
+				'--slug=mandate',
 				'--allow-root',
 			]
 		),
@@ -116,11 +116,11 @@ try {
 		throw new RuntimeException( 'Plugin Check command failed with exit code '.$result[ 'exit_code' ].'.' );
 	}
 
-	$findings = aps_plugin_check_parse_findings( $result[ 'stdout' ] );
-	$errorCount = aps_plugin_check_count_type( $findings, 'ERROR' );
-	$warningCount = aps_plugin_check_count_type( $findings, 'WARNING' );
+	$findings = wpm_plugin_check_parse_findings( $result[ 'stdout' ] );
+	$errorCount = wpm_plugin_check_count_type( $findings, 'ERROR' );
+	$warningCount = wpm_plugin_check_count_type( $findings, 'WARNING' );
 
-	aps_plugin_check_print_findings( $findings );
+	wpm_plugin_check_print_findings( $findings );
 	echo sprintf(
 		"Plugin Check completed with %d error%s and %d warning%s.\n",
 		$errorCount,
@@ -154,7 +154,7 @@ finally {
 
 exit( $exitCode );
 
-function aps_plugin_check_build_package( string $rootDir, string $temporaryRoot, string $packageDir ) :void {
+function wpm_plugin_check_build_package( string $rootDir, string $temporaryRoot, string $packageDir ) :void {
 	$logger = static function ( string $message ) :void {
 		echo $message.PHP_EOL;
 	};
@@ -171,8 +171,8 @@ function aps_plugin_check_build_package( string $rootDir, string $temporaryRoot,
  * @param string[] $command
  * @param array<string,string> $env
  */
-function aps_plugin_check_run( array $command, string $cwd, array $env = [] ) :void {
-	$result = aps_plugin_check_run_capture( $command, $cwd, $env, true );
+function wpm_plugin_check_run( array $command, string $cwd, array $env = [] ) :void {
+	$result = wpm_plugin_check_run_capture( $command, $cwd, $env, true );
 	if ( $result[ 'exit_code' ] !== 0 ) {
 		throw new RuntimeException( 'Command failed with exit code '.$result[ 'exit_code' ].': '.implode( ' ', $command ) );
 	}
@@ -183,8 +183,8 @@ function aps_plugin_check_run( array $command, string $cwd, array $env = [] ) :v
  * @param array<string,string> $env
  * @return array{exit_code:int,stdout:string,stderr:string}
  */
-function aps_plugin_check_run_capture( array $command, string $cwd, array $env = [], bool $stream = false ) :array {
-	echo '> '.implode( ' ', array_map( 'aps_plugin_check_quote_arg', $command ) ).PHP_EOL;
+function wpm_plugin_check_run_capture( array $command, string $cwd, array $env = [], bool $stream = false ) :array {
+	echo '> '.implode( ' ', array_map( 'wpm_plugin_check_quote_arg', $command ) ).PHP_EOL;
 	$descriptorSpec = [
 		0 => [ 'file', 'php://stdin', 'r' ],
 		1 => [ 'pipe', 'w' ],
@@ -226,7 +226,7 @@ function aps_plugin_check_run_capture( array $command, string $cwd, array $env =
 /**
  * @return array<int,array{file:string,line:int,column:int,type:string,code:string,message:string,docs:string}>
  */
-function aps_plugin_check_parse_findings( string $output ) :array {
+function wpm_plugin_check_parse_findings( string $output ) :array {
 	$findings = [];
 	$currentFile = 'unknown';
 	foreach ( preg_split( '/\R/', $output ) ?: [] as $line ) {
@@ -268,7 +268,7 @@ function aps_plugin_check_parse_findings( string $output ) :array {
 /**
  * @param array<int,array{type:string}> $findings
  */
-function aps_plugin_check_count_type( array $findings, string $type ) :int {
+function wpm_plugin_check_count_type( array $findings, string $type ) :int {
 	return count(
 		array_filter(
 			$findings,
@@ -280,7 +280,7 @@ function aps_plugin_check_count_type( array $findings, string $type ) :int {
 /**
  * @param array<int,array{file:string,line:int,column:int,type:string,code:string,message:string,docs:string}> $findings
  */
-function aps_plugin_check_print_findings( array $findings ) :void {
+function wpm_plugin_check_print_findings( array $findings ) :void {
 	foreach ( $findings as $finding ) {
 		$location = $finding[ 'file' ];
 		if ( $finding[ 'line' ] > 0 ) {
@@ -303,6 +303,6 @@ function aps_plugin_check_print_findings( array $findings ) :void {
 	}
 }
 
-function aps_plugin_check_quote_arg( string $arg ) :string {
+function wpm_plugin_check_quote_arg( string $arg ) :string {
 	return preg_match( '/\s/', $arg ) === 1 ? '"'.$arg.'"' : $arg;
 }

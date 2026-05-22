@@ -2,16 +2,16 @@
 
 declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper;
+namespace FernleafSystems\Wordpress\Plugin\Mandate;
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Admin\AdminPage;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityGroupProvider;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityScopeEnforcer;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -20,7 +20,7 @@ if ( !defined( 'ABSPATH' ) ) {
 class Plugin {
 
 	public const VERSION = '0.1.0';
-	public const MENU_SLUG = 'application-password-scoper';
+	public const MENU_SLUG = 'mandate';
 
 	public static function boot( string $pluginFile ) :void {
 		( new self() )->register( $pluginFile );

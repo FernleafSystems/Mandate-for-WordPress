@@ -2,7 +2,7 @@
 
 declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;

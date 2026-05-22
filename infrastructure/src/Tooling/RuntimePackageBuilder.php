@@ -1,19 +1,20 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling;
+namespace FernleafSystems\Wordpress\Plugin\Mandate\Tooling;
 
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
 class RuntimePackageBuilder {
 
-	public const PLUGIN_SLUG = 'application-password-scoper';
+	public const PLUGIN_SLUG = 'mandate';
 
 	private const RUNTIME_FILES = [
 		'plugin.php',
 		'init.php',
 		'unsupported.php',
 		'readme.txt',
+		'LICENSE',
 	];
 
 	private const RUNTIME_DIRECTORIES = [
@@ -63,7 +64,7 @@ class RuntimePackageBuilder {
 		$this->copyRuntimeFiles( $targetDir );
 		$this->writePackageComposerJson( $targetDir );
 		$this->installPackageComposerDependencies( $targetDir );
-		$this->removePackageComposerFiles( $targetDir );
+		$this->removePackageComposerLock( $targetDir );
 
 		$this->assertPackageIsUsable( $targetDir );
 		$this->log( 'Runtime package created at: '.$targetDir );
@@ -246,9 +247,8 @@ class RuntimePackageBuilder {
 		);
 	}
 
-	private function removePackageComposerFiles( string $targetDir ) :void {
+	private function removePackageComposerLock( string $targetDir ) :void {
 		$this->filesystem->remove( [
-			Path::join( $targetDir, 'composer.json' ),
 			Path::join( $targetDir, 'composer.lock' ),
 		] );
 	}
@@ -256,6 +256,7 @@ class RuntimePackageBuilder {
 	private function assertPackageIsUsable( string $targetDir ) :void {
 		foreach ( [
 			...self::RUNTIME_FILES,
+			'composer.json',
 			'vendor/autoload.php',
 			...self::BUILT_ASSET_FILES,
 		] as $file ) {

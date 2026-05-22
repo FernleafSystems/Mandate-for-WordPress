@@ -3,8 +3,8 @@ set -eu
 
 cd /var/www/html
 
-SITE_URL="${APS_PLUGIN_CHECK_SITE_URL:-http://application-password-scoper-plugin-check.local}"
-PLUGIN_CHECK_VERSION="${APS_PLUGIN_CHECK_VERSION:?APS_PLUGIN_CHECK_VERSION must be set by the Plugin Check runner}"
+SITE_URL="${WPM_PLUGIN_CHECK_SITE_URL:-http://mandate-plugin-check.local}"
+PLUGIN_CHECK_VERSION="${WPM_PLUGIN_CHECK_VERSION:?WPM_PLUGIN_CHECK_VERSION must be set by the Plugin Check runner}"
 
 for _ in $(seq 1 60); do
 	if wp core version --allow-root >/dev/null 2>&1; then
@@ -13,7 +13,7 @@ for _ in $(seq 1 60); do
 	sleep 2
 done
 
-if [ ! -f wp-config.php ]; then
+if ! wp config path --allow-root >/dev/null 2>&1; then
 	wp config create \
 		--dbname=wordpress \
 		--dbuser=root \
@@ -27,7 +27,7 @@ fi
 if ! wp core is-installed --allow-root >/dev/null 2>&1; then
 	wp core install \
 		--url="${SITE_URL}" \
-		--title="Application Password Scoper Plugin Check" \
+		--title="Mandate Plugin Check" \
 		--admin_user=admin \
 		--admin_password=password \
 		--admin_email=devnull@example.com \
@@ -46,6 +46,6 @@ else
 	wp plugin install plugin-check --version="${PLUGIN_CHECK_VERSION}" --activate --allow-root
 fi
 
-if ! wp plugin is-active application-password-scoper --allow-root >/dev/null 2>&1; then
-	wp plugin activate application-password-scoper --allow-root
+if ! wp plugin is-active mandate --allow-root >/dev/null 2>&1; then
+	wp plugin activate mandate --allow-root
 fi

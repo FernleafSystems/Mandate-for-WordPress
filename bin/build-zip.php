@@ -1,10 +1,10 @@
 #!/usr/bin/env php
 <?php declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\CommandRunner;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\RuntimePackageBuilder;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\TemporaryDirectoryManager;
-use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\ZipBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ZipBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -56,7 +56,7 @@ try {
 	$packageBuilder = new RuntimePackageBuilder( $projectRoot, $commandRunner, $filesystem, $logger );
 	$zipBuilder = new ZipBuilder( $filesystem, $logger );
 
-	$temporaryRoot = $temporaryDirectoryManager->create( 'application-password-scoper-build' );
+	$temporaryRoot = $temporaryDirectoryManager->create( 'mandate-build' );
 	$packageDir = Path::join( $temporaryRoot, RuntimePackageBuilder::PLUGIN_SLUG );
 
 	$packageBuilder->build( $packageDir, $temporaryRoot );

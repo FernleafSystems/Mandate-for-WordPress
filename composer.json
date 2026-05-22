@@ -1,6 +1,6 @@
 {
-  "name": "fernleafsystems/application-password-scoper",
-  "description": "Restrict WordPress Application Passwords to a saved capability allowlist.",
+  "name": "fernleafsystems/mandate",
+  "description": "Scoping AI access for WordPress by controlling Application Password capabilities.",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
   "require": {
@@ -20,12 +20,12 @@
   },
   "autoload": {
     "psr-4": {
-      "FernleafSystems\\Wordpress\\Plugin\\ApplicationPasswordScoper\\": "src/"
+      "FernleafSystems\\Wordpress\\Plugin\\Mandate\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "FernleafSystems\\Wordpress\\Plugin\\ApplicationPasswordScoper\\Tooling\\": "infrastructure/src/Tooling/"
+      "FernleafSystems\\Wordpress\\Plugin\\Mandate\\Tooling\\": "infrastructure/src/Tooling/"
     }
   },
   "scripts": {

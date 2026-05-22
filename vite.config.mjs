@@ -9,7 +9,7 @@ export default defineConfig( {
 		lib: {
 			entry: resolve( 'assets/src/admin-page.js' ),
 			formats: [ 'iife' ],
-			name: 'ApplicationPasswordScoperAdminPage',
+			name: 'MandateAdminPage',
 		},
 		outDir: 'assets/dist',
 		rollupOptions: {
