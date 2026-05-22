@@ -3,6 +3,7 @@
 
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\CommandRunner;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\TemporaryDirectoryManager;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\ZipBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
@@ -39,36 +40,52 @@ $options = \getopt( '', [
 
 $projectRoot = Path::normalize( $projectRoot );
 $buildDir = Path::join( $projectRoot, 'build' );
-$packageBaseDir = Path::join( $buildDir, 'package' );
-$packageDir = Path::join( $packageBaseDir, RuntimePackageBuilder::PLUGIN_SLUG );
 $keepPackage = isset( $options[ 'keep-package' ] );
+$temporaryRoot = null;
+$packageDir = null;
+$logger = static function ( string $message ) :void {
+	echo $message.PHP_EOL;
+};
+$filesystem = new Filesystem();
+$temporaryDirectoryManager = new TemporaryDirectoryManager( $filesystem );
 
 $exitCode = 0;
 try {
-	$outputZip = resolve_output_zip( $options[ 'output' ] ?? null, $projectRoot, $buildDir, $packageBaseDir );
-	$logger = static function ( string $message ) :void {
-		echo $message.PHP_EOL;
-	};
-	$filesystem = new Filesystem();
+	$outputZip = resolve_output_zip( $options[ 'output' ] ?? null, $projectRoot, $buildDir );
 	$commandRunner = new CommandRunner( $projectRoot, $logger );
 	$packageBuilder = new RuntimePackageBuilder( $projectRoot, $commandRunner, $filesystem, $logger );
 	$zipBuilder = new ZipBuilder( $filesystem, $logger );
 
-	$packageBuilder->build( $packageDir, $packageBaseDir );
-	$zipBuilder->build( $packageDir, $outputZip, RuntimePackageBuilder::PLUGIN_SLUG );
+	$temporaryRoot = $temporaryDirectoryManager->create( 'application-password-scoper-build' );
+	$packageDir = Path::join( $temporaryRoot, RuntimePackageBuilder::PLUGIN_SLUG );
 
-	if ( !$keepPackage ) {
-		$filesystem->remove( $packageDir );
-	}
+	$packageBuilder->build( $packageDir, $temporaryRoot );
+	$zipBuilder->build( $packageDir, $outputZip, RuntimePackageBuilder::PLUGIN_SLUG );
 }
 catch ( \Throwable $throwable ) {
 	\fwrite( \STDERR, 'Build failed: '.$throwable->getMessage().PHP_EOL );
 	$exitCode = 1;
 }
+finally {
+	if ( $temporaryRoot !== null ) {
+		if ( $keepPackage ) {
+			echo 'Package retained at: '.( $packageDir ?? $temporaryRoot ).PHP_EOL;
+		}
+		else {
+			try {
+				$temporaryDirectoryManager->remove( $temporaryRoot );
+			}
+			catch ( \Throwable $throwable ) {
+				\fwrite( \STDERR, 'Build temp cleanup failed: '.$throwable->getMessage().PHP_EOL );
+				$exitCode = 1;
+			}
+		}
+	}
+}
 
 exit( $exitCode );
 
-function resolve_output_zip( mixed $output, string $projectRoot, string $buildDir, string $packageBaseDir ) :string {
+function resolve_output_zip( mixed $output, string $projectRoot, string $buildDir ) :string {
 	if ( \is_string( $output ) && \trim( $output ) !== '' ) {
 		$output = \trim( $output, " \t\n\r\0\x0B\"'" );
 		if ( Path::isAbsolute( $output ) ) {
@@ -95,10 +112,6 @@ function resolve_output_zip( mixed $output, string $projectRoot, string $buildDi
 
 	if ( !Path::isBasePath( $buildDir, $resolved ) ) {
 		throw new \RuntimeException( 'Output zip must be inside the build directory: '.$resolved );
-	}
-
-	if ( Path::isBasePath( $packageBaseDir, $resolved ) ) {
-		throw new \RuntimeException( 'Output zip cannot be inside the temporary package directory: '.$resolved );
 	}
 
 	return $resolved;

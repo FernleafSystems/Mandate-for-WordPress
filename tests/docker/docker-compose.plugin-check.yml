@@ -30,7 +30,10 @@ services:
     volumes:
       - aps-plugin-check-wp:/var/www/html
       - ../../../../../Libraries/wordpress:/wordpress-src:ro
-      - ./.runtime/plugin-check/application-password-scoper:/var/www/html/wp-content/plugins/application-password-scoper:ro
+      - type: bind
+        source: ${APS_PLUGIN_CHECK_PACKAGE_DIR:?APS_PLUGIN_CHECK_PACKAGE_DIR must be set}
+        target: /var/www/html/wp-content/plugins/application-password-scoper
+        read_only: true
       - ../../:/app:ro
 
 volumes:

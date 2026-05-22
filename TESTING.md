@@ -1,6 +1,6 @@
 # Application Password Scoper Testing
 
-`TESTING.md` is the source of truth for this MVP's local verification commands.
+`TESTING.md` is the source of truth for this plugin's local verification commands.
 
 ## Setup
 
@@ -23,7 +23,7 @@ The plugin runtime, unit test bootstrap, and build tooling require `vendor/autol
 | Plugin Check | `composer test:plugin-check -- --clean` | Builds a production-shaped plugin package and runs WordPress.org Plugin Check through WP-CLI. Omit `-- --clean` for a warm repeat. |
 | Browser smoke | `composer test:browser -- --clean -- --workers=1` | Provisions a Docker WordPress site, activates the plugin, and runs Playwright UI/API checks. |
 
-`phpunit-unit.xml` is included as lightweight scaffolding if PHPUnit is added later, but PHPUnit is not required for the MVP test gate.
+`phpunit-unit.xml` is included as lightweight scaffolding if PHPUnit is added later, but PHPUnit is not required for the current test gate.
 
 Before browser tests, install the Node test dependency and browser:
 
@@ -53,13 +53,13 @@ composer test:browser -- --clean -- --workers=1
 `composer build-zip` follows the simple production packaging contract for this plugin:
 
 - runs `npm ci --no-audit --no-fund` and `npm run build` in the source checkout
-- stages the package under `build/package/application-password-scoper`
-- copies only `plugin.php`, `init.php`, `unsupported.php`, `readme.txt`, `src`, and `assets/dist`
+- stages the package under the system temp directory and removes it after the zip is built
+- copies only `plugin.php`, `init.php`, `unsupported.php`, `readme.txt`, `LICENSE`, `src`, and `assets/dist`
 - creates production Composer autoload files in the staged package with `composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader`
-- removes staged Composer metadata before zipping
+- removes the staged Composer lock file before zipping, while keeping the generated package `composer.json` alongside `vendor/`
 - writes the zip under `build/` with the archive root folder `application-password-scoper/`
 
-Use `composer build-zip -- --output=application-password-scoper-test.zip` to choose a filename inside `build/`. Output paths outside `build/` are rejected. Use `--keep-package` when you need to inspect the staged package directory after a build.
+Use `composer build-zip -- --output=application-password-scoper-test.zip` to choose a filename inside `build/`. Output paths outside `build/` are rejected. Use `--keep-package` when you need to inspect the temp package directory after a build; the retained path is printed in the command output.
 
 `composer test:plugin-check` installs the WordPress.org Plugin Check plugin in a disposable Docker WordPress site and fails on Plugin Check `ERROR` findings. `WARNING` findings are printed for convergence cleanup, but they do not fail the command.
 
@@ -67,7 +67,9 @@ Use `composer build-zip -- --output=application-password-scoper-test.zip` to cho
 
 The Plugin Check lane uses `tests/docker/docker-compose.plugin-check.yml`, which starts MySQL and a WP-CLI container only. It does not expose a WordPress web server or port. The runner seeds WordPress from the local reference checkout, provisions the site through WP-CLI, installs Plugin Check, activates this plugin, and runs `wp plugin check application-password-scoper --format=json`.
 
-Plugin Check inspects a release-shaped package under `tests/docker/.runtime/plugin-check/application-password-scoper`, not the raw repo root. The package is built with the same runtime package builder as `composer build-zip`, but it skips the source asset rebuild and expects `assets/dist` to already exist. Run `composer install` and `npm run build` before the gate.
+Plugin Check inspects a release-shaped package under the system temp directory, not the raw repo root. The temp package is mounted read-only into Docker, removed after the check finishes, and built with the same runtime package builder as `composer build-zip`. It skips the source asset rebuild and expects `assets/dist` to already exist. Run `composer install` and `npm run build` before the gate.
+
+Use `composer test:plugin-check -- --keep-package` only when you need to inspect the temp package directory after a run; the retained path is printed in the command output.
 
 The default Plugin Check version is pinned in `tests/plugin-check/run-plugin-check.php`. To test a future Plugin Check release locally:
 
@@ -83,7 +85,7 @@ The browser lane follows the lightweight shape of Shield's Docker/Playwright tes
 
 - `tests/docker/docker-compose.browser.yml` starts MySQL, WordPress, and WP-CLI.
 - `tests/docker/provision-browser-site.sh` installs WordPress, activates the plugin, creates fixture roles/users/application passwords, and installs a test-only mu-plugin fixture endpoint.
-- `tests/browser/scoper-admin.spec.js` verifies the Tools menu item, page load, user/password auto-reload behavior, role summary, selected password summary, tabbed capability controls, save/reset behavior, and REST capability enforcement through WordPress filters.
+- `tests/browser/scoper-admin.spec.js` verifies the real wp-admin selection flow, user/password auto-reload behavior, grouped capability controls, save/reset behavior, and REST capability enforcement through WordPress filters.
 
 ## Manual Smoke Test
 

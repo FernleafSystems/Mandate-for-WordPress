@@ -4,9 +4,11 @@ declare( strict_types=1 );
 
 require __DIR__.'/bootstrap.php';
 require __DIR__.'/ScoperTest.php';
+require __DIR__.'/ToolingTest.php';
 
 $classes = [
 	ScoperTest::class,
+	ToolingTest::class,
 ];
 $failures = 0;
 $count = 0;

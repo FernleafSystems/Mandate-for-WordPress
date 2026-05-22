@@ -4,6 +4,7 @@ declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\CommandRunner;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\TemporaryDirectoryManager;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -20,9 +21,13 @@ require $autoload;
 
 $args = array_slice( $_SERVER[ 'argv' ] ?? [], 1 );
 $mode = in_array( '--clean', $args, true ) ? 'clean' : 'warm';
+$keepPackage = in_array( '--keep-package', $args, true );
 $pluginCheckVersion = getenv( 'APS_PLUGIN_CHECK_VERSION' ) ?: APS_PLUGIN_CHECK_DEFAULT_VERSION;
-$runtimeDir = Path::join( $rootDir, 'tests/docker/.runtime/plugin-check' );
-$packageDir = Path::join( $runtimeDir, RuntimePackageBuilder::PLUGIN_SLUG );
+$filesystem = new Filesystem();
+$temporaryDirectoryManager = new TemporaryDirectoryManager( $filesystem );
+$temporaryRoot = null;
+$packageDir = null;
+$exitCode = 0;
 
 $compose = [
 	'docker',
@@ -33,89 +38,123 @@ $compose = [
 	'tests/docker/docker-compose.plugin-check.yml',
 ];
 
-if ( $mode === 'clean' ) {
-	aps_plugin_check_run( array_merge( $compose, [ 'down', '-v', '--remove-orphans' ] ), $rootDir );
+try {
+	$temporaryRoot = $temporaryDirectoryManager->create( 'application-password-scoper-plugin-check' );
+	$packageDir = Path::join( $temporaryRoot, RuntimePackageBuilder::PLUGIN_SLUG );
+	$filesystem->mkdir( $packageDir );
+	$composeEnv = [
+		'APS_PLUGIN_CHECK_PACKAGE_DIR' => $packageDir,
+	];
+
+	if ( $mode === 'clean' ) {
+		aps_plugin_check_run( array_merge( $compose, [ 'down', '-v', '--remove-orphans' ] ), $rootDir, $composeEnv );
+	}
+
+	aps_plugin_check_build_package( $rootDir, $temporaryRoot, $packageDir );
+
+	aps_plugin_check_run( array_merge( $compose, [ 'up', '-d', 'db' ] ), $rootDir, $composeEnv );
+	aps_plugin_check_run(
+		array_merge(
+			$compose,
+			[
+				'run',
+				'--rm',
+				'-T',
+				'--entrypoint',
+				'sh',
+				'wp-cli',
+				'-c',
+				'if [ ! -f /var/www/html/wp-includes/version.php ]; then tar -C /wordpress-src --exclude=.git -cf - . | tar -C /var/www/html -xf -; fi && mkdir -p /var/www/html/wp-content/plugins',
+			]
+		),
+		$rootDir,
+		$composeEnv
+	);
+	aps_plugin_check_run(
+		array_merge(
+			$compose,
+			[
+				'run',
+				'--rm',
+				'-T',
+				'--env',
+				'APS_PLUGIN_CHECK_VERSION='.$pluginCheckVersion,
+				'wp-cli',
+				'sh',
+				'/app/tests/plugin-check/provision-site.sh',
+			]
+		),
+		$rootDir,
+		$composeEnv
+	);
+
+	$result = aps_plugin_check_run_capture(
+		array_merge(
+			$compose,
+			[
+				'run',
+				'--rm',
+				'-T',
+				'wp-cli',
+				'wp',
+				'plugin',
+				'check',
+				'application-password-scoper',
+				'--format=json',
+				'--require=./wp-content/plugins/plugin-check/cli.php',
+				'--slug=application-password-scoper',
+				'--allow-root',
+			]
+		),
+		$rootDir,
+		$composeEnv
+	);
+
+	if ( $result[ 'exit_code' ] !== 0 ) {
+		echo $result[ 'stdout' ];
+		fwrite( STDERR, $result[ 'stderr' ] );
+		throw new RuntimeException( 'Plugin Check command failed with exit code '.$result[ 'exit_code' ].'.' );
+	}
+
+	$findings = aps_plugin_check_parse_findings( $result[ 'stdout' ] );
+	$errorCount = aps_plugin_check_count_type( $findings, 'ERROR' );
+	$warningCount = aps_plugin_check_count_type( $findings, 'WARNING' );
+
+	aps_plugin_check_print_findings( $findings );
+	echo sprintf(
+		"Plugin Check completed with %d error%s and %d warning%s.\n",
+		$errorCount,
+		$errorCount === 1 ? '' : 's',
+		$warningCount,
+		$warningCount === 1 ? '' : 's'
+	);
+
+	$exitCode = $errorCount > 0 ? 1 : 0;
+}
+catch ( Throwable $throwable ) {
+	fwrite( STDERR, 'Plugin Check failed: '.$throwable->getMessage().PHP_EOL );
+	$exitCode = 1;
+}
+finally {
+	if ( $temporaryRoot !== null ) {
+		if ( $keepPackage ) {
+			echo 'Plugin Check package retained at: '.( $packageDir ?? $temporaryRoot ).PHP_EOL;
+		}
+		else {
+			try {
+				$temporaryDirectoryManager->remove( $temporaryRoot );
+			}
+			catch ( Throwable $throwable ) {
+				fwrite( STDERR, 'Plugin Check temp cleanup failed: '.$throwable->getMessage().PHP_EOL );
+				$exitCode = 1;
+			}
+		}
+	}
 }
 
-aps_plugin_check_build_package( $rootDir, $runtimeDir, $packageDir );
+exit( $exitCode );
 
-aps_plugin_check_run( array_merge( $compose, [ 'up', '-d', 'db' ] ), $rootDir );
-aps_plugin_check_run(
-	array_merge(
-		$compose,
-		[
-			'run',
-			'--rm',
-			'-T',
-			'--entrypoint',
-			'sh',
-			'wp-cli',
-			'-c',
-			'if [ ! -f /var/www/html/wp-includes/version.php ]; then cp -a /wordpress-src/. /var/www/html/; fi && mkdir -p /var/www/html/wp-content/plugins',
-		]
-	),
-	$rootDir
-);
-aps_plugin_check_run(
-	array_merge(
-		$compose,
-		[
-			'run',
-			'--rm',
-			'-T',
-			'--env',
-			'APS_PLUGIN_CHECK_VERSION='.$pluginCheckVersion,
-			'wp-cli',
-			'sh',
-			'/app/tests/plugin-check/provision-site.sh',
-		]
-	),
-	$rootDir
-);
-
-$result = aps_plugin_check_run_capture(
-	array_merge(
-		$compose,
-		[
-			'run',
-			'--rm',
-			'-T',
-			'wp-cli',
-			'wp',
-			'plugin',
-			'check',
-			'application-password-scoper',
-			'--format=json',
-			'--require=./wp-content/plugins/plugin-check/cli.php',
-			'--slug=application-password-scoper',
-			'--allow-root',
-		]
-	),
-	$rootDir
-);
-
-if ( $result[ 'exit_code' ] !== 0 ) {
-	echo $result[ 'stdout' ];
-	fwrite( STDERR, $result[ 'stderr' ] );
-	exit( $result[ 'exit_code' ] );
-}
-
-$findings = aps_plugin_check_parse_findings( $result[ 'stdout' ] );
-$errorCount = aps_plugin_check_count_type( $findings, 'ERROR' );
-$warningCount = aps_plugin_check_count_type( $findings, 'WARNING' );
-
-aps_plugin_check_print_findings( $findings );
-echo sprintf(
-	"Plugin Check completed with %d error%s and %d warning%s.\n",
-	$errorCount,
-	$errorCount === 1 ? '' : 's',
-	$warningCount,
-	$warningCount === 1 ? '' : 's'
-);
-
-exit( $errorCount > 0 ? 1 : 0 );
-
-function aps_plugin_check_build_package( string $rootDir, string $runtimeDir, string $packageDir ) :void {
+function aps_plugin_check_build_package( string $rootDir, string $temporaryRoot, string $packageDir ) :void {
 	$logger = static function ( string $message ) :void {
 		echo $message.PHP_EOL;
 	};
@@ -125,7 +164,7 @@ function aps_plugin_check_build_package( string $rootDir, string $runtimeDir, st
 		new CommandRunner( $rootDir, $logger ),
 		new Filesystem(),
 		$logger
-	) )->build( $packageDir, $runtimeDir, false );
+	) )->build( $packageDir, $temporaryRoot, false );
 }
 
 /**
@@ -135,7 +174,7 @@ function aps_plugin_check_build_package( string $rootDir, string $runtimeDir, st
 function aps_plugin_check_run( array $command, string $cwd, array $env = [] ) :void {
 	$result = aps_plugin_check_run_capture( $command, $cwd, $env, true );
 	if ( $result[ 'exit_code' ] !== 0 ) {
-		exit( $result[ 'exit_code' ] );
+		throw new RuntimeException( 'Command failed with exit code '.$result[ 'exit_code' ].': '.implode( ' ', $command ) );
 	}
 }
 

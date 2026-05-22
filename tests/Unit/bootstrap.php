@@ -61,6 +61,17 @@ abstract class Aps_Test_Case {
 			throw new RuntimeException( $message !== '' ? $message : 'Unexpected array key: '.$key );
 		}
 	}
+
+	protected function assertThrowsRuntimeException( callable $callback, string $message = '' ) :void {
+		try {
+			$callback();
+		}
+		catch ( RuntimeException ) {
+			return;
+		}
+
+		throw new RuntimeException( $message !== '' ? $message : 'Expected RuntimeException was not thrown.' );
+	}
 }
 
 function aps_test_reset_state() :void {
