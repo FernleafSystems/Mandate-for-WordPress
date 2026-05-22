@@ -26,6 +26,16 @@ final class Wpm_Test_Roles {
 	}
 }
 
+final class Wpm_Test_Wp_Die_Exception extends RuntimeException {
+}
+
+final class Wpm_Test_Redirect_Exception extends RuntimeException {
+
+	public function __construct( public string $location ) {
+		parent::__construct( 'Redirected to '.$location );
+	}
+}
+
 abstract class Wpm_Test_Case {
 
 	public function setUp() :void {
@@ -80,11 +90,83 @@ function wpm_test_reset_state() :void {
 	$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles( [] );
 	$GLOBALS[ 'wpm_test_users' ] = [];
 	$GLOBALS[ 'wpm_test_current_user_id' ] = 1;
+	$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'manage_options' => true ];
 	$GLOBALS[ 'wpm_test_rest_uuid' ] = null;
 	$GLOBALS[ 'wpm_test_is_multisite' ] = false;
 	$GLOBALS[ 'wpm_test_super_admins' ] = [];
+	$GLOBALS[ 'wpm_test_filters' ] = [];
+	$GLOBALS[ 'wpm_test_valid_nonces' ] = [];
+	$GLOBALS[ 'wpm_test_last_redirect' ] = null;
+	$GLOBALS[ 'wpm_test_wp_die' ] = [];
+	$_GET = [];
+	$_POST = [];
+	$_REQUEST = [];
+	$_SERVER[ 'REQUEST_METHOD' ] = 'GET';
 	if ( class_exists( 'WP_Application_Passwords' ) ) {
 		WP_Application_Passwords::$passwordsByUser = [];
+	}
+}
+
+function wpm_test_set_valid_nonce( string $name, string $action ) :string {
+	$nonce = 'nonce:'.$action;
+	$GLOBALS[ 'wpm_test_valid_nonces' ][ $name ] = [
+		'action' => $action,
+		'nonce'  => $nonce,
+	];
+	return $nonce;
+}
+
+if ( !function_exists( '__' ) ) {
+	function __( string $text, string $domain = 'default' ) :string {
+		return $text;
+	}
+}
+
+if ( !function_exists( 'esc_html__' ) ) {
+	function esc_html__( string $text, string $domain = 'default' ) :string {
+		return esc_html( $text );
+	}
+}
+
+if ( !function_exists( 'esc_attr__' ) ) {
+	function esc_attr__( string $text, string $domain = 'default' ) :string {
+		return esc_attr( $text );
+	}
+}
+
+if ( !function_exists( 'esc_html' ) ) {
+	function esc_html( mixed $text ) :string {
+		return htmlspecialchars( (string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
+}
+
+if ( !function_exists( 'esc_attr' ) ) {
+	function esc_attr( mixed $text ) :string {
+		return htmlspecialchars( (string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
+}
+
+if ( !function_exists( 'esc_url' ) ) {
+	function esc_url( mixed $url ) :string {
+		return (string)$url;
+	}
+}
+
+if ( !function_exists( 'wp_unslash' ) ) {
+	function wp_unslash( mixed $value ) :mixed {
+		return is_array( $value ) ? array_map( 'wp_unslash', $value ) : stripslashes( (string)$value );
+	}
+}
+
+if ( !function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( mixed $value ) :string {
+		return trim( strip_tags( (string)$value ) );
+	}
+}
+
+if ( !function_exists( 'absint' ) ) {
+	function absint( mixed $value ) :int {
+		return abs( (int)$value );
 	}
 }
 
@@ -134,6 +216,65 @@ if ( !function_exists( 'get_current_user_id' ) ) {
 	}
 }
 
+if ( !function_exists( 'current_user_can' ) ) {
+	function current_user_can( string $capability, mixed ...$args ) :bool {
+		return !empty( $GLOBALS[ 'wpm_test_current_user_caps' ][ $capability ] );
+	}
+}
+
+if ( !function_exists( 'wp_die' ) ) {
+	function wp_die( mixed $message = '' ) :never {
+		$GLOBALS[ 'wpm_test_wp_die' ][] = (string)$message;
+		throw new Wpm_Test_Wp_Die_Exception( (string)$message );
+	}
+}
+
+if ( !function_exists( 'admin_url' ) ) {
+	function admin_url( string $path = '' ) :string {
+		return 'https://example.test/wp-admin/'.ltrim( $path, '/' );
+	}
+}
+
+if ( !function_exists( 'add_query_arg' ) ) {
+	function add_query_arg( array $args, string $url ) :string {
+		$separator = str_contains( $url, '?' ) ? '&' : '?';
+		return $url.$separator.http_build_query( $args, '', '&' );
+	}
+}
+
+if ( !function_exists( 'wp_safe_redirect' ) ) {
+	function wp_safe_redirect( string $location, int $status = 302, string $xRedirectBy = 'WordPress' ) :bool {
+		$GLOBALS[ 'wpm_test_last_redirect' ] = $location;
+		throw new Wpm_Test_Redirect_Exception( $location );
+	}
+}
+
+if ( !function_exists( 'wp_nonce_field' ) ) {
+	function wp_nonce_field( string $action = '-1', string $name = '_wpnonce', bool $referer = true, bool $display = true ) :string {
+		$nonce = wpm_test_set_valid_nonce( $name, $action );
+		$field = '<input type="hidden" name="'.esc_attr( $name ).'" value="'.esc_attr( $nonce ).'" />';
+		if ( $display ) {
+			echo $field;
+		}
+		return $field;
+	}
+}
+
+if ( !function_exists( 'check_admin_referer' ) ) {
+	function check_admin_referer( string $action = '-1', string $query_arg = '_wpnonce' ) :int|false {
+		$submitted = $_POST[ $query_arg ] ?? $_GET[ $query_arg ] ?? '';
+		$valid = $GLOBALS[ 'wpm_test_valid_nonces' ][ $query_arg ] ?? null;
+		if ( is_array( $valid )
+			&& ( $valid[ 'action' ] ?? null ) === $action
+			&& ( $valid[ 'nonce' ] ?? null ) === $submitted
+		) {
+			return 1;
+		}
+
+		wp_die( 'invalid nonce' );
+	}
+}
+
 if ( !function_exists( 'rest_get_authenticated_app_password' ) ) {
 	function rest_get_authenticated_app_password() :?string {
 		return $GLOBALS[ 'wpm_test_rest_uuid' ];
@@ -142,6 +283,19 @@ if ( !function_exists( 'rest_get_authenticated_app_password' ) ) {
 
 if ( !function_exists( 'apply_filters' ) ) {
 	function apply_filters( string $tag, mixed $value, mixed ...$args ) :mixed {
+		$callbacks = $GLOBALS[ 'wpm_test_filters' ][ $tag ] ?? [];
+		if ( $callbacks === [] ) {
+			return $value;
+		}
+
+		ksort( $callbacks );
+		foreach ( $callbacks as $priorityCallbacks ) {
+			foreach ( $priorityCallbacks as $callback ) {
+				$acceptedArgs = max( 1, (int)$callback[ 'accepted_args' ] );
+				$value = $callback[ 'callback' ]( ...array_slice( [ $value, ...$args ], 0, $acceptedArgs ) );
+			}
+		}
+
 		return $value;
 	}
 }
@@ -167,6 +321,53 @@ if ( !function_exists( 'add_action' ) ) {
 
 if ( !function_exists( 'add_filter' ) ) {
 	function add_filter( string $hookName, mixed $callback, int $priority = 10, int $acceptedArgs = 1 ) :void {
+		$GLOBALS[ 'wpm_test_filters' ][ $hookName ][ $priority ][] = [
+			'callback'      => $callback,
+			'accepted_args' => $acceptedArgs,
+		];
+	}
+}
+
+if ( !function_exists( 'selected' ) ) {
+	function selected( mixed $selected, mixed $current = true, bool $display = true ) :string {
+		$result = (string)$selected === (string)$current ? 'selected="selected"' : '';
+		if ( $display ) {
+			echo $result;
+		}
+		return $result;
+	}
+}
+
+if ( !function_exists( 'checked' ) ) {
+	function checked( mixed $checked, mixed $current = true, bool $display = true ) :string {
+		$result = (bool)$checked === (bool)$current ? 'checked="checked"' : '';
+		if ( $display ) {
+			echo $result;
+		}
+		return $result;
+	}
+}
+
+if ( !function_exists( 'disabled' ) ) {
+	function disabled( mixed $disabled, mixed $current = true, bool $display = true ) :string {
+		$result = (bool)$disabled === (bool)$current ? 'disabled="disabled"' : '';
+		if ( $display ) {
+			echo $result;
+		}
+		return $result;
+	}
+}
+
+if ( !function_exists( 'wp_dropdown_users' ) ) {
+	function wp_dropdown_users( array $args = [] ) :string {
+		$name = isset( $args[ 'name' ] ) ? (string)$args[ 'name' ] : 'user';
+		$id = isset( $args[ 'id' ] ) ? (string)$args[ 'id' ] : $name;
+		$selectedUser = isset( $args[ 'selected' ] ) ? (string)$args[ 'selected' ] : '';
+		$output = '<select name="'.esc_attr( $name ).'" id="'.esc_attr( $id ).'">'
+			.'<option value="'.esc_attr( $selectedUser ).'" selected="selected">'.esc_html( $selectedUser ).'</option>'
+			.'</select>';
+		echo $output;
+		return $output;
 	}
 }
 

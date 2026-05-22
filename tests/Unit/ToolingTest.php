@@ -2,9 +2,36 @@
 
 declare( strict_types=1 );
 
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ZipBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+
+final class Wpm_Test_Package_CommandRunner extends CommandRunner {
+
+	/**
+	 * @param string[] $command
+	 */
+	public function run( array $command, ?string $workingDir = null ) :void {
+		if ( !in_array( 'install', $command, true ) || $workingDir === null ) {
+			return;
+		}
+
+		$filesystem = new Filesystem();
+		$filesystem->mkdir( Path::join( $workingDir, 'vendor' ) );
+		$filesystem->dumpFile( Path::join( $workingDir, 'vendor/autoload.php' ), "<?php\n" );
+		$filesystem->dumpFile( Path::join( $workingDir, 'composer.lock' ), "{}\n" );
+	}
+
+	/**
+	 * @return string[]
+	 */
+	public function getComposerCommand() :array {
+		return [ 'composer' ];
+	}
+}
 
 final class ToolingTest extends Wpm_Test_Case {
 
@@ -86,5 +113,103 @@ final class ToolingTest extends Wpm_Test_Case {
 		finally {
 			$filesystem->remove( $directory );
 		}
+	}
+
+	public function testRuntimePackageAndZipExcludeStaticSiteDirectory() :void {
+		$filesystem = new Filesystem();
+		$fixtureRoot = Path::join( \sys_get_temp_dir(), 'mandate-package-fixture-'.\bin2hex( \random_bytes( 4 ) ) );
+		$packageRoot = Path::join( \sys_get_temp_dir(), 'mandate-package-target-'.\bin2hex( \random_bytes( 4 ) ) );
+		$packageDir = Path::join( $packageRoot, RuntimePackageBuilder::PLUGIN_SLUG );
+		$zipPath = Path::join( $packageRoot, 'mandate.zip' );
+
+		try {
+			$this->createPackageFixture( $fixtureRoot, $filesystem );
+
+			$builder = new RuntimePackageBuilder(
+				$fixtureRoot,
+				new Wpm_Test_Package_CommandRunner( $fixtureRoot, static function ( string $message ) :void {} ),
+				$filesystem,
+				static function ( string $message ) :void {}
+			);
+			$builder->build( $packageDir, $packageRoot, false );
+
+			$this->assertTrue( \is_file( Path::join( $packageDir, 'plugin.php' ) ) );
+			$this->assertTrue( \is_file( Path::join( $packageDir, 'assets/dist/admin-page.js' ) ) );
+			$this->assertFalse( \file_exists( Path::join( $packageDir, 'site' ) ) );
+
+			( new ZipBuilder( $filesystem, static function ( string $message ) :void {} ) )
+				->build( $packageDir, $zipPath, RuntimePackageBuilder::PLUGIN_SLUG );
+
+			$zip = new ZipArchive();
+			$this->assertSame( true, $zip->open( $zipPath ) );
+			try {
+				$names = [];
+				for ( $index = 0; $index < $zip->numFiles; $index++ ) {
+					$name = $zip->getNameIndex( $index );
+					if ( \is_string( $name ) ) {
+						$names[] = $name;
+					}
+				}
+			}
+			finally {
+				$zip->close();
+			}
+
+			$this->assertTrue( in_array( 'mandate/plugin.php', $names, true ) );
+			$this->assertTrue( in_array( 'mandate/assets/dist/admin-page.js', $names, true ) );
+			$this->assertFalse( in_array( 'mandate/site/index.html', $names, true ) );
+		}
+		finally {
+			$filesystem->remove( [
+				$fixtureRoot,
+				$packageRoot,
+			] );
+		}
+	}
+
+	private function createPackageFixture( string $fixtureRoot, Filesystem $filesystem ) :void {
+		$filesystem->mkdir( [
+			Path::join( $fixtureRoot, 'src' ),
+			Path::join( $fixtureRoot, 'assets/dist' ),
+			Path::join( $fixtureRoot, 'site/assets' ),
+		] );
+
+		foreach ( [
+			'plugin.php',
+			'init.php',
+			'unsupported.php',
+			'readme.txt',
+			'LICENSE',
+			'src/Plugin.php',
+			'assets/dist/admin-page.css',
+			'assets/dist/admin-page.js',
+			'site/index.html',
+			'site/assets/shield-icon.png',
+		] as $file ) {
+			$filesystem->dumpFile( Path::join( $fixtureRoot, $file ), "fixture\n" );
+		}
+
+		$composer = [
+			'name'        => 'fernleafsystems/mandate-fixture',
+			'description' => 'Fixture package',
+			'type'        => 'wordpress-plugin',
+			'license'     => 'GPL-2.0-or-later',
+			'require'     => [
+				'php' => '>=8.1',
+			],
+			'config'      => [],
+			'autoload'    => [
+				'psr-4' => [
+					'Fixture\\' => 'src/',
+				],
+			],
+		];
+
+		$json = \json_encode( $composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		if ( !\is_string( $json ) ) {
+			throw new RuntimeException( 'Failed to encode fixture composer config.' );
+		}
+
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'composer.json' ), $json.PHP_EOL );
 	}
 }

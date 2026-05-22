@@ -52,6 +52,22 @@ class ScopeRepository {
 	}
 
 	/**
+	 * @return CapabilityScopeRecord|null
+	 */
+	public function findForUser( int $userId, string $uuid ) :?array {
+		if ( $userId < 1 ) {
+			return null;
+		}
+
+		$record = $this->find( $uuid );
+		if ( $record === null || $record[ 'user_id' ] !== $userId ) {
+			return null;
+		}
+
+		return $record;
+	}
+
+	/**
 	 * @param array<string,true> $allowedCaps
 	 * @param array<string,true> $allowedMetaCaps
 	 */
@@ -79,7 +95,11 @@ class ScopeRepository {
 		return $this->persist( $all );
 	}
 
-	public function delete( string $uuid ) :bool {
+	public function deleteForUser( int $userId, string $uuid ) :bool {
+		if ( $userId < 1 ) {
+			return false;
+		}
+
 		$uuid = ApplicationPasswordRepository::normalizeUuid( $uuid );
 		if ( $uuid === '' ) {
 			return false;
@@ -88,6 +108,9 @@ class ScopeRepository {
 		$all = $this->all();
 		if ( !isset( $all[ $uuid ] ) ) {
 			return true;
+		}
+		if ( $all[ $uuid ][ 'user_id' ] !== $userId ) {
+			return false;
 		}
 
 		unset( $all[ $uuid ] );
@@ -99,7 +122,7 @@ class ScopeRepository {
 	 */
 	public function deleteForApplicationPassword( int $userId, array $item ) :void {
 		$uuid = isset( $item[ 'uuid' ] ) ? (string)$item[ 'uuid' ] : '';
-		$this->delete( $uuid );
+		$this->deleteForUser( $userId, $uuid );
 	}
 
 	/**

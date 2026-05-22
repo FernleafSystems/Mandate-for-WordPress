@@ -23,9 +23,12 @@ if ( !defined( 'ABSPATH' ) ) {
 class AdminPage {
 
 	private const REQUIRED_CAPABILITY = 'manage_options';
-	private const NONCE_ACTION = 'mandate_save_scope';
-	private const NONCE_NAME = 'mandate_nonce';
+	private const NONCE_ACTION_PREFIX = 'mandate_scope';
 	private const ASSET_HANDLE = 'mandate-admin-page';
+	private const FORM_ACTIONS = [
+		'save_scope'  => true,
+		'clear_scope' => true,
+	];
 
 	private ScopeRepository $scopeRepository;
 
@@ -114,21 +117,25 @@ class AdminPage {
 			return;
 		}
 
-		if ( !current_user_can( self::REQUIRED_CAPABILITY ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage application password scopes.', 'mandate' ) );
+		$this->requireManageCapability();
+
+		$userId = absint( $this->postScalar( 'user_id' ) );
+		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->postScalar( 'app_password_uuid' ) );
+		$action = sanitize_key( $this->postScalar( 'mandate_action' ) );
+		$message = 'invalid';
+
+		if ( !isset( self::FORM_ACTIONS[ $action ] ) ) {
+			$this->redirectAfterPost( $userId, $uuid, $message );
 		}
 
-		check_admin_referer( self::NONCE_ACTION, self::NONCE_NAME );
-
-		$userId = absint( $this->verifiedPostScalar( 'user_id' ) );
-		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->verifiedPostScalar( 'app_password_uuid' ) );
-		$action = sanitize_key( $this->verifiedPostScalar( 'mandate_action' ) );
-		$message = 'invalid';
+		check_admin_referer(
+			$this->nonceAction( $action, $userId, $uuid ),
+			$this->nonceName( $action )
+		);
 
 		if ( $userId > 0 && $uuid !== '' && $this->passwordRepository->userOwnsPassword( $userId, $uuid ) ) {
 			if ( $action === 'clear_scope' ) {
-				$this->scopeRepository->delete( $uuid );
-				$message = 'reset';
+				$message = $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
 			}
 			elseif ( $action === 'save_scope' ) {
 				if ( $this->isSuperAdminUser( $userId ) ) {
@@ -147,13 +154,17 @@ class AdminPage {
 			}
 		}
 
+		$this->redirectAfterPost( $userId, $uuid, $message );
+	}
+
+	private function redirectAfterPost( int $userId, string $uuid, string $message ) :void {
 		wp_safe_redirect(
 			add_query_arg(
 				[
 					'page'              => Plugin::MENU_SLUG,
 					'user_id'           => $userId,
 					'app_password_uuid' => $uuid,
-					'mandate_message' => $message,
+					'mandate_message'   => $message,
 				],
 				admin_url( 'tools.php' )
 			)
@@ -161,15 +172,19 @@ class AdminPage {
 		exit;
 	}
 
-	public function render() :void {
+	private function requireManageCapability() :void {
 		if ( !current_user_can( self::REQUIRED_CAPABILITY ) ) {
 			wp_die( esc_html__( 'You do not have permission to manage application password scopes.', 'mandate' ) );
 		}
+	}
+
+	public function render() :void {
+		$this->requireManageCapability();
 
 		$selectedUserId = $this->selectedUserId();
 		$passwords = $this->passwordRepository->forUser( $selectedUserId );
 		$selectedUuid = $this->selectedPasswordUuid( $passwords );
-		$scope = $selectedUuid !== '' ? $this->scopeRepository->find( $selectedUuid ) : null;
+		$scope = $selectedUuid !== '' ? $this->scopeRepository->findForUser( $selectedUserId, $selectedUuid ) : null;
 		$candidateCaps = $this->candidateProvider->forUser( $selectedUserId );
 		$metaCaps = $this->metaRegistry->registered();
 		$selectedCaps = $scope === null
@@ -405,7 +420,14 @@ class AdminPage {
 		}
 
 		echo '<form method="post" action="'.esc_url( admin_url( 'tools.php?page='.Plugin::MENU_SLUG ) ).'" class="mandate-scope-form">';
-		wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
+		wp_nonce_field(
+			$this->nonceAction( 'save_scope', $selectedUserId, $selectedUuid ),
+			$this->nonceName( 'save_scope' )
+		);
+		wp_nonce_field(
+			$this->nonceAction( 'clear_scope', $selectedUserId, $selectedUuid ),
+			$this->nonceName( 'clear_scope' )
+		);
 		echo '<input type="hidden" name="user_id" value="'.esc_attr( (string)$selectedUserId ).'" />';
 		echo '<input type="hidden" name="app_password_uuid" value="'.esc_attr( $selectedUuid ).'" />';
 
@@ -503,13 +525,29 @@ class AdminPage {
 			&& is_super_admin( $userId );
 	}
 
+	private function nonceAction( string $action, int $userId, string $uuid ) :string {
+		return implode(
+			':',
+			[
+				self::NONCE_ACTION_PREFIX,
+				$action,
+				(string)max( 0, $userId ),
+				ApplicationPasswordRepository::normalizeUuid( $uuid ),
+			]
+		);
+	}
+
+	private function nonceName( string $action ) :string {
+		return 'mandate_'.$action.'_nonce';
+	}
+
 	private function getScalar( string $key ) :string {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Sanitized non-mutating admin view-state query arg.
 		return $this->requestScalar( $_GET, $key );
 	}
 
-	private function verifiedPostScalar( string $key ) :string {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Nonce is verified in handlePost() before scoped POST values are read.
+	private function postScalar( string $key ) :string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Sanitized action context is needed to select the scoped nonce before verification.
 		return $this->requestScalar( $_POST, $key );
 	}
 

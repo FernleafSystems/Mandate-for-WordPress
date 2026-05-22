@@ -4,6 +4,7 @@ declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
@@ -13,6 +14,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 final class MandateTest extends Wpm_Test_Case {
 
 	private const UUID = '11111111-1111-4111-8111-111111111111';
+	private const OTHER_UUID = '22222222-2222-4222-8222-222222222222';
 
 	public function testScopeNormalizationStoresBooleanMaps() :void {
 		$record = ( new ScopeRepository() )->normalizeRecord(
@@ -291,6 +293,127 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 	}
 
+	public function testMetaCapabilityRegistryUsesMandateFilter() :void {
+		add_filter(
+			'mandate_meta_capabilities',
+			static function ( array $capabilities ) :array {
+				$capabilities[] = 'wpm_manage_widget';
+				return $capabilities;
+			}
+		);
+
+		$this->assertArrayHasKey( 'wpm_manage_widget', ( new MetaCapabilityRegistry() )->registered() );
+	}
+
+	public function testAdminPostIgnoresNonPostRequests() :void {
+		$this->seedAdminFixture();
+		$_SERVER[ 'REQUEST_METHOD' ] = 'GET';
+		$_POST[ 'mandate_action' ] = 'save_scope';
+
+		$this->adminPage()->handlePost();
+
+		$this->assertSame( [], ( new ScopeRepository() )->all() );
+	}
+
+	public function testAdminPostIgnoresUnrelatedPostRequests() :void {
+		$this->seedAdminFixture();
+		$_SERVER[ 'REQUEST_METHOD' ] = 'POST';
+
+		$this->adminPage()->handlePost();
+
+		$this->assertSame( [], ( new ScopeRepository() )->all() );
+	}
+
+	public function testAdminPostRequiresManageOptionsBeforeMutation() :void {
+		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_current_user_caps' ] = [];
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true );
+
+		$this->assertThrowsRuntimeException(
+			fn() => $this->adminPage()->handlePost()
+		);
+		$this->assertSame( [], ( new ScopeRepository() )->all() );
+	}
+
+	public function testAdminPostRequiresActionScopedNonceBeforeMutation() :void {
+		$this->seedAdminFixture();
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], false );
+
+		$this->assertThrowsRuntimeException(
+			fn() => $this->adminPage()->handlePost()
+		);
+		$this->assertSame( [], ( new ScopeRepository() )->all() );
+	}
+
+	public function testAdminPostRejectsUnownedPassword() :void {
+		$this->seedAdminFixture();
+		$this->submitScopePost( 'save_scope', 5, self::OTHER_UUID, [ 'read' ], [], true );
+
+		$this->handlePostExpectRedirect( $this->adminPage() );
+
+		$this->assertSame( [], ( new ScopeRepository() )->all() );
+		$this->assertTrue( str_contains( (string)$GLOBALS[ 'wpm_test_last_redirect' ], 'mandate_message=invalid' ) );
+	}
+
+	public function testAdminPostSavesOwnedScopeWithCandidateCapsOnly() :void {
+		$this->seedAdminFixture();
+		$this->submitScopePost(
+			'save_scope',
+			5,
+			self::UUID,
+			[ 'read', 'upload_files', 'manage_options', 'Bad Cap' ],
+			[ 'edit_post', 'wpm_missing_meta' ],
+			true
+		);
+
+		$repository = new ScopeRepository();
+		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$record = $repository->findForUser( 5, self::UUID );
+
+		$this->assertSame(
+			[ 'read' => true, 'upload_files' => true ],
+			$record[ 'allowed_caps' ]
+		);
+		$this->assertSame( [ 'edit_post' => true ], $record[ 'allowed_meta_caps' ] );
+		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ ScopeRepository::OPTION_NAME ] );
+	}
+
+	public function testAdminPostClearsOnlyOwnedScope() :void {
+		$this->seedAdminFixture();
+		$repository = new ScopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], 1 );
+		$repository->save( self::OTHER_UUID, 9, [ 'read' => true ], [], 1 );
+		$this->submitScopePost( 'clear_scope', 5, self::UUID, [], [], true );
+
+		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$this->assertSame( null, $repository->findForUser( 5, self::UUID ) );
+		$this->assertArrayHasKey( self::OTHER_UUID, $repository->all() );
+	}
+
+	public function testAdminPostClearRefusesScopeOwnedByDifferentUser() :void {
+		$this->seedAdminFixture();
+		$repository = new ScopeRepository();
+		$repository->save( self::UUID, 9, [ 'read' => true ], [], 1 );
+		$this->submitScopePost( 'clear_scope', 5, self::UUID, [], [], true );
+
+		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$this->assertSame( 9, $repository->find( self::UUID )[ 'user_id' ] );
+		$this->assertTrue( str_contains( (string)$GLOBALS[ 'wpm_test_last_redirect' ], 'mandate_message=invalid' ) );
+	}
+
+	public function testScopeRepositoryFindAndDeleteRequireMatchingUser() :void {
+		$repository = new ScopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], 1 );
+
+		$this->assertSame( null, $repository->findForUser( 9, self::UUID ) );
+		$this->assertFalse( $repository->deleteForUser( 9, self::UUID ) );
+		$this->assertArrayHasKey( self::UUID, $repository->all() );
+		$this->assertTrue( $repository->deleteForUser( 5, self::UUID ) );
+		$this->assertSame( [], $repository->all() );
+	}
+
 	public function testDeletedApplicationPasswordPrunesScopeRecord() :void {
 		$repository = new ScopeRepository();
 		$repository->save( self::UUID, 5, [ 'read' => true ], [], 1 );
@@ -299,6 +422,107 @@ final class MandateTest extends Wpm_Test_Case {
 		$repository->deleteForApplicationPassword( 5, [ 'uuid' => self::UUID ] );
 
 		$this->assertSame( [], $repository->all() );
+	}
+
+	public function testDeletedApplicationPasswordDoesNotPruneScopeForDifferentUser() :void {
+		$repository = new ScopeRepository();
+		$repository->save( self::UUID, 9, [ 'read' => true ], [], 1 );
+
+		$repository->deleteForApplicationPassword( 5, [ 'uuid' => self::UUID ] );
+
+		$this->assertSame( 9, $repository->find( self::UUID )[ 'user_id' ] );
+	}
+
+	private function adminPage( ?ScopeRepository $repository = null ) :AdminPage {
+		return new AdminPage(
+			$repository ?? new ScopeRepository(),
+			new ApplicationPasswordRepository(),
+			new CapabilityCandidateProvider(),
+			new MetaCapabilityRegistry(),
+			new CapabilityGroupProvider(),
+			dirname( __DIR__, 2 ).'/plugin.php'
+		);
+	}
+
+	private function seedAdminFixture() :void {
+		$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles(
+			[
+				'wpm_editor' => [
+					'read'         => true,
+					'edit_posts'   => true,
+					'upload_files' => true,
+				],
+			]
+		);
+		$GLOBALS[ 'wpm_test_users' ][ 5 ] = (object)[
+			'ID'    => 5,
+			'roles' => [ 'wpm_editor' ],
+		];
+		WP_Application_Passwords::$passwordsByUser = [
+			5 => [
+				[
+					'uuid'      => self::UUID,
+					'name'      => 'Client',
+					'app_id'    => '',
+					'created'   => 0,
+					'last_used' => 0,
+				],
+			],
+		];
+	}
+
+	/**
+	 * @param string[] $allowedCaps
+	 * @param string[] $allowedMetaCaps
+	 */
+	private function submitScopePost(
+		string $action,
+		int $userId,
+		string $uuid,
+		array $allowedCaps,
+		array $allowedMetaCaps,
+		bool $withNonce
+	) :void {
+		$_SERVER[ 'REQUEST_METHOD' ] = 'POST';
+		$_POST = [
+			'mandate_action'    => $action,
+			'user_id'           => (string)$userId,
+			'app_password_uuid' => $uuid,
+			'allowed_caps'      => $allowedCaps,
+			'allowed_meta_caps' => $allowedMetaCaps,
+		];
+		if ( $withNonce ) {
+			$nonceName = $this->adminPagePrivateString( 'nonceName', [ $action ] );
+			$_POST[ $nonceName ] = wpm_test_set_valid_nonce(
+				$nonceName,
+				$this->adminPagePrivateString( 'nonceAction', [ $action, $userId, $uuid ] )
+			);
+		}
+	}
+
+	private function handlePostExpectRedirect( AdminPage $adminPage ) :void {
+		try {
+			$adminPage->handlePost();
+		}
+		catch ( Wpm_Test_Redirect_Exception ) {
+			return;
+		}
+
+		throw new RuntimeException( 'Expected admin POST to redirect.' );
+	}
+
+	/**
+	 * @param array<int,mixed> $args
+	 */
+	private function adminPagePrivateString( string $method, array $args ) :string {
+		$reflection = new ReflectionMethod( AdminPage::class, $method );
+		$reflection->setAccessible( true );
+		$result = $reflection->invokeArgs( $this->adminPage(), $args );
+		if ( !is_string( $result ) ) {
+			throw new RuntimeException( 'Expected AdminPage::'.$method.'() to return a string.' );
+		}
+
+		return $result;
 	}
 
 	/**
