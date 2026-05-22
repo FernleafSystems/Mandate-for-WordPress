@@ -1,0 +1,28 @@
+{
+  "name": "fernleafsystems/application-password-scoper",
+  "description": "Restrict WordPress Application Passwords to a saved capability allowlist.",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "php": ">=8.2"
+  },
+  "config": {
+    "platform": {
+      "php": "8.2"
+    },
+    "sort-packages": true,
+    "allow-plugins": {}
+  },
+  "autoload": {
+    "psr-4": {
+      "FernleafSystems\\Wordpress\\Plugin\\ApplicationPasswordScoper\\": "src/"
+    }
+  },
+  "scripts": {
+    "test": "@test:unit",
+    "test:unit": "@php tests/Unit/run.php",
+    "test:browser": "@php tests/browser/run-browser.php"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
