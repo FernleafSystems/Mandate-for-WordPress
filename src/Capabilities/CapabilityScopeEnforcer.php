@@ -7,6 +7,10 @@ namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilitie
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\MetaCaps\MetaCapabilityRegistry;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class CapabilityScopeEnforcer {
 
 	private ScopeRepository $scopeRepository;

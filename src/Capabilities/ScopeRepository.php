@@ -6,6 +6,10 @@ namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilitie
 
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords\ApplicationPasswordRepository;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class ScopeRepository {
 
 	public const OPTION_NAME = 'application_password_scoper_scopes';

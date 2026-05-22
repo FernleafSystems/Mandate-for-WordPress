@@ -4,6 +4,10 @@ declare( strict_types=1 );
 
 namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\ApplicationPasswords;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class ApplicationPasswordRepository {
 
 	/**

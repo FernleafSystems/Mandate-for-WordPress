@@ -4,6 +4,10 @@ declare( strict_types=1 );
 
 namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class CapabilityName {
 
 	public static function normalize( string $capability ) :string {

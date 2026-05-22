@@ -21,6 +21,7 @@
   "scripts": {
     "test": "@test:unit",
     "test:unit": "@php tests/Unit/run.php",
+    "test:plugin-check": "@php tests/plugin-check/run-plugin-check.php",
     "test:browser": "@php tests/browser/run-browser.php"
   },
   "minimum-stability": "stable",

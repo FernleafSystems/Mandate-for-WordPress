@@ -6,6 +6,10 @@ namespace FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\MetaCaps;
 
 use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Capabilities\CapabilityName;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class MetaCapabilityRegistry {
 
 	private const DEFAULT_META_CAPABILITIES = [
