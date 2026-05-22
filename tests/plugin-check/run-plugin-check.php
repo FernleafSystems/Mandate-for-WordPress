@@ -2,14 +2,27 @@
 
 declare( strict_types=1 );
 
+use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\ApplicationPasswordScoper\Tooling\RuntimePackageBuilder;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
+
 const APS_PLUGIN_CHECK_DEFAULT_VERSION = '1.9.0';
 
 $rootDir = dirname( __DIR__, 2 );
+$autoload = $rootDir.'/vendor/autoload.php';
+if ( !is_file( $autoload ) ) {
+	fwrite( STDERR, "Missing vendor/autoload.php. Run composer install before Plugin Check.\n" );
+	exit( 1 );
+}
+
+require $autoload;
+
 $args = array_slice( $_SERVER[ 'argv' ] ?? [], 1 );
 $mode = in_array( '--clean', $args, true ) ? 'clean' : 'warm';
 $pluginCheckVersion = getenv( 'APS_PLUGIN_CHECK_VERSION' ) ?: APS_PLUGIN_CHECK_DEFAULT_VERSION;
-$runtimeDir = $rootDir.'/tests/docker/.runtime/plugin-check';
-$packageDir = $runtimeDir.'/application-password-scoper';
+$runtimeDir = Path::join( $rootDir, 'tests/docker/.runtime/plugin-check' );
+$packageDir = Path::join( $runtimeDir, RuntimePackageBuilder::PLUGIN_SLUG );
 
 $compose = [
 	'docker',
@@ -103,118 +116,16 @@ echo sprintf(
 exit( $errorCount > 0 ? 1 : 0 );
 
 function aps_plugin_check_build_package( string $rootDir, string $runtimeDir, string $packageDir ) :void {
-	if ( !is_file( $rootDir.'/vendor/autoload.php' ) ) {
-		fwrite( STDERR, "Missing vendor/autoload.php. Run composer dump-autoload before Plugin Check.\n" );
-		exit( 1 );
-	}
+	$logger = static function ( string $message ) :void {
+		echo $message.PHP_EOL;
+	};
 
-	if ( !is_file( $rootDir.'/readme.txt' ) ) {
-		fwrite( STDERR, "Missing readme.txt. Plugin Check runs against the production package shape.\n" );
-		exit( 1 );
-	}
-
-	if ( !is_dir( $runtimeDir ) && !mkdir( $runtimeDir, 0777, true ) && !is_dir( $runtimeDir ) ) {
-		throw new RuntimeException( 'Failed to create Plugin Check runtime directory.' );
-	}
-
-	aps_plugin_check_remove_directory( $packageDir, $runtimeDir );
-	if ( !mkdir( $packageDir, 0777, true ) && !is_dir( $packageDir ) ) {
-		throw new RuntimeException( 'Failed to create Plugin Check package directory.' );
-	}
-
-	foreach ( [ 'plugin.php', 'init.php', 'unsupported.php', 'readme.txt', 'composer.json' ] as $file ) {
-		aps_plugin_check_copy_file( $rootDir.'/'.$file, $packageDir.'/'.$file );
-	}
-
-	foreach ( [ 'assets/dist/admin-page.css', 'assets/dist/admin-page.js' ] as $file ) {
-		if ( !is_file( $rootDir.'/'.$file ) ) {
-			fwrite( STDERR, "Missing built admin asset: {$file}. Run npm run build before Plugin Check.\n" );
-			exit( 1 );
-		}
-	}
-
-	aps_plugin_check_copy_directory( $rootDir.'/assets/dist', $packageDir.'/assets/dist' );
-	aps_plugin_check_copy_directory( $rootDir.'/src', $packageDir.'/src' );
-	aps_plugin_check_copy_directory( $rootDir.'/vendor', $packageDir.'/vendor' );
-}
-
-function aps_plugin_check_remove_directory( string $directory, string $allowedRoot ) :void {
-	if ( !is_dir( $directory ) ) {
-		return;
-	}
-
-	$realDirectory = realpath( $directory );
-	$realAllowedRoot = realpath( $allowedRoot );
-	if ( $realDirectory === false || $realAllowedRoot === false ) {
-		throw new RuntimeException( 'Could not resolve Plugin Check runtime path.' );
-	}
-
-	$realDirectory = aps_plugin_check_normalize_path( $realDirectory );
-	$realAllowedRoot = aps_plugin_check_normalize_path( $realAllowedRoot );
-	if ( !str_starts_with( $realDirectory, $realAllowedRoot.'/' ) ) {
-		throw new RuntimeException( 'Refusing to remove a directory outside the Plugin Check runtime path.' );
-	}
-
-	$items = scandir( $directory );
-	if ( $items === false ) {
-		throw new RuntimeException( 'Could not read Plugin Check runtime directory.' );
-	}
-
-	foreach ( $items as $item ) {
-		if ( $item === '.' || $item === '..' ) {
-			continue;
-		}
-
-		$path = $directory.'/'.$item;
-		if ( is_dir( $path ) && !is_link( $path ) ) {
-			aps_plugin_check_remove_directory( $path, $allowedRoot );
-		}
-		elseif ( file_exists( $path ) || is_link( $path ) ) {
-			unlink( $path );
-		}
-	}
-
-	if ( is_dir( $directory ) ) {
-		rmdir( $directory );
-	}
-}
-
-function aps_plugin_check_copy_directory( string $source, string $target ) :void {
-	if ( !is_dir( $source ) ) {
-		throw new RuntimeException( 'Missing package source directory: '.$source );
-	}
-
-	$iterator = new RecursiveIteratorIterator(
-		new RecursiveDirectoryIterator( $source, FilesystemIterator::SKIP_DOTS ),
-		RecursiveIteratorIterator::SELF_FIRST
-	);
-	foreach ( $iterator as $item ) {
-		$relativePath = substr( $item->getPathname(), strlen( $source ) + 1 );
-		$destination = $target.'/'.str_replace( '\\', '/', $relativePath );
-		if ( $item->isDir() ) {
-			if ( !is_dir( $destination ) && !mkdir( $destination, 0777, true ) && !is_dir( $destination ) ) {
-				throw new RuntimeException( 'Failed to create package directory: '.$destination );
-			}
-			continue;
-		}
-
-		aps_plugin_check_copy_file( $item->getPathname(), $destination );
-	}
-}
-
-function aps_plugin_check_copy_file( string $source, string $target ) :void {
-	if ( !is_file( $source ) ) {
-		throw new RuntimeException( 'Missing package source file: '.$source );
-	}
-
-	$directory = dirname( $target );
-	if ( !is_dir( $directory ) && !mkdir( $directory, 0777, true ) && !is_dir( $directory ) ) {
-		throw new RuntimeException( 'Failed to create package directory: '.$directory );
-	}
-
-	if ( !copy( $source, $target ) ) {
-		throw new RuntimeException( 'Failed to copy package file: '.$source );
-	}
+	( new RuntimePackageBuilder(
+		$rootDir,
+		new CommandRunner( $rootDir, $logger ),
+		new Filesystem(),
+		$logger
+	) )->build( $packageDir, $runtimeDir, false );
 }
 
 /**
@@ -355,8 +266,4 @@ function aps_plugin_check_print_findings( array $findings ) :void {
 
 function aps_plugin_check_quote_arg( string $arg ) :string {
 	return preg_match( '/\s/', $arg ) === 1 ? '"'.$arg.'"' : $arg;
-}
-
-function aps_plugin_check_normalize_path( string $path ) :string {
-	return str_replace( '\\', '/', $path );
 }

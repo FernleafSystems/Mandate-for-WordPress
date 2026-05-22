@@ -1,6 +1,7 @@
 .idea/
 vendor/
 node_modules/
+build/
 test-results/
 playwright-report/
 tests/docker/.runtime/

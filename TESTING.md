@@ -4,19 +4,20 @@
 
 ## Setup
 
-From a fresh checkout, generate Composer's autoload files before running tests or activating the plugin:
+From a fresh checkout, install Composer dependencies before running tests, build tooling, or activating the plugin:
 
 ```powershell
-composer dump-autoload
+composer install
 ```
 
-The plugin runtime and unit test bootstrap require `vendor/autoload.php`. `vendor/` remains ignored for this cleanup, so packaging or committing generated Composer files is a separate decision.
+The plugin runtime, unit test bootstrap, and build tooling require `vendor/autoload.php`. `vendor/` remains ignored; `composer.lock` is committed so Composer tooling dependencies stay reproducible.
 
 ## Public Commands
 
 | Goal | Command | Notes |
 | --- | --- | --- |
 | Admin assets | `npm run build` | Builds the committed Vite admin JS/CSS assets in `assets/dist`. |
+| Build zip | `composer build-zip` | Builds assets, creates a production-shaped package, and writes `build/application-password-scoper-YYYYmmdd-HHMMSS.zip`. |
 | Unit tests | `composer test:unit` | Runs the no-dependency PHP unit runner in `tests/Unit`. |
 | Default PHP test gate | `composer test` | Alias for `composer test:unit`. |
 | Plugin Check | `composer test:plugin-check -- --clean` | Builds a production-shaped plugin package and runs WordPress.org Plugin Check through WP-CLI. Omit `-- --clean` for a warm repeat. |
@@ -37,15 +38,28 @@ npx playwright install chromium
 Run these before reporting a completed implementation:
 
 ```powershell
-composer validate
-composer dump-autoload
-npm install --no-audit --no-fund
+composer validate --no-check-publish
+composer install
 npm run build
+composer build-zip
 Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 composer test:unit
 composer test:plugin-check -- --clean
 composer test:browser -- --clean -- --workers=1
 ```
+
+## Build Zip
+
+`composer build-zip` follows the simple production packaging contract for this plugin:
+
+- runs `npm ci --no-audit --no-fund` and `npm run build` in the source checkout
+- stages the package under `build/package/application-password-scoper`
+- copies only `plugin.php`, `init.php`, `unsupported.php`, `readme.txt`, `src`, and `assets/dist`
+- creates production Composer autoload files in the staged package with `composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader`
+- removes staged Composer metadata before zipping
+- writes the zip under `build/` with the archive root folder `application-password-scoper/`
+
+Use `composer build-zip -- --output=application-password-scoper-test.zip` to choose a filename inside `build/`. Output paths outside `build/` are rejected. Use `--keep-package` when you need to inspect the staged package directory after a build.
 
 `composer test:plugin-check` installs the WordPress.org Plugin Check plugin in a disposable Docker WordPress site and fails on Plugin Check `ERROR` findings. `WARNING` findings are printed for convergence cleanup, but they do not fail the command.
 
@@ -53,7 +67,7 @@ composer test:browser -- --clean -- --workers=1
 
 The Plugin Check lane uses `tests/docker/docker-compose.plugin-check.yml`, which starts MySQL and a WP-CLI container only. It does not expose a WordPress web server or port. The runner seeds WordPress from the local reference checkout, provisions the site through WP-CLI, installs Plugin Check, activates this plugin, and runs `wp plugin check application-password-scoper --format=json`.
 
-Plugin Check inspects a release-shaped package under `tests/docker/.runtime/plugin-check/application-password-scoper`, not the raw repo root. The package contains `plugin.php`, `init.php`, `unsupported.php`, `readme.txt`, `composer.json`, `assets/dist`, `src`, and `vendor`, so `composer dump-autoload` and `npm run build` must be current before running the gate.
+Plugin Check inspects a release-shaped package under `tests/docker/.runtime/plugin-check/application-password-scoper`, not the raw repo root. The package is built with the same runtime package builder as `composer build-zip`, but it skips the source asset rebuild and expects `assets/dist` to already exist. Run `composer install` and `npm run build` before the gate.
 
 The default Plugin Check version is pinned in `tests/plugin-check/run-plugin-check.php`. To test a future Plugin Check release locally:
 

@@ -6,6 +6,11 @@
   "require": {
     "php": ">=8.2"
   },
+  "require-dev": {
+    "ext-zip": "*",
+    "symfony/filesystem": "^7.0",
+    "symfony/process": "^7.0"
+  },
   "config": {
     "platform": {
       "php": "8.2"
@@ -18,7 +23,16 @@
       "FernleafSystems\\Wordpress\\Plugin\\ApplicationPasswordScoper\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "FernleafSystems\\Wordpress\\Plugin\\ApplicationPasswordScoper\\Tooling\\": "infrastructure/src/Tooling/"
+    }
+  },
   "scripts": {
+    "build-zip": [
+      "Composer\\Config::disableProcessTimeout",
+      "@php bin/build-zip.php"
+    ],
     "test": "@test:unit",
     "test:unit": "@php tests/Unit/run.php",
     "test:plugin-check": "@php tests/plugin-check/run-plugin-check.php",
