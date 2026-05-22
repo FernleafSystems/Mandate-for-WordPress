@@ -1,0 +1,56 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: testpass
+      MYSQL_DATABASE: wordpress
+    command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
+    volumes:
+      - wpm-browser-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h localhost -uroot -ptestpass -e 'USE wordpress; SELECT 1;' >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  wordpress:
+    image: wordpress:php8.2-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: testpass
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_ENVIRONMENT_TYPE', 'local' );
+    ports:
+      - "${WPM_BROWSER_PORT:-8898}:80"
+    volumes:
+      - wpm-browser-wp:/var/www/html
+      - ../../:/var/www/html/wp-content/plugins/mandate
+
+  wp-cli:
+    image: wordpress:cli-php8.2
+    user: "0:0"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: testpass
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_ENVIRONMENT_TYPE', 'local' );
+    volumes:
+      - wpm-browser-wp:/var/www/html
+      - ../../../../../Libraries/wordpress:/wordpress-src:ro
+      - ../../:/var/www/html/wp-content/plugins/mandate
+      - ../../:/app
+
+volumes:
+  wpm-browser-db:
+  wpm-browser-wp:
