@@ -12,7 +12,7 @@ if ( !defined( 'ABSPATH' ) ) {
 }
 
 /**
- * @phpstan-type CapabilityScopeRecord array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,updated_at:int,updated_by:int}
+ * @phpstan-type CapabilityScopeRecord array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,roles_at_update:list<string>|null,updated_at:int,updated_by:int}
  */
 class ScopeRepository {
 
@@ -70,12 +70,14 @@ class ScopeRepository {
 	/**
 	 * @param array<string,true> $allowedCaps
 	 * @param array<string,true> $allowedMetaCaps
+	 * @param string[] $rolesAtUpdate
 	 */
 	public function save(
 		string $uuid,
 		int $userId,
 		array $allowedCaps,
 		array $allowedMetaCaps,
+		array $rolesAtUpdate,
 		int $updatedBy
 	) :bool {
 		$uuid = ApplicationPasswordRepository::normalizeUuid( $uuid );
@@ -88,6 +90,7 @@ class ScopeRepository {
 			'user_id'           => $userId,
 			'allowed_caps'      => CapabilityName::normalizeMap( $allowedCaps ),
 			'allowed_meta_caps' => CapabilityName::normalizeMap( $allowedMetaCaps ),
+			'roles_at_update'   => $this->normalizeRoleSlugs( $rolesAtUpdate ),
 			'updated_at'        => time(),
 			'updated_by'        => max( 0, $updatedBy ),
 		];
@@ -141,13 +144,45 @@ class ScopeRepository {
 		$allowedMetaCaps = isset( $record[ 'allowed_meta_caps' ] ) && is_array( $record[ 'allowed_meta_caps' ] )
 			? CapabilityName::normalizeMap( $record[ 'allowed_meta_caps' ] )
 			: [];
+		$rolesAtUpdate = isset( $record[ 'roles_at_update' ] ) && is_array( $record[ 'roles_at_update' ] )
+			? $this->normalizeRoleSlugs( $record[ 'roles_at_update' ] )
+			: null;
 
 		return [
 			'user_id'           => $userId,
 			'allowed_caps'      => $allowedCaps,
 			'allowed_meta_caps' => $allowedMetaCaps,
+			'roles_at_update'   => $rolesAtUpdate,
 			'updated_at'        => isset( $record[ 'updated_at' ] ) ? max( 0, (int)$record[ 'updated_at' ] ) : 0,
 			'updated_by'        => isset( $record[ 'updated_by' ] ) ? max( 0, (int)$record[ 'updated_by' ] ) : 0,
 		];
+	}
+
+	/**
+	 * @param array<int|string,mixed> $roles
+	 * @return list<string>
+	 */
+	private function normalizeRoleSlugs( array $roles ) :array {
+		$normalized = [];
+		foreach ( $roles as $role ) {
+			if ( !is_scalar( $role ) ) {
+				continue;
+			}
+
+			$slug = trim( (string)$role );
+			if ( $slug === '' ) {
+				continue;
+			}
+
+			$slug = function_exists( 'sanitize_key' )
+				? sanitize_key( $slug )
+				: strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $slug ) ?? '' );
+			if ( $slug !== '' ) {
+				$normalized[ $slug ] = $slug;
+			}
+		}
+
+		ksort( $normalized, SORT_NATURAL );
+		return array_values( $normalized );
 	}
 }

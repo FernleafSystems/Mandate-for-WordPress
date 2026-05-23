@@ -148,7 +148,14 @@ class AdminPage {
 
 					$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
 					$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
-					$this->scopeRepository->save( $uuid, $userId, $allowedCaps, $allowedMetaCaps, get_current_user_id() );
+					$this->scopeRepository->save(
+						$uuid,
+						$userId,
+						$allowedCaps,
+						$allowedMetaCaps,
+						$this->roleSlugsForUser( $userId ),
+						get_current_user_id()
+					);
 					$message = 'saved';
 				}
 			}
@@ -259,6 +266,8 @@ class AdminPage {
 	 * @param CapabilityScopeRecord|null $scope
 	 */
 	private function renderSelectionForm( int $selectedUserId, array $passwords, string $selectedUuid, ?array $scope ) :void {
+		$currentRoleSlugs = $this->roleSlugsForUser( $selectedUserId );
+
 		echo '<form method="get" action="'.esc_url( admin_url( 'tools.php' ) ).'" class="mandate-selection" data-wpm-selection-form>';
 		echo '<input type="hidden" name="page" value="'.esc_attr( Plugin::MENU_SLUG ).'" />';
 		echo '<div class="mandate-selection-grid">';
@@ -274,7 +283,7 @@ class AdminPage {
 			]
 		);
 		echo '</div>';
-		$this->renderRoleSummary( $selectedUserId );
+		$this->renderRoleSummary( $currentRoleSlugs );
 		echo '</div>';
 
 		echo '<div class="mandate-selection-column">';
@@ -291,7 +300,7 @@ class AdminPage {
 			echo '<p class="description">'.esc_html__( 'No application passwords are available for this user.', 'mandate' ).'</p>';
 		}
 		echo '</div>';
-		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope );
+		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope, $currentRoleSlugs );
 		echo '</div>';
 		echo '</div>';
 		echo '<p class="mandate-selection-status" data-wpm-selection-status hidden>'.esc_html__( 'Loading selection...', 'mandate' ).'</p>';
@@ -299,8 +308,11 @@ class AdminPage {
 		echo '</form>';
 	}
 
-	private function renderRoleSummary( int $selectedUserId ) :void {
-		$roles = $this->roleSummaries( $selectedUserId );
+	/**
+	 * @param list<string> $roleSlugs
+	 */
+	private function renderRoleSummary( array $roleSlugs ) :void {
+		$roles = $this->roleSummaries( $roleSlugs );
 		echo '<div id="mandate-role-summary" class="mandate-role-summary">';
 		echo '<p class="mandate-role-summary-label">'.esc_html__( 'Roles for selected user', 'mandate' ).'</p>';
 		if ( empty( $roles ) ) {
@@ -321,17 +333,38 @@ class AdminPage {
 	}
 
 	/**
-	 * @return array<int,array{name:string,slug:string}>
+	 * @return list<string>
 	 */
-	private function roleSummaries( int $selectedUserId ) :array {
+	private function roleSlugsForUser( int $selectedUserId ) :array {
 		$user = $selectedUserId > 0 ? get_userdata( $selectedUserId ) : false;
 		if ( !is_object( $user ) || !isset( $user->roles ) || !is_array( $user->roles ) ) {
 			return [];
 		}
 
+		$slugs = [];
+		foreach ( $user->roles as $role ) {
+			if ( !is_scalar( $role ) ) {
+				continue;
+			}
+
+			$slug = sanitize_key( (string)$role );
+			if ( $slug !== '' ) {
+				$slugs[ $slug ] = $slug;
+			}
+		}
+
+		ksort( $slugs, SORT_NATURAL );
+		return array_values( $slugs );
+	}
+
+	/**
+	 * @param list<string> $roleSlugs
+	 * @return array<int,array{name:string,slug:string}>
+	 */
+	private function roleSummaries( array $roleSlugs ) :array {
 		$wpRoles = function_exists( 'wp_roles' ) ? wp_roles() : null;
 		$summaries = [];
-		foreach ( array_unique( array_filter( array_map( 'strval', $user->roles ) ) ) as $roleSlug ) {
+		foreach ( $roleSlugs as $roleSlug ) {
 			$registered = is_object( $wpRoles ) && method_exists( $wpRoles, 'get_role' )
 				? $wpRoles->get_role( $roleSlug )
 				: null;
@@ -360,8 +393,9 @@ class AdminPage {
 	/**
 	 * @param list<ApplicationPasswordRecord> $passwords
 	 * @param CapabilityScopeRecord|null $scope
+	 * @param list<string> $currentRoleSlugs
 	 */
-	private function renderPasswordSummary( array $passwords, string $selectedUuid, ?array $scope ) :void {
+	private function renderPasswordSummary( array $passwords, string $selectedUuid, ?array $scope, array $currentRoleSlugs ) :void {
 		$password = $this->selectedPassword( $passwords, $selectedUuid );
 		if ( $password === null ) {
 			return;
@@ -379,8 +413,28 @@ class AdminPage {
 			__( 'Scope', 'mandate' ),
 			$scope === null ? __( 'Unrestricted', 'mandate' ) : __( 'Restricted', 'mandate' )
 		);
+		if ( $scope !== null ) {
+			$this->renderDetailItem( __( 'Scope Last Saved', 'mandate' ), $this->formatTimestamp( $scope[ 'updated_at' ] ) );
+			$this->renderDetailItem(
+				__( 'Roles When Saved', 'mandate' ),
+				$scope[ 'roles_at_update' ] === null
+					? __( 'Not recorded', 'mandate' )
+					: $this->formatRoleSlugs( $scope[ 'roles_at_update' ] )
+			);
+			$this->renderDetailItem( __( 'Current Roles', 'mandate' ), $this->formatRoleSlugs( $currentRoleSlugs ) );
+		}
 		echo '</dl>';
+		if ( $scope !== null && $scope[ 'roles_at_update' ] !== null && $scope[ 'roles_at_update' ] !== $currentRoleSlugs ) {
+			echo '<div class="notice notice-warning inline" data-wpm-role-snapshot-status="changed"><p>'.esc_html__( 'The selected user roles have changed since this scope was saved. Review the selected capabilities before relying on this scope.', 'mandate' ).'</p></div>';
+		}
 		echo '</div>';
+	}
+
+	/**
+	 * @param list<string> $roleSlugs
+	 */
+	private function formatRoleSlugs( array $roleSlugs ) :string {
+		return $roleSlugs === [] ? __( 'No roles', 'mandate' ) : implode( ', ', $roleSlugs );
 	}
 
 	/**

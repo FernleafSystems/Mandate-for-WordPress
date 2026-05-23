@@ -104,7 +104,7 @@ class CapabilityScopeEnforcer {
 	}
 
 	/**
-	 * @return array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,updated_at:int,updated_by:int}|null
+	 * @return array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,roles_at_update:list<string>|null,updated_at:int,updated_by:int}|null
 	 */
 	private function scopeForCurrentRequest() :?array {
 		$uuid = $this->context->uuid();
