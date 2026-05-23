@@ -86,6 +86,30 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 		$this->assertTrue( current_user_can( 'upload_files' ) );
 	}
 
+	public function test_scoped_application_password_denies_unallowlisted_mapped_meta_cap() :void {
+		$userId = $this->createUser();
+		$postId = $this->createPost( $userId );
+		$item = $this->createApplicationPassword( $userId );
+		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository->save( $item[ 'uuid' ], $userId, [ 'read' => true, 'edit_posts' => true ], [], [ self::ROLE ], 1 );
+
+		wp_set_current_user( $userId );
+		do_action( 'application_password_did_authenticate', get_user_by( 'id', $userId ), $item );
+
+		$this->assertFalse( current_user_can( 'edit_post', $postId ) );
+	}
+
+	public function test_normal_request_keeps_mapped_meta_cap_behavior_unchanged() :void {
+		$userId = $this->createUser();
+		$postId = $this->createPost( $userId );
+		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository->save( self::UUID, $userId, [ 'read' => true ], [], [ self::ROLE ], 1 );
+
+		wp_set_current_user( $userId );
+
+		$this->assertTrue( current_user_can( 'edit_post', $postId ) );
+	}
+
 	public function test_deleted_application_password_prunes_only_matching_scope() :void {
 		$userId = $this->createUser();
 		$otherUserId = $this->createUser();
@@ -96,11 +120,38 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 		do_action( 'wp_delete_application_password', $userId, [ 'uuid' => self::UUID ] );
 
 		$this->assertNull( $repository->find( self::UUID ) );
-		$this->assertSame( $otherUserId, $repository->find( self::OTHER_UUID )[ 'user_id' ] );
+		$remaining = $repository->find( self::OTHER_UUID );
+		$this->assertNotNull( $remaining );
+		$this->assertSame( $otherUserId, $remaining[ 'user_id' ] );
+	}
+
+	public function test_real_application_password_deletion_prunes_only_matching_scope() :void {
+		$userId = $this->createUser();
+		$otherUserId = $this->createUser();
+		$item = $this->createApplicationPassword( $userId );
+		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository->save( $item[ 'uuid' ], $userId, [ 'read' => true ], [], [ self::ROLE ], 1 );
+		$repository->save( self::OTHER_UUID, $otherUserId, [ 'read' => true ], [], [ self::ROLE ], 1 );
+
+		$this->assertTrue( WP_Application_Passwords::delete_application_password( $userId, $item[ 'uuid' ] ) );
+
+		$this->assertNull( $repository->find( $item[ 'uuid' ] ) );
+		$remaining = $repository->find( self::OTHER_UUID );
+		$this->assertNotNull( $remaining );
+		$this->assertSame( $otherUserId, $remaining[ 'user_id' ] );
 	}
 
 	private function createUser() :int {
 		return (int)self::factory()->user->create( [ 'role' => self::ROLE ] );
+	}
+
+	private function createPost( int $authorId ) :int {
+		return (int)self::factory()->post->create(
+			[
+				'post_author' => $authorId,
+				'post_status' => 'draft',
+			]
+		);
 	}
 
 	/**

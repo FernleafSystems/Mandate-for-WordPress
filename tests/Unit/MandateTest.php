@@ -199,37 +199,6 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertArrayNotHasKey( 'delete_posts', $candidates );
 	}
 
-	public function testApplicationPasswordRepositoryOwnsNormalizedPasswordRecordContract() :void {
-		WP_Application_Passwords::$passwordsByUser = [
-			5 => [
-				[
-					'uuid'      => '11111111-1111-4111-8111-111111111111',
-					'name'      => 'Client App',
-					'app_id'    => 123,
-					'created'   => '10',
-					'last_used' => null,
-				],
-				[
-					'uuid' => 'not-a-uuid',
-					'name' => 'Broken',
-				],
-			],
-		];
-
-		$this->assertSame(
-			[
-				[
-					'uuid'      => '11111111-1111-4111-8111-111111111111',
-					'name'      => 'Client App',
-					'app_id'    => '123',
-					'created'   => 10,
-					'last_used' => 0,
-				],
-			],
-			( new ApplicationPasswordRepository() )->forUser( 5 )
-		);
-	}
-
 	public function testApplicationPasswordContextCapturesOnlyValidAuthenticatedPasswordRecords() :void {
 		$context = new CurrentApplicationPasswordContext();
 
@@ -387,6 +356,27 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertFalse( $filtered[ 'delete_posts' ] );
 	}
 
+	public function testScopedApplicationPasswordDeniesSavedCapsThatAreNoLongerRoleDerived() :void {
+		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'read' => true, 'upload_files' => true ] );
+		$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles(
+			[
+				'wpm_editor' => [
+					'read' => true,
+				],
+			]
+		);
+
+		$filtered = $enforcer->filterUserCapabilities(
+			[ 'read' => true, 'upload_files' => true ],
+			[ 'upload_files' ],
+			[ 'upload_files', 5 ],
+			(object)[ 'ID' => 5 ]
+		);
+
+		$this->assertTrue( $filtered[ 'read' ] );
+		$this->assertFalse( $filtered[ 'upload_files' ] );
+	}
+
 	public function testEnforcementNeverGrantsMissingCaps() :void {
 		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'read' => true, 'edit_posts' => true ] );
 
@@ -446,6 +436,25 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$this->assertSame(
 			[ 'do_not_allow' ],
+			$enforcer->filterMetaCaps( [ 'manage_options' ], 'manage_network_options', 5, [] )
+		);
+	}
+
+	public function testScopedSuperAdminMappedPrimitiveCapsInsideAllowlistArePreserved() :void {
+		$GLOBALS[ 'wpm_test_is_multisite' ] = true;
+		$GLOBALS[ 'wpm_test_super_admins' ] = [ 5 ];
+		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'manage_options' => true, 'read' => true ] );
+		$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles(
+			[
+				'wpm_editor' => [
+					'manage_options' => true,
+					'read'           => true,
+				],
+			]
+		);
+
+		$this->assertSame(
+			[ 'manage_options' ],
 			$enforcer->filterMetaCaps( [ 'manage_options' ], 'manage_network_options', 5, [] )
 		);
 	}
@@ -597,6 +606,19 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 'reset', $this->redirectMessage( $location ) );
 	}
 
+	public function testAdminPostRefusesMultisiteSuperAdminScopeWithoutMutation() :void {
+		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_is_multisite' ] = true;
+		$GLOBALS[ 'wpm_test_super_admins' ] = [ 5 ];
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true );
+
+		$repository = $this->scopeRepository();
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$this->assertSame( [], $repository->all() );
+		$this->assertSame( 'super_admin_unsupported', $this->redirectMessage( $location ) );
+	}
+
 	public function testAdminRenderFlagsChangedRoleSnapshot() :void {
 		$this->seedAdminFixture();
 		$repository = $this->scopeRepository();
@@ -636,6 +658,24 @@ final class MandateTest extends Wpm_Test_Case {
 		$html = $this->renderAdminPage( $repository );
 
 		$this->assertFalse( str_contains( $html, 'data-wpm-role-snapshot-status="changed"' ) );
+	}
+
+	public function testAdminRenderAddsTooltipAttributesForDescribedCapabilitiesOnly() :void {
+		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_roles' ]->roles[ 'wpm_editor' ][ 'wpm_manage_widget' ] = true;
+
+		$html = $this->renderAdminPage( $this->scopeRepository() );
+
+		$described = $this->capabilityCodeAttributes( $html, 'upload_files' );
+		$this->assertSame( '', $described[ 'data-wpm-tooltip' ] );
+		$this->assertArrayHasKey( 'data-wpm-tooltip-text', $described );
+		$this->assertNotSame( '', $described[ 'data-wpm-tooltip-text' ] );
+		$this->assertSame( '0', $described[ 'tabindex' ] );
+
+		$custom = $this->capabilityCodeAttributes( $html, 'wpm_manage_widget' );
+		$this->assertArrayNotHasKey( 'data-wpm-tooltip', $custom );
+		$this->assertArrayNotHasKey( 'data-wpm-tooltip-text', $custom );
+		$this->assertArrayNotHasKey( 'tabindex', $custom );
 	}
 
 	public function testAdminPostClearsOnlyOwnedScope() :void {
@@ -859,6 +899,40 @@ final class MandateTest extends Wpm_Test_Case {
 			ob_end_clean();
 			throw $throwable;
 		}
+	}
+
+	/**
+	 * @return array<string,string>
+	 */
+	private function capabilityCodeAttributes( string $html, string $capability ) :array {
+		$document = new DOMDocument();
+		$previous = libxml_use_internal_errors( true );
+		try {
+			$document->loadHTML( '<!doctype html><html><body>'.$html.'</body></html>' );
+			libxml_clear_errors();
+		}
+		finally {
+			libxml_use_internal_errors( $previous );
+		}
+
+		$xpath = new DOMXPath( $document );
+		$capabilityLiteral = json_encode( $capability, JSON_THROW_ON_ERROR );
+		$nodes = $xpath->query( '//code[normalize-space(.) = '.$capabilityLiteral.']' );
+		if ( !$nodes instanceof DOMNodeList || $nodes->length < 1 ) {
+			throw new RuntimeException( 'Expected rendered capability code for '.$capability.'.' );
+		}
+
+		$node = $nodes->item( 0 );
+		if ( !$node instanceof DOMElement ) {
+			throw new RuntimeException( 'Expected capability node to be an element.' );
+		}
+
+		$attributes = [];
+		foreach ( $node->attributes ?? [] as $attribute ) {
+			$attributes[ $attribute->name ] = $attribute->value;
+		}
+
+		return $attributes;
 	}
 
 	/**

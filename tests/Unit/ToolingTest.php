@@ -70,6 +70,16 @@ final class ToolingTest extends Wpm_Test_Case {
 		);
 	}
 
+	public function testTemporaryDirectoryManagerRefusesEmptyNormalizedPrefix() :void {
+		$manager = new TemporaryDirectoryManager();
+
+		$this->assertThrowsRuntimeException(
+			static function () use ( $manager ) :void {
+				$manager->create( ' -._ ' );
+			}
+		);
+	}
+
 	public function testTemporaryDirectoryManagerRefusesTempFile() :void {
 		$manager = new TemporaryDirectoryManager();
 		$file = \tempnam( \sys_get_temp_dir(), 'mandate-file-test-' );
@@ -115,6 +125,18 @@ final class ToolingTest extends Wpm_Test_Case {
 		}
 	}
 
+	public function testZipBuilderRefusesMissingSourceDirectory() :void {
+		$filesystem = new Filesystem();
+		$zipPath = Path::join( \sys_get_temp_dir(), 'mandate-missing-source-'.\bin2hex( \random_bytes( 4 ) ).'.zip' );
+
+		$this->assertThrowsRuntimeException(
+			static function () use ( $filesystem, $zipPath ) :void {
+				( new ZipBuilder( $filesystem, static function ( string $message ) :void {} ) )
+					->build( Path::join( \sys_get_temp_dir(), 'mandate-missing-source' ), $zipPath, RuntimePackageBuilder::PLUGIN_SLUG );
+			}
+		);
+	}
+
 	public function testRuntimePackageAndZipExcludeStaticSiteDirectory() :void {
 		$filesystem = new Filesystem();
 		$fixtureRoot = Path::join( \sys_get_temp_dir(), 'mandate-package-fixture-'.\bin2hex( \random_bytes( 4 ) ) );
@@ -136,6 +158,7 @@ final class ToolingTest extends Wpm_Test_Case {
 			$this->assertTrue( \is_file( Path::join( $packageDir, 'plugin.php' ) ) );
 			$this->assertTrue( \is_file( Path::join( $packageDir, 'assets/dist/admin-page.js' ) ) );
 			$this->assertFalse( \file_exists( Path::join( $packageDir, 'site' ) ) );
+			$this->assertPackageComposerJsonContainsRuntimeConfigOnly( $packageDir );
 
 			( new ZipBuilder( $filesystem, static function ( string $message ) :void {} ) )
 				->build( $packageDir, $zipPath, RuntimePackageBuilder::PLUGIN_SLUG );
@@ -165,6 +188,22 @@ final class ToolingTest extends Wpm_Test_Case {
 				$packageRoot,
 			] );
 		}
+	}
+
+	private function assertPackageComposerJsonContainsRuntimeConfigOnly( string $packageDir ) :void {
+		$json = \file_get_contents( Path::join( $packageDir, 'composer.json' ) );
+		if ( !\is_string( $json ) ) {
+			throw new RuntimeException( 'Failed to read package composer.json.' );
+		}
+
+		$config = \json_decode( $json, true );
+		$this->assertIsArray( $config );
+		$this->assertSame( [ 'php' => '>=8.1' ], $config[ 'require' ] );
+		$this->assertSame( [ 'psr-4' => [ 'Fixture\\' => 'src/' ] ], $config[ 'autoload' ] );
+		$this->assertArrayNotHasKey( 'require-dev', $config );
+		$this->assertArrayNotHasKey( 'autoload-dev', $config );
+		$this->assertArrayNotHasKey( 'scripts', $config );
+		$this->assertArrayNotHasKey( 'minimum-stability', $config );
 	}
 
 	private function createPackageFixture( string $fixtureRoot, Filesystem $filesystem ) :void {
@@ -197,12 +236,24 @@ final class ToolingTest extends Wpm_Test_Case {
 			'require'     => [
 				'php' => '>=8.1',
 			],
+			'require-dev' => [
+				'phpunit/phpunit' => '^11.5',
+			],
 			'config'      => [],
 			'autoload'    => [
 				'psr-4' => [
 					'Fixture\\' => 'src/',
 				],
 			],
+			'autoload-dev' => [
+				'psr-4' => [
+					'Fixture\\Tests\\' => 'tests/',
+				],
+			],
+			'scripts' => [
+				'test' => 'phpunit',
+			],
+			'minimum-stability' => 'dev',
 		];
 
 		$json = \json_encode( $composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
