@@ -1,5 +1,11 @@
 import './admin-page.css';
 
+const TOOLTIP_ID = 'mandate-capability-tooltip';
+
+let tooltipElement = null;
+let tooltipTarget = null;
+let tooltipGlobalEventsBound = false;
+
 function submitForm( form ) {
 	if ( typeof form.requestSubmit === 'function' ) {
 		form.requestSubmit();
@@ -95,11 +101,141 @@ function enhanceBulkControls( root ) {
 	} );
 }
 
+function getTooltipElement() {
+	if ( tooltipElement ) {
+		return tooltipElement;
+	}
+
+	tooltipElement = document.createElement( 'div' );
+	tooltipElement.id = TOOLTIP_ID;
+	tooltipElement.className = 'mandate-tooltip';
+	tooltipElement.setAttribute( 'role', 'tooltip' );
+	tooltipElement.hidden = true;
+	document.body.appendChild( tooltipElement );
+
+	return tooltipElement;
+}
+
+function positionTooltip( target ) {
+	const tooltip = getTooltipElement();
+	const targetRect = target.getBoundingClientRect();
+	const tooltipRect = tooltip.getBoundingClientRect();
+	const viewportPadding = 8;
+	const gap = 8;
+	const viewportWidth = document.documentElement.clientWidth;
+	let top = targetRect.top - tooltipRect.height - gap;
+
+	if ( top < viewportPadding ) {
+		top = targetRect.bottom + gap;
+	}
+
+	const centeredLeft = targetRect.left + ( targetRect.width / 2 ) - ( tooltipRect.width / 2 );
+	const maxLeft = Math.max( viewportPadding, viewportWidth - tooltipRect.width - viewportPadding );
+	const left = Math.min( Math.max( viewportPadding, centeredLeft ), maxLeft );
+
+	tooltip.style.left = `${left}px`;
+	tooltip.style.top = `${top}px`;
+}
+
+function hideTooltip() {
+	if ( tooltipTarget ) {
+		tooltipTarget.removeAttribute( 'aria-describedby' );
+		tooltipTarget = null;
+	}
+
+	if ( tooltipElement ) {
+		tooltipElement.hidden = true;
+		tooltipElement.textContent = '';
+	}
+}
+
+function showTooltip( target ) {
+	const text = target.dataset.wpmTooltipText;
+	if ( !text ) {
+		hideTooltip();
+		return;
+	}
+
+	const tooltip = getTooltipElement();
+	if ( tooltipTarget && tooltipTarget !== target ) {
+		tooltipTarget.removeAttribute( 'aria-describedby' );
+	}
+
+	tooltipTarget = target;
+	tooltip.textContent = text;
+	tooltip.hidden = false;
+	target.setAttribute( 'aria-describedby', TOOLTIP_ID );
+	positionTooltip( target );
+}
+
+function bindTooltipGlobalEvents() {
+	if ( tooltipGlobalEventsBound ) {
+		return;
+	}
+
+	document.addEventListener( 'keydown', ( event ) => {
+		if ( event.key === 'Escape' ) {
+			hideTooltip();
+		}
+	} );
+	window.addEventListener( 'scroll', hideTooltip, true );
+	window.addEventListener( 'resize', hideTooltip );
+	tooltipGlobalEventsBound = true;
+}
+
+function closestTooltipTarget( event ) {
+	if ( !( event.target instanceof Element ) ) {
+		return null;
+	}
+
+	return event.target.closest( '[data-wpm-tooltip]' );
+}
+
+function enhanceTooltips( root ) {
+	bindTooltipGlobalEvents();
+
+	root.addEventListener( 'pointerover', ( event ) => {
+		const target = closestTooltipTarget( event );
+		if ( target ) {
+			showTooltip( target );
+		}
+	} );
+
+	root.addEventListener( 'pointerout', ( event ) => {
+		const target = closestTooltipTarget( event );
+		const movedInsideTarget = event.relatedTarget instanceof Node && target && target.contains( event.relatedTarget );
+		if ( target && target === tooltipTarget && !movedInsideTarget ) {
+			hideTooltip();
+		}
+	} );
+
+	root.addEventListener( 'focusin', ( event ) => {
+		const target = closestTooltipTarget( event );
+		if ( target ) {
+			showTooltip( target );
+		}
+	} );
+
+	root.addEventListener( 'focusout', ( event ) => {
+		const target = closestTooltipTarget( event );
+		if ( target && target === tooltipTarget ) {
+			hideTooltip();
+		}
+	} );
+
+	root.addEventListener( 'click', ( event ) => {
+		if ( event.target instanceof Element && event.target.closest( '[data-wpm-tab]' ) ) {
+			hideTooltip();
+		}
+	} );
+}
+
 document.addEventListener( 'DOMContentLoaded', () => {
 	document.querySelectorAll( '.mandate' ).forEach( ( root ) => {
 		root.classList.add( 'is-wpm-enhanced' );
 		enhanceSelectionForm( root );
 		enhanceTabs( root );
 		enhanceBulkControls( root );
+		enhanceTooltips( root );
 	} );
 } );

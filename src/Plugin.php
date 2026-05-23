@@ -8,6 +8,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
@@ -32,6 +33,7 @@ class Plugin {
 		$scopeRepository = new ScopeRepository( $optionsRepository );
 		$passwordRepository = new ApplicationPasswordRepository();
 		$candidateProvider = new CapabilityCandidateProvider();
+		$descriptionProvider = new CapabilityDescriptionProvider();
 		$groupProvider = new CapabilityGroupProvider();
 		$metaRegistry = new MetaCapabilityRegistry();
 		$context = new CurrentApplicationPasswordContext();
@@ -40,6 +42,7 @@ class Plugin {
 			$scopeRepository,
 			$passwordRepository,
 			$candidateProvider,
+			$descriptionProvider,
 			$metaRegistry,
 			$groupProvider,
 			$pluginFile

@@ -6,6 +6,7 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityName;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
@@ -36,6 +37,8 @@ class AdminPage {
 
 	private CapabilityCandidateProvider $candidateProvider;
 
+	private CapabilityDescriptionProvider $descriptionProvider;
+
 	private MetaCapabilityRegistry $metaRegistry;
 
 	private CapabilityGroupProvider $groupProvider;
@@ -48,6 +51,7 @@ class AdminPage {
 		ScopeRepository $scopeRepository,
 		ApplicationPasswordRepository $passwordRepository,
 		CapabilityCandidateProvider $candidateProvider,
+		CapabilityDescriptionProvider $descriptionProvider,
 		MetaCapabilityRegistry $metaRegistry,
 		CapabilityGroupProvider $groupProvider,
 		string $pluginFile
@@ -55,6 +59,7 @@ class AdminPage {
 		$this->scopeRepository = $scopeRepository;
 		$this->passwordRepository = $passwordRepository;
 		$this->candidateProvider = $candidateProvider;
+		$this->descriptionProvider = $descriptionProvider;
 		$this->metaRegistry = $metaRegistry;
 		$this->groupProvider = $groupProvider;
 		$this->pluginFile = $pluginFile;
@@ -546,11 +551,21 @@ class AdminPage {
 		foreach ( array_keys( $capabilities ) as $capability ) {
 			echo '<label>';
 			echo '<input type="checkbox" name="'.esc_attr( $fieldName ).'[]" value="'.esc_attr( $capability ).'" '.checked( isset( $selected[ $capability ] ), true, false ).' /> ';
-			echo '<code>'.esc_html( $capability ).'</code>';
+			$this->renderCapabilityName( $capability );
 			echo '</label>';
 		}
 		echo '</div>';
 		echo '</fieldset>';
+	}
+
+	private function renderCapabilityName( string $capability ) :void {
+		$description = $this->descriptionProvider->descriptionFor( $capability );
+		if ( $description === '' ) {
+			echo '<code>'.esc_html( $capability ).'</code>';
+			return;
+		}
+
+		echo '<code tabindex="0" data-wpm-tooltip data-wpm-tooltip-text="'.esc_attr( $description ).'">'.esc_html( $capability ).'</code>';
 	}
 
 	private function renderMessage() :void {

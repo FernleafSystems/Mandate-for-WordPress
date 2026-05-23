@@ -75,6 +75,10 @@ function primitiveCapInput( page, group, capability ) {
 	return page.locator( `#mandate-${group}-primitive-capabilities input[name="allowed_caps[]"][value="${capability}"]` );
 }
 
+function primitiveCapTooltipTarget( page, group, capability ) {
+	return page.locator( `#mandate-${group}-primitive-capabilities [data-wpm-tooltip]` ).filter( { hasText: capability } );
+}
+
 function anyPrimitiveCapInput( page, capability ) {
 	return page.locator( `input[name="allowed_caps[]"][value="${capability}"]` );
 }
@@ -130,6 +134,20 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 
 	await expect( anyPrimitiveCapInput( page, primary.direct_cap ) ).toHaveCount( 0 );
 	await expect( anyPrimitiveCapInput( page, fixture.unassigned_role_cap ) ).toHaveCount( 0 );
+
+	const uploadFilesName = primitiveCapTooltipTarget( page, 'wordpress', 'upload_files' );
+	const tooltip = page.locator( '[role="tooltip"]' );
+	await expect( uploadFilesName ).toHaveAttribute( 'data-wpm-tooltip', '' );
+	await uploadFilesName.hover();
+	await expect( tooltip ).toBeVisible();
+	await expect( tooltip ).not.toHaveText( '' );
+	await page.keyboard.press( 'Escape' );
+	await expect( tooltip ).not.toBeVisible();
+	await uploadFilesName.focus();
+	await expect( tooltip ).toBeVisible();
+	await expect( tooltip ).not.toHaveText( '' );
+	await page.keyboard.press( 'Escape' );
+	await expect( primitiveCapTooltipTarget( page, 'other', 'wpm_manage_widget' ) ).toHaveCount( 0 );
 
 	await page.locator( '[data-wpm-panel="wordpress"] [data-wpm-select-state="unchecked"]' ).click();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).not.toBeChecked();

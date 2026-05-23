@@ -6,6 +6,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPas
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
@@ -486,6 +487,7 @@ final class MandateTest extends Wpm_Test_Case {
 				$this->scopeRepository(),
 				new ApplicationPasswordRepository(),
 				new CapabilityCandidateProvider(),
+				new CapabilityDescriptionProvider(),
 				new MetaCapabilityRegistry(),
 				new CapabilityGroupProvider(),
 				$pluginFile
@@ -721,6 +723,7 @@ final class MandateTest extends Wpm_Test_Case {
 			$repository ?? $this->scopeRepository(),
 			new ApplicationPasswordRepository(),
 			new CapabilityCandidateProvider(),
+			new CapabilityDescriptionProvider(),
 			new MetaCapabilityRegistry(),
 			new CapabilityGroupProvider(),
 			dirname( __DIR__, 2 ).'/plugin.php'
