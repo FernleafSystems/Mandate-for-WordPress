@@ -12,6 +12,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvide
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -27,7 +28,8 @@ class Plugin {
 	}
 
 	private function register( string $pluginFile ) :void {
-		$scopeRepository = new ScopeRepository();
+		$optionsRepository = new PluginOptionsRepository();
+		$scopeRepository = new ScopeRepository( $optionsRepository );
 		$passwordRepository = new ApplicationPasswordRepository();
 		$candidateProvider = new CapabilityCandidateProvider();
 		$groupProvider = new CapabilityGroupProvider();

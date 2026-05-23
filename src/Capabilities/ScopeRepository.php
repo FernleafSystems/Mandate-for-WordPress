@@ -5,6 +5,7 @@ declare( strict_types=1 );
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -15,19 +16,18 @@ if ( !defined( 'ABSPATH' ) ) {
  */
 class ScopeRepository {
 
-	public const OPTION_NAME = 'mandate_scopes';
+	private PluginOptionsRepository $optionsRepository;
+
+	public function __construct( PluginOptionsRepository $optionsRepository ) {
+		$this->optionsRepository = $optionsRepository;
+	}
 
 	/**
 	 * @return array<string,CapabilityScopeRecord>
 	 */
 	public function all() :array {
-		$raw = function_exists( 'get_option' ) ? get_option( self::OPTION_NAME, [] ) : [];
-		if ( !is_array( $raw ) ) {
-			return [];
-		}
-
 		$normalized = [];
-		foreach ( $raw as $uuid => $record ) {
+		foreach ( $this->optionsRepository->scopes() as $uuid => $record ) {
 			$uuid = ApplicationPasswordRepository::normalizeUuid( (string)$uuid );
 			$record = is_array( $record ) ? $this->normalizeRecord( $record ) : null;
 			if ( $uuid !== '' && $record !== null ) {
@@ -92,7 +92,7 @@ class ScopeRepository {
 			'updated_by'        => max( 0, $updatedBy ),
 		];
 
-		return $this->persist( $all );
+		return $this->optionsRepository->replaceScopes( $all );
 	}
 
 	public function deleteForUser( int $userId, string $uuid ) :bool {
@@ -114,7 +114,7 @@ class ScopeRepository {
 		}
 
 		unset( $all[ $uuid ] );
-		return $this->persist( $all );
+		return $this->optionsRepository->replaceScopes( $all );
 	}
 
 	/**
@@ -149,17 +149,5 @@ class ScopeRepository {
 			'updated_at'        => isset( $record[ 'updated_at' ] ) ? max( 0, (int)$record[ 'updated_at' ] ) : 0,
 			'updated_by'        => isset( $record[ 'updated_by' ] ) ? max( 0, (int)$record[ 'updated_by' ] ) : 0,
 		];
-	}
-
-	/**
-	 * @param array<string,CapabilityScopeRecord> $scopes
-	 */
-	private function persist( array $scopes ) :bool {
-		if ( function_exists( 'update_option' ) ) {
-			$updated = update_option( self::OPTION_NAME, $scopes, false );
-			return (bool)$updated || get_option( self::OPTION_NAME, [] ) === $scopes;
-		}
-
-		return false;
 	}
 }

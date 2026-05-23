@@ -155,7 +155,7 @@ $primaryPassword = wpm_browser_fixture_password( (int)$primaryUser->ID, 'WPM Bro
 $secondaryPassword = wpm_browser_fixture_password( (int)$primaryUser->ID, 'WPM Browser Secondary' );
 $otherPassword = wpm_browser_fixture_password( (int)$otherUser->ID, 'WPM Browser Other' );
 
-update_option( 'mandate_scopes', [], false );
+( new \FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository() )->replaceScopes( [] );
 update_option(
 	'mandate_browser_fixture',
 	[
