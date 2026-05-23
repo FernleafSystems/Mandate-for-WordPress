@@ -466,10 +466,10 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->seedAdminFixture();
 		$this->submitScopePost( 'save_scope', 5, self::OTHER_UUID, [ 'read' ], [], true );
 
-		$this->handlePostExpectRedirect( $this->adminPage() );
+		$location = $this->handlePostExpectRedirect( $this->adminPage() );
 
 		$this->assertSame( [], $this->scopeRepository()->all() );
-		$this->assertTrue( str_contains( (string)$GLOBALS[ 'wpm_test_last_redirect' ], 'mandate_message=invalid' ) );
+		$this->assertSame( 'invalid', $this->redirectMessage( $location ) );
 	}
 
 	public function testAdminPostSavesOwnedScopeWithCandidateCapsOnly() :void {
@@ -494,6 +494,28 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [ 'edit_post' => true ], $record[ 'allowed_meta_caps' ] );
 		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
 		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
+	}
+
+	public function testAdminPostAllSelectedScopeDeletesStoredScope() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1 );
+		$repository->save( self::OTHER_UUID, 9, [ 'read' => true ], [], [], 1 );
+		$this->submitScopePost(
+			'save_scope',
+			5,
+			self::UUID,
+			[ 'read', 'edit_posts', 'upload_files' ],
+			array_keys( ( new MetaCapabilityRegistry() )->registered() ),
+			true
+		);
+
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$storedScopes = $this->storedScopes();
+		$this->assertArrayNotHasKey( self::UUID, $storedScopes );
+		$this->assertArrayHasKey( self::OTHER_UUID, $storedScopes );
+		$this->assertSame( 'reset', $this->redirectMessage( $location ) );
 	}
 
 	public function testAdminRenderFlagsChangedRoleSnapshot() :void {
@@ -544,10 +566,13 @@ final class MandateTest extends Wpm_Test_Case {
 		$repository->save( self::OTHER_UUID, 9, [ 'read' => true ], [], [], 1 );
 		$this->submitScopePost( 'clear_scope', 5, self::UUID, [], [], true );
 
-		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
 
 		$this->assertSame( null, $repository->findForUser( 5, self::UUID ) );
-		$this->assertArrayHasKey( self::OTHER_UUID, $repository->all() );
+		$storedScopes = $this->storedScopes();
+		$this->assertArrayNotHasKey( self::UUID, $storedScopes );
+		$this->assertArrayHasKey( self::OTHER_UUID, $storedScopes );
+		$this->assertSame( 'reset', $this->redirectMessage( $location ) );
 	}
 
 	public function testAdminPostClearRefusesScopeOwnedByDifferentUser() :void {
@@ -556,10 +581,11 @@ final class MandateTest extends Wpm_Test_Case {
 		$repository->save( self::UUID, 9, [ 'read' => true ], [], [], 1 );
 		$this->submitScopePost( 'clear_scope', 5, self::UUID, [], [], true );
 
-		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
 
 		$this->assertSame( 9, $repository->find( self::UUID )[ 'user_id' ] );
-		$this->assertTrue( str_contains( (string)$GLOBALS[ 'wpm_test_last_redirect' ], 'mandate_message=invalid' ) );
+		$this->assertArrayHasKey( self::UUID, $this->storedScopes() );
+		$this->assertSame( 'invalid', $this->redirectMessage( $location ) );
 	}
 
 	public function testScopeRepositoryFindAndDeleteRequireMatchingUser() :void {
@@ -590,6 +616,27 @@ final class MandateTest extends Wpm_Test_Case {
 		$repository->deleteForApplicationPassword( 5, [ 'uuid' => self::UUID ] );
 
 		$this->assertSame( 9, $repository->find( self::UUID )[ 'user_id' ] );
+	}
+
+	public function testPluginDeleteHookPrunesStoredScopeRecord() :void {
+		$this->scopeRepository()->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+		$this->assertArrayHasKey( self::UUID, $this->storedScopes() );
+
+		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		do_action( 'wp_delete_application_password', 5, [ 'uuid' => self::UUID ] );
+
+		$this->assertArrayNotHasKey( self::UUID, $this->storedScopes() );
+	}
+
+	public function testPluginDeleteHookDoesNotPruneScopeForDifferentUser() :void {
+		$this->scopeRepository()->save( self::UUID, 9, [ 'read' => true ], [], [], 1 );
+
+		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		do_action( 'wp_delete_application_password', 5, [ 'uuid' => self::UUID ] );
+
+		$storedScopes = $this->storedScopes();
+		$this->assertArrayHasKey( self::UUID, $storedScopes );
+		$this->assertSame( 9, $storedScopes[ self::UUID ][ 'user_id' ] );
 	}
 
 	private function adminPage( ?ScopeRepository $repository = null ) :AdminPage {
@@ -659,15 +706,34 @@ final class MandateTest extends Wpm_Test_Case {
 		}
 	}
 
-	private function handlePostExpectRedirect( AdminPage $adminPage ) :void {
+	private function handlePostExpectRedirect( AdminPage $adminPage ) :string {
 		try {
 			$adminPage->handlePost();
 		}
-		catch ( Wpm_Test_Redirect_Exception ) {
-			return;
+		catch ( Wpm_Test_Redirect_Exception $redirect ) {
+			return $redirect->location;
 		}
 
 		throw new RuntimeException( 'Expected admin POST to redirect.' );
+	}
+
+	private function redirectMessage( string $location ) :string {
+		$query = parse_url( $location, PHP_URL_QUERY );
+		if ( !is_string( $query ) ) {
+			return '';
+		}
+
+		parse_str( $query, $params );
+		$message = $params[ 'mandate_message' ] ?? '';
+		return is_scalar( $message ) ? (string)$message : '';
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function storedScopes() :array {
+		$scopes = $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ][ 'scopes' ] ?? [];
+		return is_array( $scopes ) ? $scopes : [];
 	}
 
 	private function renderAdminPage( ScopeRepository $repository ) :string {

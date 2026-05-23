@@ -148,15 +148,20 @@ class AdminPage {
 
 					$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
 					$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
-					$this->scopeRepository->save(
-						$uuid,
-						$userId,
-						$allowedCaps,
-						$allowedMetaCaps,
-						$this->roleSlugsForUser( $userId ),
-						get_current_user_id()
-					);
-					$message = 'saved';
+					if ( $allowedCaps === $candidates && $allowedMetaCaps === $this->metaRegistry->registered() ) {
+						$message = $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
+					}
+					else {
+						$this->scopeRepository->save(
+							$uuid,
+							$userId,
+							$allowedCaps,
+							$allowedMetaCaps,
+							$this->roleSlugsForUser( $userId ),
+							get_current_user_id()
+						);
+						$message = 'saved';
+					}
 				}
 			}
 		}

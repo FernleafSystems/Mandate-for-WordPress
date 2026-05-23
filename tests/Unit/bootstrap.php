@@ -94,6 +94,7 @@ function wpm_test_reset_state() :void {
 	$GLOBALS[ 'wpm_test_rest_uuid' ] = null;
 	$GLOBALS[ 'wpm_test_is_multisite' ] = false;
 	$GLOBALS[ 'wpm_test_super_admins' ] = [];
+	$GLOBALS[ 'wpm_test_actions' ] = [];
 	$GLOBALS[ 'wpm_test_filters' ] = [];
 	$GLOBALS[ 'wpm_test_valid_nonces' ] = [];
 	$GLOBALS[ 'wpm_test_last_redirect' ] = null;
@@ -316,6 +317,27 @@ if ( !class_exists( 'WP_Application_Passwords' ) ) {
 
 if ( !function_exists( 'add_action' ) ) {
 	function add_action( string $hookName, mixed $callback, int $priority = 10, int $acceptedArgs = 1 ) :void {
+		$GLOBALS[ 'wpm_test_actions' ][ $hookName ][ $priority ][] = [
+			'callback'      => $callback,
+			'accepted_args' => $acceptedArgs,
+		];
+	}
+}
+
+if ( !function_exists( 'do_action' ) ) {
+	function do_action( string $hookName, mixed ...$args ) :void {
+		$callbacks = $GLOBALS[ 'wpm_test_actions' ][ $hookName ] ?? [];
+		if ( $callbacks === [] ) {
+			return;
+		}
+
+		ksort( $callbacks );
+		foreach ( $callbacks as $priorityCallbacks ) {
+			foreach ( $priorityCallbacks as $callback ) {
+				$acceptedArgs = max( 0, (int)$callback[ 'accepted_args' ] );
+				$callback[ 'callback' ]( ...array_slice( $args, 0, $acceptedArgs ) );
+			}
+		}
 	}
 }
 
