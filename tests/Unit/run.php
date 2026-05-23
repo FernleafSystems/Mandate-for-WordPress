@@ -2,38 +2,36 @@
 
 declare( strict_types=1 );
 
-require __DIR__.'/bootstrap.php';
-require __DIR__.'/MandateTest.php';
-require __DIR__.'/ToolingTest.php';
-
-$classes = [
-	MandateTest::class,
-	ToolingTest::class,
-];
-$failures = 0;
-$count = 0;
-
-foreach ( $classes as $class ) {
-	$test = new $class();
-	foreach ( get_class_methods( $test ) as $method ) {
-		if ( strncmp( $method, 'test', 4 ) !== 0 ) {
-			continue;
-		}
-
-		$count++;
-		try {
-			$test->setUp();
-			$test->{$method}();
-			echo '.';
-		}
-		catch ( Throwable $throwable ) {
-			$failures++;
-			echo "F\n\n";
-			echo $class.'::'.$method."\n";
-			echo $throwable->getMessage()."\n";
-		}
-	}
+$rootDir = dirname( __DIR__, 2 );
+$phpunit = $rootDir.'/vendor/bin/phpunit';
+if ( PHP_OS_FAMILY === 'Windows' ) {
+	$phpunit .= '.bat';
 }
 
-echo "\n".$count.' tests, '.$failures." failures\n";
-exit( $failures > 0 ? 1 : 0 );
+if ( !is_file( $phpunit ) ) {
+	fwrite( STDERR, 'PHPUnit is missing. Run composer install before running tests.'.PHP_EOL );
+	exit( 1 );
+}
+
+$command = array_merge(
+	[
+		$phpunit,
+		'-c',
+		$rootDir.'/phpunit-unit.xml',
+	],
+	array_slice( $_SERVER[ 'argv' ] ?? [], 1 )
+);
+
+$descriptorSpec = [
+	0 => [ 'file', 'php://stdin', 'r' ],
+	1 => [ 'file', 'php://stdout', 'w' ],
+	2 => [ 'file', 'php://stderr', 'w' ],
+];
+
+$process = proc_open( $command, $descriptorSpec, $pipes, $rootDir );
+if ( !is_resource( $process ) ) {
+	fwrite( STDERR, 'Failed to start PHPUnit.'.PHP_EOL );
+	exit( 1 );
+}
+
+exit( proc_close( $process ) );

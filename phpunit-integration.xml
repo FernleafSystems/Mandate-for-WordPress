@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.5/phpunit.xsd"
-	bootstrap="tests/Unit/bootstrap.php"
+	bootstrap="tests/Integration/bootstrap.php"
 	colors="true"
 	cacheResult="false"
-	beStrictAboutOutputDuringTests="true"
+	beStrictAboutOutputDuringTests="false"
 	beStrictAboutTestsThatDoNotTestAnything="true">
 	<testsuites>
-		<testsuite name="Mandate Unit">
-			<directory suffix="Test.php">tests/Unit</directory>
+		<testsuite name="Mandate WordPress Integration">
+			<directory suffix="Test.php">tests/Integration</directory>
 		</testsuite>
 	</testsuites>
 </phpunit>

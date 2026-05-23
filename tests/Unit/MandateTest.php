@@ -229,6 +229,34 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 	}
 
+	public function testApplicationPasswordContextCapturesOnlyValidAuthenticatedPasswordRecords() :void {
+		$context = new CurrentApplicationPasswordContext();
+
+		$context->captureAuthenticatedPassword(
+			(object)[ 'ID' => 5 ],
+			[ 'uuid' => strtoupper( self::UUID ) ]
+		);
+
+		$this->assertSame( 5, $context->userId() );
+		$this->assertSame( self::UUID, $context->uuid() );
+
+		$context = new CurrentApplicationPasswordContext();
+		$context->captureAuthenticatedPassword(
+			(object)[ 'ID' => 5 ],
+			[ 'uuid' => 'not-a-uuid' ]
+		);
+		$this->assertSame( 1, $context->userId() );
+		$this->assertSame( null, $context->uuid() );
+
+		$context = new CurrentApplicationPasswordContext();
+		$context->captureAuthenticatedPassword(
+			(object)[ 'ID' => 0 ],
+			[ 'uuid' => self::UUID ]
+		);
+		$this->assertSame( 1, $context->userId() );
+		$this->assertSame( null, $context->uuid() );
+	}
+
 	public function testCapabilityGroupsClassifyWordpressPrimitiveCaps() :void {
 		$groups = ( new CapabilityGroupProvider() )->group(
 			[
@@ -410,6 +438,17 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 	}
 
+	public function testScopedSuperAdminMappedPrimitiveCapsOutsideAllowlistAreDenied() :void {
+		$GLOBALS[ 'wpm_test_is_multisite' ] = true;
+		$GLOBALS[ 'wpm_test_super_admins' ] = [ 5 ];
+		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'read' => true ] );
+
+		$this->assertSame(
+			[ 'do_not_allow' ],
+			$enforcer->filterMetaCaps( [ 'manage_options' ], 'manage_network_options', 5, [] )
+		);
+	}
+
 	public function testMetaCapabilityRegistryUsesMandateFilter() :void {
 		add_filter(
 			'mandate_meta_capabilities',
@@ -430,6 +469,44 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->adminPage()->handlePost();
 
 		$this->assertSame( [], $this->scopeRepository()->all() );
+	}
+
+	public function testAdminAssetsEnqueueOnlyForRegisteredPageHookAndExistingDistFiles() :void {
+		$root = sys_get_temp_dir().'/mandate-admin-assets-'.bin2hex( random_bytes( 4 ) );
+		$dist = $root.'/assets/dist';
+		$pluginFile = $root.'/plugin.php';
+		if ( !mkdir( $dist, 0777, true ) && !is_dir( $dist ) ) {
+			throw new RuntimeException( 'Failed to create admin asset fixture directory.' );
+		}
+		file_put_contents( $pluginFile, "<?php\n" );
+		file_put_contents( $dist.'/admin-page.css', "body{}\n" );
+
+		try {
+			$adminPage = new AdminPage(
+				$this->scopeRepository(),
+				new ApplicationPasswordRepository(),
+				new CapabilityCandidateProvider(),
+				new MetaCapabilityRegistry(),
+				new CapabilityGroupProvider(),
+				$pluginFile
+			);
+
+			$adminPage->registerMenu();
+			$adminPage->enqueueAssets( 'dashboard_page_not_mandate' );
+			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_styles' ] );
+			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
+
+			$adminPage->enqueueAssets( 'tools_page_mandate' );
+			$this->assertArrayHasKey( 'mandate-admin-page', $GLOBALS[ 'wpm_test_enqueued_styles' ] );
+			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
+			$this->assertSame(
+				'https://example.test/wp-content/plugins/'.basename( $root ).'/assets/dist/admin-page.css',
+				$GLOBALS[ 'wpm_test_enqueued_styles' ][ 'mandate-admin-page' ][ 'src' ]
+			);
+		}
+		finally {
+			$this->removeDirectory( $root );
+		}
 	}
 
 	public function testAdminPostIgnoresUnrelatedPostRequests() :void {
@@ -734,6 +811,33 @@ final class MandateTest extends Wpm_Test_Case {
 	private function storedScopes() :array {
 		$scopes = $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ][ 'scopes' ] ?? [];
 		return is_array( $scopes ) ? $scopes : [];
+	}
+
+	private function removeDirectory( string $directory ) :void {
+		if ( !is_dir( $directory ) ) {
+			return;
+		}
+
+		$items = scandir( $directory );
+		if ( $items === false ) {
+			return;
+		}
+
+		foreach ( $items as $item ) {
+			if ( $item === '.' || $item === '..' ) {
+				continue;
+			}
+
+			$path = $directory.DIRECTORY_SEPARATOR.$item;
+			if ( is_dir( $path ) && !is_link( $path ) ) {
+				$this->removeDirectory( $path );
+			}
+			elseif ( is_file( $path ) || is_link( $path ) ) {
+				unlink( $path );
+			}
+		}
+
+		rmdir( $directory );
 	}
 
 	private function renderAdminPage( ScopeRepository $repository ) :string {

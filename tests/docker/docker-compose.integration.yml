@@ -1,0 +1,17 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: testpass
+      MYSQL_DATABASE: wordpress_test_integration
+    command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
+    tmpfs:
+      - /var/lib/mysql:size=512M
+    ports:
+      - "${WPM_INTEGRATION_DB_PORT:-3312}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ptestpass"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s

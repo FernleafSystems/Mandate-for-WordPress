@@ -2,6 +2,8 @@
 
 declare( strict_types=1 );
 
+use PHPUnit\Framework\TestCase;
+
 if ( !defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', dirname( __DIR__, 2 ).'/' );
 }
@@ -36,40 +38,11 @@ final class Wpm_Test_Redirect_Exception extends RuntimeException {
 	}
 }
 
-abstract class Wpm_Test_Case {
+abstract class Wpm_Test_Case extends TestCase {
 
-	public function setUp() :void {
+	protected function setUp() :void {
+		parent::setUp();
 		wpm_test_reset_state();
-	}
-
-	protected function assertSame( mixed $expected, mixed $actual, string $message = '' ) :void {
-		if ( $expected !== $actual ) {
-			throw new RuntimeException(
-				( $message !== '' ? $message."\n" : '' )
-				.'Expected: '.var_export( $expected, true )."\n"
-				.'Actual: '.var_export( $actual, true )
-			);
-		}
-	}
-
-	protected function assertTrue( mixed $actual, string $message = '' ) :void {
-		$this->assertSame( true, $actual, $message );
-	}
-
-	protected function assertFalse( mixed $actual, string $message = '' ) :void {
-		$this->assertSame( false, $actual, $message );
-	}
-
-	protected function assertArrayHasKey( string $key, array $array, string $message = '' ) :void {
-		if ( !array_key_exists( $key, $array ) ) {
-			throw new RuntimeException( $message !== '' ? $message : 'Missing array key: '.$key );
-		}
-	}
-
-	protected function assertArrayNotHasKey( string $key, array $array, string $message = '' ) :void {
-		if ( array_key_exists( $key, $array ) ) {
-			throw new RuntimeException( $message !== '' ? $message : 'Unexpected array key: '.$key );
-		}
 	}
 
 	protected function assertThrowsRuntimeException( callable $callback, string $message = '' ) :void {
@@ -77,6 +50,7 @@ abstract class Wpm_Test_Case {
 			$callback();
 		}
 		catch ( RuntimeException ) {
+			$this->addToAssertionCount( 1 );
 			return;
 		}
 
@@ -96,6 +70,9 @@ function wpm_test_reset_state() :void {
 	$GLOBALS[ 'wpm_test_super_admins' ] = [];
 	$GLOBALS[ 'wpm_test_actions' ] = [];
 	$GLOBALS[ 'wpm_test_filters' ] = [];
+	$GLOBALS[ 'wpm_test_management_pages' ] = [];
+	$GLOBALS[ 'wpm_test_enqueued_styles' ] = [];
+	$GLOBALS[ 'wpm_test_enqueued_scripts' ] = [];
 	$GLOBALS[ 'wpm_test_valid_nonces' ] = [];
 	$GLOBALS[ 'wpm_test_last_redirect' ] = null;
 	$GLOBALS[ 'wpm_test_wp_die' ] = [];
@@ -233,6 +210,74 @@ if ( !function_exists( 'wp_die' ) ) {
 if ( !function_exists( 'admin_url' ) ) {
 	function admin_url( string $path = '' ) :string {
 		return 'https://example.test/wp-admin/'.ltrim( $path, '/' );
+	}
+}
+
+if ( !function_exists( 'add_management_page' ) ) {
+	function add_management_page(
+		string $pageTitle,
+		string $menuTitle,
+		string $capability,
+		string $menuSlug,
+		callable $callback
+	) :string {
+		$hookSuffix = 'tools_page_'.$menuSlug;
+		$GLOBALS[ 'wpm_test_management_pages' ][ $menuSlug ] = [
+			'page_title'  => $pageTitle,
+			'menu_title'  => $menuTitle,
+			'capability'  => $capability,
+			'menu_slug'   => $menuSlug,
+			'callback'    => $callback,
+			'hook_suffix' => $hookSuffix,
+		];
+
+		return $hookSuffix;
+	}
+}
+
+if ( !function_exists( 'plugin_dir_path' ) ) {
+	function plugin_dir_path( string $file ) :string {
+		return rtrim( dirname( $file ), "\\/" ).'/';
+	}
+}
+
+if ( !function_exists( 'plugin_dir_url' ) ) {
+	function plugin_dir_url( string $file ) :string {
+		return 'https://example.test/wp-content/plugins/'.basename( dirname( $file ) ).'/';
+	}
+}
+
+if ( !function_exists( 'wp_enqueue_style' ) ) {
+	function wp_enqueue_style(
+		string $handle,
+		string $src = '',
+		array $deps = [],
+		string|bool|null $ver = false,
+		string $media = 'all'
+	) :void {
+		$GLOBALS[ 'wpm_test_enqueued_styles' ][ $handle ] = [
+			'src'   => $src,
+			'deps'  => $deps,
+			'ver'   => $ver,
+			'media' => $media,
+		];
+	}
+}
+
+if ( !function_exists( 'wp_enqueue_script' ) ) {
+	function wp_enqueue_script(
+		string $handle,
+		string $src = '',
+		array $deps = [],
+		string|bool|null $ver = false,
+		array|bool $args = []
+	) :void {
+		$GLOBALS[ 'wpm_test_enqueued_scripts' ][ $handle ] = [
+			'src'  => $src,
+			'deps' => $deps,
+			'ver'  => $ver,
+			'args' => $args,
+		];
 	}
 }
 

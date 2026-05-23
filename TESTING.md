@@ -18,12 +18,22 @@ The plugin runtime, unit test bootstrap, and build tooling require `vendor/autol
 | --- | --- | --- |
 | Admin assets | `npm run build` | Builds the committed Vite admin JS/CSS assets in `assets/dist`. |
 | Build zip | `composer build-zip` | Builds assets, creates a production-shaped package, and writes `build/mandate-YYYYmmdd-HHMMSS.zip`. |
-| Unit tests | `composer test:unit` | Runs the no-dependency PHP unit runner in `tests/Unit`. |
+| Unit tests | `composer test:unit` | Runs the PHPUnit 11 unit suite in `tests/Unit`. |
+| WordPress integration tests | `composer test:integration` | Starts a minimal MySQL Docker sidecar, prepares WordPress core, and runs `tests/Integration` through `wp-phpunit`. |
+| WordPress test install | `composer test:integration:install` | Prepares the WordPress core checkout used by the integration bootstrap without running tests. |
 | Default PHP test gate | `composer test` | Alias for `composer test:unit`. |
 | Plugin Check | `composer test:plugin-check -- --clean` | Builds a production-shaped plugin package and runs WordPress.org Plugin Check through WP-CLI. Omit `-- --clean` for a warm repeat. |
 | Browser smoke | `composer test:browser -- --clean -- --workers=1` | Provisions a Docker WordPress site, activates the plugin, and runs Playwright UI/API checks. |
 
-`phpunit-unit.xml` is included as lightweight scaffolding if PHPUnit is added later, but PHPUnit is not required for the current test gate.
+The unit lane uses the latest PHPUnit line compatible with the Composer PHP 8.2 platform (`>=11.5 <12`). WordPress integration tests use the Composer-installed `wp-phpunit` library and `yoast/phpunit-polyfills`, with a small local bootstrap shim for WordPress' current PHPUnit 11 compatibility gaps.
+
+`composer test:integration` accepts `--clean` before PHPUnit arguments to recreate the database sidecar, and passes PHPUnit arguments after `--`:
+
+```powershell
+composer test:integration -- --clean -- --filter MandateIntegrationTest
+```
+
+Set `WP_CORE_DIR` to use a specific WordPress checkout. If unset, the installer prefers the local reference checkout at `D:\Work\Dev\Libraries\wordpress` when present, then falls back to a downloaded copy under the system temp directory. The default integration database connection is `root:testpass@127.0.0.1:3312/wordpress_test_integration`; override it with `WPM_INTEGRATION_DB_NAME`, `WPM_INTEGRATION_DB_USER`, `WPM_INTEGRATION_DB_PASS`, and `WPM_INTEGRATION_DB_PORT`, or set `WPM_INTEGRATION_DB_HOST` directly.
 
 Before browser tests, install the Node test dependency and browser:
 
@@ -44,6 +54,7 @@ npm run build
 composer build-zip
 Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 composer test:unit
+composer test:integration
 composer test:plugin-check -- --clean
 composer test:browser -- --clean -- --workers=1
 ```
