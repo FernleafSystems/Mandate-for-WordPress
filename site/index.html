@@ -3,8 +3,8 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="description" content="Mandate helps WordPress administrators scope AI and automation access by narrowing what individual Application Passwords can do.">
-	<title>Mandate - Scope AI Access for WordPress</title>
+	<meta name="description" content="WordPress Application Passwords carry the full power of the user behind them. Mandate adds the policy layer WordPress doesn't ship with — scope what each credential can actually do.">
+	<title>Mandate — Least Privilege for WordPress Integrations</title>
 	<style>
 		:root {
 			--ink: #0f1724;
@@ -238,6 +238,12 @@
 			line-height: 1.42;
 		}
 
+		.hero-mandate-line {
+			color: var(--shield-blue) !important;
+			font-weight: 800;
+			margin-top: 18px !important;
+		}
+
 		.hero-actions {
 			display: flex;
 			align-items: center;
@@ -307,9 +313,22 @@
 		.capability-card h3,
 		.step-card h3,
 		.download-card h3 {
-			margin: 0 0 20px;
-			font-size: clamp(28px, 3vw, 36px);
+			margin: 0 0 12px;
+			font-size: clamp(22px, 2.4vw, 28px);
 			line-height: 1.08;
+		}
+
+		.capability-card .preset-label {
+			display: inline-block;
+			margin-bottom: 16px;
+			padding: 4px 10px;
+			border-radius: 999px;
+			background: var(--soft-blue);
+			color: var(--shield-blue);
+			font-size: 13px;
+			font-weight: 800;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
 		}
 
 		.capability-card ul {
@@ -318,7 +337,7 @@
 			margin: 0;
 			padding: 0;
 			color: #536173;
-			font-size: 19px;
+			font-size: 18px;
 			font-weight: 760;
 			list-style: none;
 		}
@@ -326,6 +345,14 @@
 		.capability-card li {
 			padding-left: 18px;
 			border-left: 4px solid var(--shield-cyan);
+		}
+
+		.capability-card .card-note {
+			margin-top: 20px;
+			color: var(--muted);
+			font-size: 15px;
+			font-weight: 500;
+			line-height: 1.45;
 		}
 
 		.how-it-works {
@@ -549,7 +576,7 @@
 			<span class="mandate-mark" aria-hidden="true">M</span>
 			<span class="brand-text">
 				<strong>Mandate</strong>
-				<span class="brand-tagline">Least Privilege for WordPress AI Access</span>
+				<span class="brand-tagline">Least Privilege for WordPress Integrations</span>
 			</span>
 		</a>
 		<nav class="site-nav" aria-label="Primary navigation">
@@ -563,11 +590,11 @@
 	<main id="top">
 		<section class="hero" aria-labelledby="hero-title">
 			<div class="hero-copy">
-				<p class="eyebrow">Least Privilege for WordPress AI Access</p>
 				<h1 id="hero-title">Mandate</h1>
-				<p>AI agents are changing how WordPress is managed. Mandate helps keep their access scoped, auditable, and limited to the job at hand.</p>
+				<p>When an app authenticates with WordPress, it gains the full capabilities of that user. WordPress has no way to limit that.</p>
+				<p class="hero-mandate-line">Mandate adds the policy layer WordPress never ships with.</p>
 				<div class="hero-actions">
-					<a class="button" href="#download">Scope the credential</a>
+					<a class="button" href="#download">Get Mandate</a>
 					<a class="text-link" href="https://getshieldsecurity.com/" target="_blank" rel="noopener noreferrer">From Shield Security</a>
 				</div>
 			</div>
@@ -576,44 +603,50 @@
 		<section class="section overview" id="overview" aria-labelledby="overview-title">
 			<div class="section-inner editorial-grid">
 				<div>
-					<p class="eyebrow">In Short</p>
-					<h2 id="overview-title">Mandate limits what an AI agent or connected app may do.</h2>
+					<h2 id="overview-title">WordPress authenticates the request. It doesn't limit it.</h2>
 				</div>
 				<div class="editorial-copy">
-					<p>WordPress Application Passwords normally inherit the broad access of their user. Mandate adds an allowlist of capabilities, so an AI agent will have narrower access than the WordPress user account behind it.</p>
-					<p>No raw secret storage. No role editing. No changes to the user's normal browser sessions.</p>
+					<p>Application Passwords prove identity. They don't restrict what an authenticated request can do. That falls entirely on the user's capabilities. If that user is an admin, every app that logs in as them has admin-level access.</p>
+					<p>Today, REST clients, automation platforms, AI agents, management tools, and MCP connectors all make authenticated requests to WordPress. Any of them, if misconfigured or compromised, can do anything that user can do.</p>
+					<p>Mandate adds what's missing: a policy per Application Password. You define what each credential is allowed to do. Mandate enforces it on every request.</p>
+					<p>Normal WordPress user sessions are unaffected.</p>
 				</div>
 			</div>
 		</section>
 
 		<section class="section security-model" id="security-model" aria-labelledby="security-title">
 			<div class="section-inner">
-				<p class="eyebrow">Security model</p>
-				<h2 id="security-title">Mandate only narrows access.</h2>
+				<h2 id="security-title">Mandate removes access that apps should never have had.</h2>
 				<div class="capability-columns">
 					<div class="capability-card">
-						<h3>Allow</h3>
+						<span class="preset-label">Example scope</span>
+						<h3>Read-only integration</h3>
 						<ul>
-							<li>read</li>
-							<li>edit_posts</li>
-							<li>edit_published_posts</li>
+							<li>Read posts, pages &amp; media</li>
+							<li>No writes or deletes</li>
+							<li>No access to settings, users, or plugins</li>
 						</ul>
+						<p class="card-note">For analytics tools, headless frontends, and reporting dashboards.</p>
 					</div>
 					<div class="capability-card">
-						<h3>Block</h3>
+						<span class="preset-label">Example scope</span>
+						<h3>Content publisher</h3>
 						<ul>
-							<li>delete_posts</li>
-							<li>upload_files</li>
-							<li>manage_options</li>
+							<li>Create, edit &amp; publish posts</li>
+							<li>Upload media</li>
+							<li>No user management, plugins, or settings</li>
 						</ul>
+						<p class="card-note">For editorial tools, automation workflows, and AI writing assistants.</p>
 					</div>
 					<div class="capability-card">
-						<h3>Preserve</h3>
+						<span class="preset-label">Example scope</span>
+						<h3>WooCommerce reader</h3>
 						<ul>
-							<li>normal wp-admin access</li>
-							<li>existing WordPress roles</li>
-							<li>existing security controls</li>
+							<li>Read orders &amp; products</li>
+							<li>No order edits or fulfilment actions</li>
+							<li>No access to store settings or users</li>
 						</ul>
+						<p class="card-note">For reporting integrations, dashboards, and external order management tools.</p>
 					</div>
 				</div>
 			</div>
@@ -622,29 +655,28 @@
 		<section class="section how-it-works" aria-labelledby="workflow-title">
 			<div class="section-inner workflow">
 				<div>
-					<p class="eyebrow">How it works</p>
-					<h2 id="workflow-title">Pick the password. Limit the capabilities. Save the scope.</h2>
+					<h2 id="workflow-title">Pick the app password. Define its scope. Mandate enforces it.</h2>
 				</div>
 				<div class="steps">
 					<div class="step-card">
 						<span class="step-number">1</span>
 						<div>
 							<h3>Select the user</h3>
-							<p>Start from the WordPress account your tool already authenticates as.</p>
+							<p>Pick the user that owns the app password you want to scope.</p>
 						</div>
 					</div>
 					<div class="step-card">
 						<span class="step-number">2</span>
 						<div>
-							<h3>Select the App Password</h3>
-							<p>Scope one Application Password without changing normal wp-admin sessions.</p>
+							<h3>Choose the Application Password</h3>
+							<p>Scope one specific credential without touching the user's other passwords or their normal wp-admin access.</p>
 						</div>
 					</div>
 					<div class="step-card">
 						<span class="step-number">3</span>
 						<div>
-							<h3>Save the allowlist</h3>
-							<p>Mandate checks the saved scope during authenticated API requests and limits capabilities that are not allowed.</p>
+							<h3>Remove unnecessary capabilities</h3>
+							<p>Mandate checks scope on every API request. Anything outside it is blocked before WordPress acts on it.</p>
 						</div>
 					</div>
 				</div>
@@ -654,13 +686,9 @@
 		<section class="section download" id="download" aria-labelledby="download-title">
 			<div class="section-inner download-grid">
 				<div>
-					<p class="eyebrow">Download Mandate</p>
-					<h2 id="download-title">Install it from WordPress.org or inspect the source on GitHub.</h2>
-					<p>Mandate is a focused guardrail for WordPress sites that connect to AI tools, automation systems, REST API clients, and MCP servers.</p>
+					<h2 id="download-title">Install free from WordPress.org or GitHub. Auto-updates included.</h2>
 				</div>
 				<div class="download-card">
-					<h3>Get the plugin</h3>
-					<p>Use the WordPress.org listing when it is available, or follow development from the public repository.</p>
 					<div class="download-actions">
 						<a class="button" href="https://wordpress.org/plugins/mandate/" target="_blank" rel="noopener noreferrer">
 							<svg class="button-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -688,7 +716,7 @@
 			<img class="footer-logo" src="./assets/shield-icon.png" alt="" width="42" height="42">
 			<span>Built by the makers of <a href="https://getshieldsecurity.com/" target="_blank" rel="noopener noreferrer">Shield Security</a></span>
 		</div>
-		<p class="footer-line">Designed for WordPress sites connecting to AI.</p>
+		<p class="footer-line">The policy layer WordPress doesn't ship with.</p>
 	</footer>
 </body>
 </html>
