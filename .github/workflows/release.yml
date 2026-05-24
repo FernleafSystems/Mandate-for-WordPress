@@ -48,14 +48,24 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
-      - name: Build release zip
+      - name: Build release zips
         run: |
-          ZIP_NAME="mandate-${GITHUB_REF_NAME}.zip"
-          composer build-zip -- --output="$ZIP_NAME"
-          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+          WORDPRESS_ORG_ZIP_NAME="mandate-${GITHUB_REF_NAME}.zip"
+          GITHUB_ZIP_NAME="mandate-github-${GITHUB_REF_NAME}.zip"
+          composer build-zip -- --output="$WORDPRESS_ORG_ZIP_NAME"
+          composer build-zip -- --variant=github --skip-assets --output="$GITHUB_ZIP_NAME"
+          echo "WORDPRESS_ORG_ZIP_NAME=$WORDPRESS_ORG_ZIP_NAME" >> "$GITHUB_ENV"
+          echo "GITHUB_ZIP_NAME=$GITHUB_ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Verify release packages
+        run: |
+          php bin/verify-package.php --variant=wordpress-org --zip="${GITHUB_WORKSPACE}/build/${WORDPRESS_ORG_ZIP_NAME}"
+          php bin/verify-package.php --variant=github --zip="${GITHUB_WORKSPACE}/build/${GITHUB_ZIP_NAME}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: ${{ github.workspace }}/build/${{ env.ZIP_NAME }}
+          files: |
+            ${{ github.workspace }}/build/${{ env.WORDPRESS_ORG_ZIP_NAME }}
+            ${{ github.workspace }}/build/${{ env.GITHUB_ZIP_NAME }}
           generate_release_notes: true

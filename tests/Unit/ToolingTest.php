@@ -190,15 +190,90 @@ final class ToolingTest extends Wpm_Test_Case {
 		}
 	}
 
-	private function assertPackageComposerJsonContainsRuntimeConfigOnly( string $packageDir ) :void {
-		$json = \file_get_contents( Path::join( $packageDir, 'composer.json' ) );
-		if ( !\is_string( $json ) ) {
-			throw new RuntimeException( 'Failed to read package composer.json.' );
-		}
+	public function testWordPressOrgPackageDoesNotContainGithubUpdaterLeakage() :void {
+		$filesystem = new Filesystem();
+		$projectRoot = \dirname( __DIR__, 2 );
+		$packageRoot = Path::join( \sys_get_temp_dir(), 'mandate-wordpress-org-package-'.\bin2hex( \random_bytes( 4 ) ) );
+		$packageDir = Path::join( $packageRoot, RuntimePackageBuilder::PLUGIN_SLUG );
 
-		$config = \json_decode( $json, true );
-		$this->assertIsArray( $config );
-		$this->assertSame( [ 'php' => '>=8.1' ], $config[ 'require' ] );
+		try {
+			$this->buildPackage( $projectRoot, $packageDir, $packageRoot, RuntimePackageBuilder::VARIANT_WORDPRESS_ORG, $filesystem );
+
+			$this->assertFalse( \file_exists( Path::join( $packageDir, 'github-updater.php' ) ) );
+			$this->assertPackageComposerJsonDoesNotRequireGithubUpdater( $packageDir );
+			$this->assertStringNotContainsString( 'Update URI:', $this->readPackageFile( $packageDir, 'plugin.php' ) );
+			$this->assertStringNotContainsString( 'github-updater.php', $this->readPackageFile( $packageDir, 'init.php' ) );
+			$this->assertPackageDoesNotContainGithubUpdaterTokens( $packageDir );
+		}
+		finally {
+			$filesystem->remove( $packageRoot );
+		}
+	}
+
+	public function testGithubPackageInjectsUpdaterOnlyForGithubVariant() :void {
+		$filesystem = new Filesystem();
+		$projectRoot = \dirname( __DIR__, 2 );
+		$packageRoot = Path::join( \sys_get_temp_dir(), 'mandate-github-package-'.\bin2hex( \random_bytes( 4 ) ) );
+		$packageDir = Path::join( $packageRoot, RuntimePackageBuilder::PLUGIN_SLUG );
+
+		try {
+			$this->buildPackage( $projectRoot, $packageDir, $packageRoot, RuntimePackageBuilder::VARIANT_GITHUB, $filesystem );
+
+			$this->assertTrue( \is_file( Path::join( $packageDir, 'github-updater.php' ) ) );
+			$this->assertPackageComposerJsonRequiresGithubUpdater( $packageDir );
+			$this->assertStringContainsString(
+				'Update URI: https://github.com/FernleafSystems/Mandate-for-WordPress',
+				$this->readPackageFile( $packageDir, 'plugin.php' )
+			);
+			$this->assertStringContainsString( "require_once __DIR__.'/github-updater.php';", $this->readPackageFile( $packageDir, 'init.php' ) );
+
+			$updater = $this->readPackageFile( $packageDir, 'github-updater.php' );
+			$this->assertStringContainsString( 'https://github.com/FernleafSystems/Mandate-for-WordPress/', $updater );
+			$this->assertStringContainsString( '/mandate-github-[^\/?&#]+\.zip($|[?&#])/i', $updater );
+			$this->assertStringContainsString( "YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory", $updater );
+		}
+		finally {
+			$filesystem->remove( $packageRoot );
+		}
+	}
+
+	public function testRuntimePackageBuilderRejectsUnknownPackageVariant() :void {
+		$filesystem = new Filesystem();
+		$projectRoot = \dirname( __DIR__, 2 );
+		$packageRoot = Path::join( \sys_get_temp_dir(), 'mandate-unknown-variant-'.\bin2hex( \random_bytes( 4 ) ) );
+		$packageDir = Path::join( $packageRoot, RuntimePackageBuilder::PLUGIN_SLUG );
+
+		try {
+			$this->assertThrowsRuntimeException(
+				function () use ( $projectRoot, $packageDir, $packageRoot, $filesystem ) :void {
+					$this->buildPackage( $projectRoot, $packageDir, $packageRoot, 'external-updater', $filesystem );
+				}
+			);
+		}
+		finally {
+			$filesystem->remove( $packageRoot );
+		}
+	}
+
+	private function buildPackage(
+		string $projectRoot,
+		string $packageDir,
+		string $packageRoot,
+		string $variant,
+		Filesystem $filesystem
+	) :void {
+		$builder = new RuntimePackageBuilder(
+			$projectRoot,
+			new Wpm_Test_Package_CommandRunner( $projectRoot, static function ( string $message ) :void {} ),
+			$filesystem,
+			static function ( string $message ) :void {}
+		);
+		$builder->build( $packageDir, $packageRoot, false, $variant );
+	}
+
+	private function assertPackageComposerJsonContainsRuntimeConfigOnly( string $packageDir ) :void {
+		$config = $this->readPackageComposerJson( $packageDir );
+		$this->assertSame( [ 'php' => '>=8.1' ], $this->readPackageComposerRequire( $packageDir ) );
 		$this->assertSame( [ 'psr-4' => [ 'Fixture\\' => 'src/' ] ], $config[ 'autoload' ] );
 		$this->assertArrayNotHasKey( 'require-dev', $config );
 		$this->assertArrayNotHasKey( 'autoload-dev', $config );
@@ -206,16 +281,100 @@ final class ToolingTest extends Wpm_Test_Case {
 		$this->assertArrayNotHasKey( 'minimum-stability', $config );
 	}
 
+	private function assertPackageComposerJsonDoesNotRequireGithubUpdater( string $packageDir ) :void {
+		$this->assertArrayNotHasKey( 'yahnis-elsts/plugin-update-checker', $this->readPackageComposerRequire( $packageDir ) );
+	}
+
+	private function assertPackageComposerJsonRequiresGithubUpdater( string $packageDir ) :void {
+		$require = $this->readPackageComposerRequire( $packageDir );
+		$this->assertArrayHasKey( 'yahnis-elsts/plugin-update-checker', $require );
+		$this->assertSame( '^5.6', $require[ 'yahnis-elsts/plugin-update-checker' ] );
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function readPackageComposerJson( string $packageDir ) :array {
+		$json = \file_get_contents( Path::join( $packageDir, 'composer.json' ) );
+		if ( !\is_string( $json ) ) {
+			throw new RuntimeException( 'Failed to read package composer.json.' );
+		}
+
+		$config = \json_decode( $json, true );
+		if ( !\is_array( $config ) ) {
+			throw new RuntimeException( 'Package composer.json is not valid JSON.' );
+		}
+
+		return $config;
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function readPackageComposerRequire( string $packageDir ) :array {
+		$config = $this->readPackageComposerJson( $packageDir );
+		$this->assertArrayHasKey( 'require', $config );
+		$this->assertIsArray( $config[ 'require' ] );
+
+		return $config[ 'require' ];
+	}
+
+	private function readPackageFile( string $packageDir, string $relativePath ) :string {
+		$content = \file_get_contents( Path::join( $packageDir, $relativePath ) );
+		if ( !\is_string( $content ) ) {
+			throw new RuntimeException( 'Failed to read package file: '.$relativePath );
+		}
+
+		return $content;
+	}
+
+	private function assertPackageDoesNotContainGithubUpdaterTokens( string $packageDir ) :void {
+		$tokens = [
+			'YahnisElsts',
+			'PluginUpdateChecker',
+			'PucFactory',
+			'plugin-update-checker',
+			'mandate-github-',
+		];
+
+		$iterator = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $packageDir, FilesystemIterator::SKIP_DOTS )
+		);
+
+		foreach ( $iterator as $item ) {
+			/** @var SplFileInfo $item */
+			if ( !$item->isFile() ) {
+				continue;
+			}
+
+			$content = \file_get_contents( $item->getPathname() );
+			if ( !\is_string( $content ) ) {
+				throw new RuntimeException( 'Failed to read package file: '.$item->getPathname() );
+			}
+
+			foreach ( $tokens as $token ) {
+				$this->assertStringNotContainsString(
+					$token,
+					$content,
+					'Unexpected GitHub updater token in '.Path::makeRelative( $item->getPathname(), $packageDir )
+				);
+			}
+		}
+	}
+
 	private function createPackageFixture( string $fixtureRoot, Filesystem $filesystem ) :void {
 		$filesystem->mkdir( [
 			Path::join( $fixtureRoot, 'src' ),
 			Path::join( $fixtureRoot, 'assets/dist' ),
 			Path::join( $fixtureRoot, 'site/assets' ),
+			Path::join( $fixtureRoot, 'infrastructure/templates' ),
 		] );
 
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'plugin.php' ), "<?php\n/*\n * Plugin Name: Fixture\n * Plugin URI: https://example.test\n * Version: 1.0.0\n */\n" );
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\\call_user_func( function () {\n\t\$mandate_autoload = __DIR__.'/vendor/autoload.php';\n\tif ( \\is_file( \$mandate_autoload ) ) {\n\t\trequire_once \$mandate_autoload;\n\t\tPlugin::boot( __DIR__.'/plugin.php' );\n\t}\n} );\n" );
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'infrastructure/templates/github-updater.php' ), "<?php\nuse YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory;\n" );
+
 		foreach ( [
-			'plugin.php',
-			'init.php',
 			'unsupported.php',
 			'readme.txt',
 			'LICENSE',

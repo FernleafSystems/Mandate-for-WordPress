@@ -8,6 +8,8 @@ use Symfony\Component\Filesystem\Path;
 class RuntimePackageBuilder {
 
 	public const PLUGIN_SLUG = 'mandate';
+	public const VARIANT_WORDPRESS_ORG = 'wordpress-org';
+	public const VARIANT_GITHUB = 'github';
 
 	private const RUNTIME_FILES = [
 		'plugin.php',
@@ -26,6 +28,11 @@ class RuntimePackageBuilder {
 		'assets/dist/admin-page.css',
 		'assets/dist/admin-page.js',
 	];
+
+	private const GITHUB_UPDATER_TEMPLATE = 'infrastructure/templates/github-updater.php';
+	private const GITHUB_UPDATE_URI = 'https://github.com/FernleafSystems/Mandate-for-WordPress';
+	private const GITHUB_UPDATER_DEPENDENCY = 'yahnis-elsts/plugin-update-checker';
+	private const GITHUB_UPDATER_VERSION = '^5.6';
 
 	private string $projectRoot;
 
@@ -51,9 +58,15 @@ class RuntimePackageBuilder {
 		$this->logger = $logger;
 	}
 
-	public function build( string $targetDir, string $allowedCleanupRoot, bool $buildAssets = true ) :string {
+	public function build(
+		string $targetDir,
+		string $allowedCleanupRoot,
+		bool $buildAssets = true,
+		string $variant = self::VARIANT_WORDPRESS_ORG
+	) :string {
 		$targetDir = Path::normalize( $targetDir );
 		$allowedCleanupRoot = Path::normalize( $allowedCleanupRoot );
+		$variant = $this->normalizeVariant( $variant );
 
 		if ( $buildAssets ) {
 			$this->runAssetBuild();
@@ -62,14 +75,30 @@ class RuntimePackageBuilder {
 		$this->assertRuntimeSourcesExist();
 		$this->prepareTargetDirectory( $targetDir, $allowedCleanupRoot );
 		$this->copyRuntimeFiles( $targetDir );
-		$this->writePackageComposerJson( $targetDir );
+		$this->applyVariantTransforms( $targetDir, $variant );
+		$this->writePackageComposerJson( $targetDir, $variant );
 		$this->installPackageComposerDependencies( $targetDir );
 		$this->removePackageComposerLock( $targetDir );
 
-		$this->assertPackageIsUsable( $targetDir );
+		$this->assertPackageIsUsable( $targetDir, $variant );
 		$this->log( 'Runtime package created at: '.$targetDir );
 
 		return $targetDir;
+	}
+
+	private function normalizeVariant( string $variant ) :string {
+		$variant = \trim( $variant );
+		if ( \in_array( $variant, [ self::VARIANT_WORDPRESS_ORG, self::VARIANT_GITHUB ], true ) ) {
+			return $variant;
+		}
+
+		throw new \RuntimeException(
+			\sprintf(
+				'Unknown package variant "%s". Expected one of: %s.',
+				$variant,
+				\implode( ', ', [ self::VARIANT_WORDPRESS_ORG, self::VARIANT_GITHUB ] )
+			)
+		);
 	}
 
 	private function runAssetBuild() :void {
@@ -158,8 +187,75 @@ class RuntimePackageBuilder {
 		}
 	}
 
-	private function writePackageComposerJson( string $targetDir ) :void {
-		$composer = $this->buildPackageComposerConfig();
+	private function applyVariantTransforms( string $targetDir, string $variant ) :void {
+		if ( $variant !== self::VARIANT_GITHUB ) {
+			return;
+		}
+
+		$this->copyGithubUpdater( $targetDir );
+		$this->addGithubUpdateUri( $targetDir );
+		$this->addGithubUpdaterBootstrap( $targetDir );
+	}
+
+	private function copyGithubUpdater( string $targetDir ) :void {
+		$templatePath = Path::join( $this->projectRoot, self::GITHUB_UPDATER_TEMPLATE );
+		if ( !\is_file( $templatePath ) ) {
+			throw new \RuntimeException( 'Missing GitHub updater template: '.self::GITHUB_UPDATER_TEMPLATE );
+		}
+
+		$this->filesystem->copy( $templatePath, Path::join( $targetDir, 'github-updater.php' ), true );
+	}
+
+	private function addGithubUpdateUri( string $targetDir ) :void {
+		$pluginPath = Path::join( $targetDir, 'plugin.php' );
+		$content = $this->readPackageFile( $pluginPath );
+
+		if ( \preg_match( '/^\s*\*\s*Update URI:/mi', $content ) === 1 ) {
+			throw new \RuntimeException( 'Packaged plugin.php already contains an Update URI header.' );
+		}
+
+		$updated = \preg_replace(
+			'/^(\s*\*\s*Plugin URI:\s*.+)$/m',
+			'$1'."\n".' * Update URI: '.self::GITHUB_UPDATE_URI,
+			$content,
+			1
+		);
+		if ( !\is_string( $updated ) || $updated === $content ) {
+			throw new \RuntimeException( 'Failed to add GitHub Update URI header to packaged plugin.php.' );
+		}
+
+		$this->filesystem->dumpFile( $pluginPath, $updated );
+	}
+
+	private function addGithubUpdaterBootstrap( string $targetDir ) :void {
+		$initPath = Path::join( $targetDir, 'init.php' );
+		$content = $this->readPackageFile( $initPath );
+		$needle = "\t\trequire_once \$mandate_autoload;\n";
+		$replacement = $needle."\t\trequire_once __DIR__.'/github-updater.php';\n";
+
+		if ( \str_contains( $content, "github-updater.php" ) ) {
+			throw new \RuntimeException( 'Packaged init.php already contains the GitHub updater bootstrap.' );
+		}
+
+		$updated = \str_replace( $needle, $replacement, $content, $count );
+		if ( $count !== 1 ) {
+			throw new \RuntimeException( 'Failed to add GitHub updater bootstrap to packaged init.php.' );
+		}
+
+		$this->filesystem->dumpFile( $initPath, $updated );
+	}
+
+	private function readPackageFile( string $path ) :string {
+		$content = \file_get_contents( $path );
+		if ( $content === false ) {
+			throw new \RuntimeException( 'Failed to read package file: '.$path );
+		}
+
+		return $content;
+	}
+
+	private function writePackageComposerJson( string $targetDir, string $variant ) :void {
+		$composer = $this->buildPackageComposerConfig( $variant );
 
 		$json = \json_encode( $composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 		if ( !\is_string( $json ) ) {
@@ -172,17 +268,22 @@ class RuntimePackageBuilder {
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function buildPackageComposerConfig() :array {
+	private function buildPackageComposerConfig( string $variant ) :array {
 		$sourceConfig = $this->readSourceComposerConfig();
 		$config = $this->requireArray( $sourceConfig, 'config' );
 		$config[ 'allow-plugins' ] = new \stdClass();
+		$require = $this->requireArray( $sourceConfig, 'require' );
+		if ( $variant === self::VARIANT_GITHUB ) {
+			$require[ self::GITHUB_UPDATER_DEPENDENCY ] = self::GITHUB_UPDATER_VERSION;
+			\ksort( $require );
+		}
 
 		return [
 			'name'        => $this->requireString( $sourceConfig, 'name' ),
 			'description' => $this->requireString( $sourceConfig, 'description' ),
 			'type'        => $this->requireString( $sourceConfig, 'type' ),
 			'license'     => $this->requireString( $sourceConfig, 'license' ),
-			'require'     => $this->requireArray( $sourceConfig, 'require' ),
+			'require'     => $require,
 			'config'      => $config,
 			'autoload'    => $this->requireArray( $sourceConfig, 'autoload' ),
 		];
@@ -253,7 +354,7 @@ class RuntimePackageBuilder {
 		] );
 	}
 
-	private function assertPackageIsUsable( string $targetDir ) :void {
+	private function assertPackageIsUsable( string $targetDir, string $variant ) :void {
 		foreach ( [
 			...self::RUNTIME_FILES,
 			'composer.json',
@@ -271,6 +372,10 @@ class RuntimePackageBuilder {
 			if ( !\is_dir( $path ) ) {
 				throw new \RuntimeException( 'Package verification failed; missing directory: '.$directory );
 			}
+		}
+
+		if ( $variant === self::VARIANT_GITHUB && !\is_file( Path::join( $targetDir, 'github-updater.php' ) ) ) {
+			throw new \RuntimeException( 'Package verification failed; missing GitHub updater bootstrap.' );
 		}
 	}
 
