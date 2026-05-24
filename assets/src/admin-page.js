@@ -101,6 +101,33 @@ function enhanceBulkControls( root ) {
 	} );
 }
 
+function enhanceExpirationSummary( root ) {
+	root.addEventListener( 'click', ( event ) => {
+		const summary = event.target.closest( '[data-wpm-expiration-summary]' );
+		if ( !summary ) {
+			return;
+		}
+
+		const inputId = summary.getAttribute( 'aria-controls' );
+		const controlledInput = inputId ? document.getElementById( inputId ) : null;
+		const input = controlledInput && root.contains( controlledInput )
+			? controlledInput
+			: root.querySelector( '[data-wpm-expiration-input]' );
+		if ( !input ) {
+			return;
+		}
+
+		input.focus();
+		if ( typeof input.showPicker === 'function' ) {
+			try {
+				input.showPicker();
+			} catch ( error ) {
+				// Some browsers restrict showPicker() to specific activation paths.
+			}
+		}
+	} );
+}
+
 function getTooltipElement() {
 	if ( tooltipElement ) {
 		return tooltipElement;
@@ -236,6 +263,7 @@ document.addEventListener( 'DOMContentLoaded', () => {
 		enhanceSelectionForm( root );
 		enhanceTabs( root );
 		enhanceBulkControls( root );
+		enhanceExpirationSummary( root );
 		enhanceTooltips( root );
 	} );
 } );

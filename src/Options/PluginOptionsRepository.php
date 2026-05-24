@@ -17,7 +17,7 @@ if ( !defined( 'ABSPATH' ) ) {
 class PluginOptionsRepository {
 
 	public const OPTION_NAME = 'aptoweb_mandate_application_password_scoper_options';
-	public const CURRENT_SCHEMA_VERSION = 1;
+	public const CURRENT_SCHEMA_VERSION = 2;
 
 	/**
 	 * @return PluginOptionsDocument
@@ -75,7 +75,7 @@ class PluginOptionsRepository {
 	private function normalizeDocument( array $raw ) :?array {
 		$schemaVersion = $this->schemaVersion( $raw );
 		return match ( $schemaVersion ) {
-			self::CURRENT_SCHEMA_VERSION => $this->normalizeV1Document( $raw ),
+			1, self::CURRENT_SCHEMA_VERSION => $this->normalizeVersionedDocument( $raw ),
 			default => null,
 		};
 	}
@@ -96,7 +96,7 @@ class PluginOptionsRepository {
 	 * @param array<string,mixed> $raw
 	 * @return PluginOptionsDocument|null
 	 */
-	private function normalizeV1Document( array $raw ) :?array {
+	private function normalizeVersionedDocument( array $raw ) :?array {
 		if ( !isset( $raw[ 'metadata' ], $raw[ 'scopes' ] )
 			|| !is_array( $raw[ 'metadata' ] )
 			|| !is_array( $raw[ 'scopes' ] )

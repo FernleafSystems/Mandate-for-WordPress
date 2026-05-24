@@ -10,16 +10,20 @@ Saved scopes are easier to audit, storage is versioned, and tagged releases buil
 - Saved-role snapshots for Application Password scopes.
 - Admin scope audit details: last saved, saved roles, current roles.
 - Role-change warning when current roles differ from saved roles.
+- Optional per-Application-Password expiration dates.
+- Daily WordPress cron revocation for expired Application Passwords.
 
 ### Changed
 
 - Scope persistence moved to a centralized Mandate options document.
 - Unrestricted saves delete the stored scope.
+- Expiration-only saves keep capabilities unrestricted until the saved date passes.
 - Browser fixtures reset scopes through the options repository.
 
 ### Security
 
 - Scopes only narrow access; they never grant capabilities.
+- Expired Application Password requests lose all capabilities before cron revocation runs.
 - Malformed or unsupported option documents are ignored.
 - Deleted Application Passwords prune only matching scopes.
 
@@ -28,6 +32,7 @@ Saved scopes are easier to audit, storage is versioned, and tagged releases buil
 - Release tags build `mandate-{tag}.zip` in CI.
 - Release workflow covers Composer, Node, caching, and release notes.
 - Unit tests cover options, malformed storage, role snapshots, reset behavior, and deletion hooks.
+- Unit, integration, and browser tests cover expiration storage, enforcement, UI persistence, and cron revocation.
 - Test bootstrap supports WordPress-style actions.
 - `.gitattributes` normalizes line endings.
 

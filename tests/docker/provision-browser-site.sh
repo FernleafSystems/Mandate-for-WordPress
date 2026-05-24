@@ -171,6 +171,10 @@ update_option(
 			'role_caps'    => [ 'read', 'edit_posts', 'upload_files', 'wpm_manage_widget' ],
 			'direct_cap'   => 'delete_posts',
 		],
+		'expiration_dates' => [
+			'expired' => '2000-01-01',
+			'future'  => wp_date( 'Y-m-d', strtotime( '+1 day' ) ),
+		],
 		'secondary_user' => [
 			'user_id'      => (int)$otherUser->ID,
 			'user_login'   => 'wpm_other_user',

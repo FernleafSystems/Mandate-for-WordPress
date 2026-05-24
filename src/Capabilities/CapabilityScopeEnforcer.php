@@ -5,6 +5,7 @@ declare( strict_types=1 );
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 
 if ( !defined( 'ABSPATH' ) ) {
@@ -21,16 +22,20 @@ class CapabilityScopeEnforcer {
 
 	private MetaCapabilityRegistry $metaRegistry;
 
+	private ExpirationDatePolicy $expirationDatePolicy;
+
 	public function __construct(
 		ScopeRepository $scopeRepository,
 		CapabilityCandidateProvider $candidateProvider,
 		CurrentApplicationPasswordContext $context,
-		MetaCapabilityRegistry $metaRegistry
+		MetaCapabilityRegistry $metaRegistry,
+		ExpirationDatePolicy $expirationDatePolicy
 	) {
 		$this->scopeRepository = $scopeRepository;
 		$this->candidateProvider = $candidateProvider;
 		$this->context = $context;
 		$this->metaRegistry = $metaRegistry;
+		$this->expirationDatePolicy = $expirationDatePolicy;
 	}
 
 	public function registerHooks() :void {
@@ -54,6 +59,12 @@ class CapabilityScopeEnforcer {
 
 		if ( $userId < 1 || $scope[ 'user_id' ] !== $userId || $this->contextUserMismatch( $scope[ 'user_id' ] ) ) {
 			return $this->removeGrantedCapabilities( $allcaps );
+		}
+		if ( $this->expirationDatePolicy->isExpired( $scope[ 'expires_on' ] ) ) {
+			return $this->removeGrantedCapabilities( $allcaps );
+		}
+		if ( !$scope[ 'capabilities_restricted' ] ) {
+			return $allcaps;
 		}
 
 		$currentRoleCaps = $this->candidateProvider->forUser( $userId );
@@ -81,6 +92,12 @@ class CapabilityScopeEnforcer {
 		if ( $userId < 1 || $scope[ 'user_id' ] !== $userId || $this->contextUserMismatch( $scope[ 'user_id' ] ) ) {
 			return [ 'do_not_allow' ];
 		}
+		if ( $this->expirationDatePolicy->isExpired( $scope[ 'expires_on' ] ) ) {
+			return [ 'do_not_allow' ];
+		}
+		if ( !$scope[ 'capabilities_restricted' ] ) {
+			return $caps;
+		}
 
 		$normalizedCap = CapabilityName::normalize( $cap );
 		if ( $this->metaRegistry->isRegistered( $normalizedCap )
@@ -104,7 +121,7 @@ class CapabilityScopeEnforcer {
 	}
 
 	/**
-	 * @return array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,roles_at_update:list<string>|null,updated_at:int,updated_by:int}|null
+	 * @return array{user_id:int,capabilities_restricted:bool,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,expires_on:string|null,roles_at_update:list<string>|null,updated_at:int,updated_by:int}|null
 	 */
 	private function scopeForCurrentRequest() :?array {
 		$uuid = $this->context->uuid();

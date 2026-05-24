@@ -5,6 +5,8 @@ declare( strict_types=1 );
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 
 abstract class MandateWordPressTestCase extends WP_UnitTestCase {
@@ -58,12 +60,14 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 		$this->assertHookCallback( 'user_has_cap', CapabilityScopeEnforcer::class, 'filterUserCapabilities' );
 		$this->assertHookCallback( 'map_meta_cap', CapabilityScopeEnforcer::class, 'filterMetaCaps' );
 		$this->assertHookCallback( 'wp_delete_application_password', ScopeRepository::class, 'deleteForApplicationPassword' );
+		$this->assertHookCallback( ApplicationPasswordExpirationReaper::HOOK, ApplicationPasswordExpirationReaper::class, 'revokeExpiredApplicationPasswords' );
+		$this->assertNotFalse( wp_next_scheduled( ApplicationPasswordExpirationReaper::HOOK ) );
 	}
 
 	public function test_scoped_application_password_removes_disallowed_caps() :void {
 		$userId = $this->createUser();
 		$item = $this->createApplicationPassword( $userId );
-		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository = $this->scopeRepository();
 		$repository->save( $item[ 'uuid' ], $userId, [ 'read' => true ], [], [ self::ROLE ], 1 );
 
 		wp_set_current_user( $userId );
@@ -76,8 +80,34 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 
 	public function test_normal_request_keeps_role_caps_unchanged() :void {
 		$userId = $this->createUser();
-		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository = $this->scopeRepository();
 		$repository->save( self::UUID, $userId, [ 'read' => true ], [], [ self::ROLE ], 1 );
+
+		wp_set_current_user( $userId );
+
+		$this->assertTrue( current_user_can( 'read' ) );
+		$this->assertTrue( current_user_can( 'edit_posts' ) );
+		$this->assertTrue( current_user_can( 'upload_files' ) );
+	}
+
+	public function test_expired_application_password_removes_all_caps() :void {
+		$userId = $this->createUser();
+		$item = $this->createApplicationPassword( $userId );
+		$repository = $this->scopeRepository();
+		$repository->save( $item[ 'uuid' ], $userId, [], [], [], 1, '2000-01-01', false );
+
+		wp_set_current_user( $userId );
+		do_action( 'application_password_did_authenticate', get_user_by( 'id', $userId ), $item );
+
+		$this->assertFalse( current_user_can( 'read' ) );
+		$this->assertFalse( current_user_can( 'edit_posts' ) );
+		$this->assertFalse( current_user_can( 'upload_files' ) );
+	}
+
+	public function test_normal_request_keeps_role_caps_when_stored_expiration_is_expired() :void {
+		$userId = $this->createUser();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, $userId, [], [], [], 1, '2000-01-01', false );
 
 		wp_set_current_user( $userId );
 
@@ -90,7 +120,7 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 		$userId = $this->createUser();
 		$postId = $this->createPost( $userId );
 		$item = $this->createApplicationPassword( $userId );
-		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository = $this->scopeRepository();
 		$repository->save( $item[ 'uuid' ], $userId, [ 'read' => true, 'edit_posts' => true ], [], [ self::ROLE ], 1 );
 
 		wp_set_current_user( $userId );
@@ -102,7 +132,7 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 	public function test_normal_request_keeps_mapped_meta_cap_behavior_unchanged() :void {
 		$userId = $this->createUser();
 		$postId = $this->createPost( $userId );
-		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository = $this->scopeRepository();
 		$repository->save( self::UUID, $userId, [ 'read' => true ], [], [ self::ROLE ], 1 );
 
 		wp_set_current_user( $userId );
@@ -113,7 +143,7 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 	public function test_deleted_application_password_prunes_only_matching_scope() :void {
 		$userId = $this->createUser();
 		$otherUserId = $this->createUser();
-		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository = $this->scopeRepository();
 		$repository->save( self::UUID, $userId, [ 'read' => true ], [], [ self::ROLE ], 1 );
 		$repository->save( self::OTHER_UUID, $otherUserId, [ 'read' => true ], [], [ self::ROLE ], 1 );
 
@@ -129,7 +159,7 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 		$userId = $this->createUser();
 		$otherUserId = $this->createUser();
 		$item = $this->createApplicationPassword( $userId );
-		$repository = new ScopeRepository( new PluginOptionsRepository() );
+		$repository = $this->scopeRepository();
 		$repository->save( $item[ 'uuid' ], $userId, [ 'read' => true ], [], [ self::ROLE ], 1 );
 		$repository->save( self::OTHER_UUID, $otherUserId, [ 'read' => true ], [], [ self::ROLE ], 1 );
 
@@ -141,8 +171,24 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 		$this->assertSame( $otherUserId, $remaining[ 'user_id' ] );
 	}
 
+	public function test_expiration_reaper_revokes_real_expired_application_password_and_prunes_scope() :void {
+		$userId = $this->createUser();
+		$item = $this->createApplicationPassword( $userId );
+		$repository = $this->scopeRepository();
+		$repository->save( $item[ 'uuid' ], $userId, [], [], [], 1, '2000-01-01', false );
+
+		do_action( ApplicationPasswordExpirationReaper::HOOK );
+
+		$this->assertNull( $repository->find( $item[ 'uuid' ] ) );
+		$this->assertFalse( $this->applicationPasswordExists( $userId, $item[ 'uuid' ] ) );
+	}
+
 	private function createUser() :int {
 		return (int)self::factory()->user->create( [ 'role' => self::ROLE ] );
+	}
+
+	private function scopeRepository() :ScopeRepository {
+		return new ScopeRepository( new PluginOptionsRepository(), new ExpirationDatePolicy() );
 	}
 
 	private function createPost( int $authorId ) :int {
@@ -152,6 +198,16 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 				'post_status' => 'draft',
 			]
 		);
+	}
+
+	private function applicationPasswordExists( int $userId, string $uuid ) :bool {
+		foreach ( WP_Application_Passwords::get_user_application_passwords( $userId ) as $password ) {
+			if ( is_array( $password ) && ( $password[ 'uuid' ] ?? null ) === $uuid ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

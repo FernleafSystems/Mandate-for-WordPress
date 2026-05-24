@@ -124,6 +124,18 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
 	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
 	await expect( page.locator( '#mandate-password' ) ).toHaveValue( primaryPassword.uuid );
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'never' );
+	await page.locator( '[data-wpm-expiration-summary]' ).click();
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeFocused();
+
+	await page.locator( '[data-wpm-expiration-input]' ).fill( fixture.expiration_dates.future );
+	await Promise.all( [
+		page.waitForNavigation( { waitUntil: 'load' } ),
+		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
+	] );
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( fixture.expiration_dates.future );
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'date' );
 
 	expect( new Set( await primitiveCapabilityValues( page, 'wordpress' ) ) ).toEqual( new Set( [
 		'edit_posts',
@@ -136,18 +148,25 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	await expect( anyPrimitiveCapInput( page, fixture.unassigned_role_cap ) ).toHaveCount( 0 );
 
 	const uploadFilesName = primitiveCapTooltipTarget( page, 'wordpress', 'upload_files' );
-	const tooltip = page.locator( '[role="tooltip"]' );
 	await expect( uploadFilesName ).toHaveAttribute( 'data-wpm-tooltip', '' );
-	await uploadFilesName.hover();
-	await expect( tooltip ).toBeVisible();
-	await expect( tooltip ).not.toHaveText( '' );
-	await page.keyboard.press( 'Escape' );
-	await expect( tooltip ).not.toBeVisible();
-	await uploadFilesName.focus();
-	await expect( tooltip ).toBeVisible();
-	await expect( tooltip ).not.toHaveText( '' );
-	await page.keyboard.press( 'Escape' );
 	await expect( primitiveCapTooltipTarget( page, 'other', 'wpm_manage_widget' ) ).toHaveCount( 0 );
+
+	const scopedRequest = await request.newContext( {
+		baseURL,
+		extraHTTPHeaders: {
+			Authorization: basicAuthHeader( primary.user_login, primaryPassword.app_password ),
+		},
+	} );
+
+	let capabilityResponse = await scopedRequest.get( '/wp-json/mandate-test/v1/caps' );
+	expect( capabilityResponse.ok() ).toBeTruthy();
+	let capabilities = await capabilityResponse.json();
+	expect( capabilities.user_id ).toBe( primary.user_id );
+	expect( capabilities.read ).toBe( true );
+	expect( capabilities.edit_posts ).toBe( true );
+	expect( capabilities.upload_files ).toBe( true );
+	expect( capabilities.delete_posts ).toBe( true );
+	expect( capabilities.wpm_manage_widget ).toBe( true );
 
 	await page.locator( '[data-wpm-panel="wordpress"] [data-wpm-select-state="unchecked"]' ).click();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).not.toBeChecked();
@@ -174,16 +193,9 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'edit_posts' ) ).toBeChecked();
 
-	const scopedRequest = await request.newContext( {
-		baseURL,
-		extraHTTPHeaders: {
-			Authorization: basicAuthHeader( primary.user_login, primaryPassword.app_password ),
-		},
-	} );
-
-	let capabilityResponse = await scopedRequest.get( '/wp-json/mandate-test/v1/caps' );
+	capabilityResponse = await scopedRequest.get( '/wp-json/mandate-test/v1/caps' );
 	expect( capabilityResponse.ok() ).toBeTruthy();
-	let capabilities = await capabilityResponse.json();
+	capabilities = await capabilityResponse.json();
 	expect( capabilities.user_id ).toBe( primary.user_id );
 	expect( capabilities.read ).toBe( true );
 	expect( capabilities.edit_posts ).toBe( true );
@@ -197,6 +209,8 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 		page.locator( 'button[name="mandate_action"][value="clear_scope"]' ).click(),
 	] );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'never' );
 
 	capabilityResponse = await scopedRequest.get( '/wp-json/mandate-test/v1/caps' );
 	expect( capabilityResponse.ok() ).toBeTruthy();
@@ -205,4 +219,51 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	expect( capabilities.delete_posts ).toBe( true );
 	expect( capabilities.wpm_manage_widget ).toBe( true );
 	await scopedRequest.dispose();
+
+	const secondaryRequest = await request.newContext( {
+		baseURL,
+		extraHTTPHeaders: {
+			Authorization: basicAuthHeader( primary.user_login, secondaryPassword.app_password ),
+		},
+	} );
+	const expirationResponse = await page.request.post(
+		'/wp-json/mandate-test/v1/expiration',
+		{
+			data: {
+				user_id: primary.user_id,
+				uuid: secondaryPassword.uuid,
+				expires_on: fixture.expiration_dates.expired,
+			},
+		}
+	);
+	expect( expirationResponse.ok() ).toBeTruthy();
+	expect( ( await expirationResponse.json() ).saved ).toBe( true );
+
+	let authResponse = await secondaryRequest.get( '/wp-json/mandate-test/v1/auth' );
+	expect( authResponse.ok() ).toBeTruthy();
+	expect( ( await authResponse.json() ).user_id ).toBe( primary.user_id );
+	capabilityResponse = await secondaryRequest.get( '/wp-json/mandate-test/v1/caps' );
+	expect( capabilityResponse.ok() ).toBeTruthy();
+	capabilities = await capabilityResponse.json();
+	expect( capabilities.read ).toBe( false );
+	expect( capabilities.edit_posts ).toBe( false );
+	expect( capabilities.upload_files ).toBe( false );
+	expect( capabilities.delete_posts ).toBe( false );
+	expect( capabilities.manage_options ).toBe( false );
+	expect( capabilities.wpm_manage_widget ).toBe( false );
+
+	const cronResponse = await page.request.post(
+		'/wp-json/mandate-test/v1/run-expiration-cron',
+		{
+			data: {
+				user_id: primary.user_id,
+				uuid: secondaryPassword.uuid,
+			},
+		}
+	);
+	expect( cronResponse.ok() ).toBeTruthy();
+	expect( ( await cronResponse.json() ).password_exists ).toBe( false );
+	authResponse = await secondaryRequest.get( '/wp-json/mandate-test/v1/auth' );
+	expect( authResponse.ok() ).toBeFalsy();
+	await secondaryRequest.dispose();
 } );

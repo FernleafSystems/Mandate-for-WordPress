@@ -10,6 +10,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionP
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityName;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
@@ -45,6 +46,8 @@ class AdminPage {
 
 	private string $pluginFile;
 
+	private ExpirationDatePolicy $expirationDatePolicy;
+
 	private string $pageHookSuffix = '';
 
 	public function __construct(
@@ -54,7 +57,8 @@ class AdminPage {
 		CapabilityDescriptionProvider $descriptionProvider,
 		MetaCapabilityRegistry $metaRegistry,
 		CapabilityGroupProvider $groupProvider,
-		string $pluginFile
+		string $pluginFile,
+		ExpirationDatePolicy $expirationDatePolicy
 	) {
 		$this->scopeRepository = $scopeRepository;
 		$this->passwordRepository = $passwordRepository;
@@ -63,6 +67,7 @@ class AdminPage {
 		$this->metaRegistry = $metaRegistry;
 		$this->groupProvider = $groupProvider;
 		$this->pluginFile = $pluginFile;
+		$this->expirationDatePolicy = $expirationDatePolicy;
 	}
 
 	public function registerHooks() :void {
@@ -150,22 +155,30 @@ class AdminPage {
 					$candidates = $this->candidateProvider->forUser( $userId );
 					$submittedCaps = $this->verifiedPostScalarList( 'allowed_caps' );
 					$submittedMetaCaps = $this->verifiedPostScalarList( 'allowed_meta_caps' );
+					$expiresOn = $this->postedExpirationDate();
 
-					$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
-					$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
-					if ( $allowedCaps === $candidates && $allowedMetaCaps === $this->metaRegistry->registered() ) {
-						$message = $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
+					if ( $expiresOn === false ) {
+						$message = 'invalid';
 					}
 					else {
-						$this->scopeRepository->save(
-							$uuid,
-							$userId,
-							$allowedCaps,
-							$allowedMetaCaps,
-							$this->roleSlugsForUser( $userId ),
-							get_current_user_id()
-						);
-						$message = 'saved';
+						$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
+						$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
+						$capabilitiesRestricted = !( $allowedCaps === $candidates && $allowedMetaCaps === $this->metaRegistry->registered() );
+						if ( !$capabilitiesRestricted && $expiresOn === null ) {
+							$message = $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
+						}
+						else {
+							$message = $this->scopeRepository->save(
+								$uuid,
+								$userId,
+								$allowedCaps,
+								$allowedMetaCaps,
+								$capabilitiesRestricted ? $this->roleSlugsForUser( $userId ) : [],
+								get_current_user_id(),
+								$expiresOn,
+								$capabilitiesRestricted
+							) ? 'saved' : 'invalid';
+						}
 					}
 				}
 			}
@@ -202,12 +215,13 @@ class AdminPage {
 		$passwords = $this->passwordRepository->forUser( $selectedUserId );
 		$selectedUuid = $this->selectedPasswordUuid( $passwords );
 		$scope = $selectedUuid !== '' ? $this->scopeRepository->findForUser( $selectedUserId, $selectedUuid ) : null;
+		$expiresOn = $scope === null ? null : $scope[ 'expires_on' ];
 		$candidateCaps = $this->candidateProvider->forUser( $selectedUserId );
 		$metaCaps = $this->metaRegistry->registered();
-		$selectedCaps = $scope === null
+		$selectedCaps = $scope === null || !$scope[ 'capabilities_restricted' ]
 			? $candidateCaps
 			: array_intersect_key( $scope[ 'allowed_caps' ], $candidateCaps );
-		$selectedMetaCaps = $scope === null
+		$selectedMetaCaps = $scope === null || !$scope[ 'capabilities_restricted' ]
 			? $metaCaps
 			: array_intersect_key( $scope[ 'allowed_meta_caps' ], $metaCaps );
 		$capabilityGroups = $this->groupProvider->group( $candidateCaps, $metaCaps );
@@ -215,7 +229,7 @@ class AdminPage {
 		echo '<div class="wrap mandate">';
 		echo '<h1>'.esc_html__( 'Mandate', 'mandate' ).'</h1>';
 		$this->renderMessage();
-		$this->renderSelectionForm( $selectedUserId, $passwords, $selectedUuid, $scope );
+		$this->renderSelectionForm( $selectedUserId, $passwords, $selectedUuid, $scope, $expiresOn );
 
 		if ( $selectedUserId < 1 ) {
 			echo '</div>';
@@ -239,7 +253,8 @@ class AdminPage {
 			$selectedUuid,
 			$capabilityGroups,
 			$selectedCaps,
-			$selectedMetaCaps
+			$selectedMetaCaps,
+			$expiresOn
 		);
 		echo '</div>';
 	}
@@ -274,8 +289,9 @@ class AdminPage {
 	/**
 	 * @param list<ApplicationPasswordRecord> $passwords
 	 * @param CapabilityScopeRecord|null $scope
+	 * @param string|null $expiresOn
 	 */
-	private function renderSelectionForm( int $selectedUserId, array $passwords, string $selectedUuid, ?array $scope ) :void {
+	private function renderSelectionForm( int $selectedUserId, array $passwords, string $selectedUuid, ?array $scope, ?string $expiresOn ) :void {
 		$currentRoleSlugs = $this->roleSlugsForUser( $selectedUserId );
 
 		echo '<form method="get" action="'.esc_url( admin_url( 'tools.php' ) ).'" class="mandate-selection" data-wpm-selection-form>';
@@ -310,7 +326,7 @@ class AdminPage {
 			echo '<p class="description">'.esc_html__( 'No application passwords are available for this user.', 'mandate' ).'</p>';
 		}
 		echo '</div>';
-		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope, $currentRoleSlugs );
+		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope, $expiresOn, $currentRoleSlugs );
 		echo '</div>';
 		echo '</div>';
 		echo '<p class="mandate-selection-status" data-wpm-selection-status hidden>'.esc_html__( 'Loading selection...', 'mandate' ).'</p>';
@@ -403,9 +419,10 @@ class AdminPage {
 	/**
 	 * @param list<ApplicationPasswordRecord> $passwords
 	 * @param CapabilityScopeRecord|null $scope
+	 * @param string|null $expiresOn
 	 * @param list<string> $currentRoleSlugs
 	 */
-	private function renderPasswordSummary( array $passwords, string $selectedUuid, ?array $scope, array $currentRoleSlugs ) :void {
+	private function renderPasswordSummary( array $passwords, string $selectedUuid, ?array $scope, ?string $expiresOn, array $currentRoleSlugs ) :void {
 		$password = $this->selectedPassword( $passwords, $selectedUuid );
 		if ( $password === null ) {
 			return;
@@ -421,8 +438,9 @@ class AdminPage {
 		$this->renderDetailItem( __( 'Last Used', 'mandate' ), $this->formatTimestamp( $password[ 'last_used' ] ) );
 		$this->renderDetailItem(
 			__( 'Scope', 'mandate' ),
-			$scope === null ? __( 'Unrestricted', 'mandate' ) : __( 'Restricted', 'mandate' )
+			$scope === null || !$scope[ 'capabilities_restricted' ] ? __( 'Unrestricted', 'mandate' ) : __( 'Restricted', 'mandate' )
 		);
+		$this->renderExpirationDetailItem( $expiresOn );
 		if ( $scope !== null ) {
 			$this->renderDetailItem( __( 'Scope Last Saved', 'mandate' ), $this->formatTimestamp( $scope[ 'updated_at' ] ) );
 			$this->renderDetailItem(
@@ -465,17 +483,27 @@ class AdminPage {
 		echo '<div><dt>'.esc_html( $label ).'</dt><dd>'.esc_html( $value === '' ? '-' : $value ).'</dd></div>';
 	}
 
+	private function renderExpirationDetailItem( ?string $expiresOn ) :void {
+		$state = $expiresOn === null ? 'never' : 'date';
+		$value = $expiresOn ?? __( 'Never expires', 'mandate' );
+		echo '<div><dt>'.esc_html__( 'Expiration Date', 'mandate' ).'</dt><dd>';
+		echo '<button type="button" class="button-link" data-wpm-expiration-summary data-wpm-expiration-state="'.esc_attr( $state ).'" aria-controls="mandate-expiration-date">'.esc_html( $value ).'</button>';
+		echo '</dd></div>';
+	}
+
 	/**
 	 * @param array{wordpress:array{primitive:array<string,true>,meta:array<string,true>},other:array{primitive:array<string,true>,meta:array<string,true>}} $capabilityGroups
 	 * @param array<string,true> $selectedCaps
 	 * @param array<string,true> $selectedMetaCaps
+	 * @param string|null $expiresOn
 	 */
 	private function renderScopeForm(
 		int $selectedUserId,
 		string $selectedUuid,
 		array $capabilityGroups,
 		array $selectedCaps,
-		array $selectedMetaCaps
+		array $selectedMetaCaps,
+		?string $expiresOn
 	) :void {
 		echo '<h2>'.esc_html__( 'Capability Scope', 'mandate' ).'</h2>';
 
@@ -494,6 +522,11 @@ class AdminPage {
 		);
 		echo '<input type="hidden" name="user_id" value="'.esc_attr( (string)$selectedUserId ).'" />';
 		echo '<input type="hidden" name="app_password_uuid" value="'.esc_attr( $selectedUuid ).'" />';
+		echo '<div class="mandate-field mandate-expiration-field">';
+		echo '<label for="mandate-expiration-date">'.esc_html__( 'Expiration Date', 'mandate' ).'</label>';
+		echo '<input type="date" id="mandate-expiration-date" name="expiration_date" value="'.esc_attr( $expiresOn ?? '' ).'" data-wpm-expiration-input />';
+		echo '<p class="description">'.esc_html__( 'Leave empty for no expiration.', 'mandate' ).'</p>';
+		echo '</div>';
 
 		echo '<div class="mandate-tabs" role="tablist" aria-label="'.esc_attr__( 'Capability groups', 'mandate' ).'">';
 		$this->renderTabButton( 'wordpress', __( 'WordPress', 'mandate' ), true );
@@ -631,6 +664,15 @@ class AdminPage {
 			: '';
 
 		return strtoupper( $method );
+	}
+
+	private function postedExpirationDate() :string|null|false {
+		$submitted = $this->postScalar( 'expiration_date' );
+		if ( $submitted === '' ) {
+			return null;
+		}
+
+		return $this->expirationDatePolicy->normalize( $submitted ) ?? false;
 	}
 
 	/**

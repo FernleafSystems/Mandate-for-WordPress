@@ -25,10 +25,11 @@ An admin can choose:
 - a WordPress user
 - one of that user's Application Passwords
 - the capabilities that password should be allowed to use
+- an optional expiration date for that password
 
 When a request is authenticated with that Application Password, Mandate checks the saved allowlist and removes capabilities that are not allowed for that password.
 
-Mandate never grants new permissions. It only allows you to narrow an Application Password to capabilities the selected user already receives from their assigned role or roles.
+Mandate never grants new permissions. It only allows you to narrow an Application Password to capabilities the selected user already receives from their assigned role or roles. If the selected Application Password is past its saved expiration date, Mandate removes all capabilities for that request.
 
 Normal browser and wp-admin sessions for the same user are not changed.
 
@@ -48,7 +49,9 @@ The capability list shown on the page is built from the user's assigned roles. D
 
 Saved scopes are stored by Application Password UUID. No raw Application Password secret is displayed or stored.
 
-If no scope has been saved for an Application Password, the password behaves normally. Resetting a scope returns that password to normal WordPress behavior.
+If no scope or expiration has been saved for an Application Password, the password behaves normally. Resetting a scope returns that password to normal WordPress behavior.
+
+Expiration dates are calendar dates in the site's timezone. A password remains valid through the selected date and expires on the following day. Mandate also runs a daily WordPress cron task that revokes expired Application Passwords through WordPress core.
 
 ## Current Scope
 
@@ -59,12 +62,14 @@ This release focuses on the core safety mechanism:
 - role-derived capability allowlist
 - grouped WordPress and Everything Else capability lists
 - per-Application-Password scope storage
+- optional per-Application-Password expiration dates
 - primitive capability enforcement
 - registered meta-capability enforcement
+- automatic revocation of expired Application Passwords
 - cleanup when an Application Password is deleted
 - lightweight unit and browser smoke test coverage
 
-It does not create or delete Application Passwords, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords.
+It does not provide Application Password management screens, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords. The only automatic Application Password deletion it performs is revocation of passwords that are past a saved Mandate expiration date.
 
 ## Development Notes
 

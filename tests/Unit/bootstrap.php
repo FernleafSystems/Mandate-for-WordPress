@@ -66,10 +66,13 @@ function wpm_test_reset_state() :void {
 	$GLOBALS[ 'wpm_test_current_user_id' ] = 1;
 	$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'manage_options' => true ];
 	$GLOBALS[ 'wpm_test_rest_uuid' ] = null;
+	$GLOBALS[ 'wpm_test_now' ] = strtotime( '2026-05-23 12:00:00 UTC' );
 	$GLOBALS[ 'wpm_test_is_multisite' ] = false;
 	$GLOBALS[ 'wpm_test_super_admins' ] = [];
 	$GLOBALS[ 'wpm_test_actions' ] = [];
 	$GLOBALS[ 'wpm_test_filters' ] = [];
+	$GLOBALS[ 'wpm_test_scheduled_events' ] = [];
+	$GLOBALS[ 'wpm_test_deactivation_hooks' ] = [];
 	$GLOBALS[ 'wpm_test_management_pages' ] = [];
 	$GLOBALS[ 'wpm_test_enqueued_styles' ] = [];
 	$GLOBALS[ 'wpm_test_enqueued_scripts' ] = [];
@@ -158,6 +161,12 @@ if ( !function_exists( 'wp_is_uuid' ) ) {
 	function wp_is_uuid( mixed $uuid, mixed $version = null ) :bool {
 		return is_string( $uuid )
 			&& preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $uuid ) === 1;
+	}
+}
+
+if ( !function_exists( 'wp_date' ) ) {
+	function wp_date( string $format, ?int $timestamp = null, mixed $timezone = null ) :string {
+		return gmdate( $format, $timestamp ?? (int)$GLOBALS[ 'wpm_test_now' ] );
 	}
 }
 
@@ -357,6 +366,26 @@ if ( !class_exists( 'WP_Application_Passwords' ) ) {
 		public static function get_user_application_passwords( int $userId ) :mixed {
 			return self::$passwordsByUser[ $userId ] ?? [];
 		}
+
+		public static function delete_application_password( int $userId, string $uuid ) :bool {
+			$passwords = self::$passwordsByUser[ $userId ] ?? [];
+			if ( !is_array( $passwords ) ) {
+				return false;
+			}
+
+			foreach ( $passwords as $index => $password ) {
+				if ( !is_array( $password ) || ( $password[ 'uuid' ] ?? null ) !== $uuid ) {
+					continue;
+				}
+
+				unset( self::$passwordsByUser[ $userId ][ $index ] );
+				self::$passwordsByUser[ $userId ] = array_values( self::$passwordsByUser[ $userId ] );
+				do_action( 'wp_delete_application_password', $userId, $password );
+				return true;
+			}
+
+			return false;
+		}
 	}
 }
 
@@ -392,6 +421,58 @@ if ( !function_exists( 'add_filter' ) ) {
 			'callback'      => $callback,
 			'accepted_args' => $acceptedArgs,
 		];
+	}
+}
+
+if ( !function_exists( 'wp_next_scheduled' ) ) {
+	function wp_next_scheduled( string $hook, array $args = [] ) :int|false {
+		$events = $GLOBALS[ 'wpm_test_scheduled_events' ][ $hook ] ?? [];
+		if ( $events === [] ) {
+			return false;
+		}
+
+		ksort( $events );
+		return (int)array_key_first( $events );
+	}
+}
+
+if ( !function_exists( 'wp_schedule_event' ) ) {
+	function wp_schedule_event(
+		int $timestamp,
+		string $recurrence,
+		string $hook,
+		array $args = [],
+		bool $wpError = false
+	) :bool {
+		$GLOBALS[ 'wpm_test_scheduled_events' ][ $hook ][ $timestamp ] = [
+			'recurrence' => $recurrence,
+			'args'       => $args,
+		];
+		return true;
+	}
+}
+
+if ( !function_exists( 'wp_clear_scheduled_hook' ) ) {
+	function wp_clear_scheduled_hook( string $hook, array $args = [], bool $wpError = false ) :int {
+		$count = count( $GLOBALS[ 'wpm_test_scheduled_events' ][ $hook ] ?? [] );
+		unset( $GLOBALS[ 'wpm_test_scheduled_events' ][ $hook ] );
+		return $count;
+	}
+}
+
+if ( !function_exists( 'wp_unschedule_event' ) ) {
+	function wp_unschedule_event( int $timestamp, string $hook, array $args = [], bool $wpError = false ) :bool {
+		unset( $GLOBALS[ 'wpm_test_scheduled_events' ][ $hook ][ $timestamp ] );
+		if ( ( $GLOBALS[ 'wpm_test_scheduled_events' ][ $hook ] ?? [] ) === [] ) {
+			unset( $GLOBALS[ 'wpm_test_scheduled_events' ][ $hook ] );
+		}
+		return true;
+	}
+}
+
+if ( !function_exists( 'register_deactivation_hook' ) ) {
+	function register_deactivation_hook( string $file, callable $callback ) :void {
+		$GLOBALS[ 'wpm_test_deactivation_hooks' ][ $file ] = $callback;
 	}
 }
 

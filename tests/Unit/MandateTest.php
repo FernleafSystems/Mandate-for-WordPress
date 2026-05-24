@@ -10,6 +10,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionP
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
@@ -295,7 +296,8 @@ final class MandateTest extends Wpm_Test_Case {
 			$repository,
 			new CapabilityCandidateProvider(),
 			new CurrentApplicationPasswordContext(),
-			new MetaCapabilityRegistry()
+			new MetaCapabilityRegistry(),
+			new ExpirationDatePolicy()
 		);
 		$allcaps = [ 'read' => true, 'edit_posts' => true ];
 
@@ -312,7 +314,8 @@ final class MandateTest extends Wpm_Test_Case {
 			$this->scopeRepository(),
 			new CapabilityCandidateProvider(),
 			$context,
-			new MetaCapabilityRegistry()
+			new MetaCapabilityRegistry(),
+			new ExpirationDatePolicy()
 		);
 		$allcaps = [ 'read' => true, 'edit_posts' => true ];
 
@@ -499,7 +502,8 @@ final class MandateTest extends Wpm_Test_Case {
 				new CapabilityDescriptionProvider(),
 				new MetaCapabilityRegistry(),
 				new CapabilityGroupProvider(),
-				$pluginFile
+				$pluginFile,
+				new ExpirationDatePolicy()
 			);
 
 			$adminPage->registerMenu();
@@ -575,11 +579,14 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
 		$record = $repository->findForUser( 5, self::UUID );
 
+		$this->assertNotNull( $record );
+		$this->assertTrue( $record[ 'capabilities_restricted' ] );
 		$this->assertSame(
 			[ 'read' => true, 'upload_files' => true ],
 			$record[ 'allowed_caps' ]
 		);
 		$this->assertSame( [ 'edit_post' => true ], $record[ 'allowed_meta_caps' ] );
+		$this->assertNull( $record[ 'expires_on' ] );
 		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
 		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
 	}
@@ -766,7 +773,8 @@ final class MandateTest extends Wpm_Test_Case {
 			new CapabilityDescriptionProvider(),
 			new MetaCapabilityRegistry(),
 			new CapabilityGroupProvider(),
-			dirname( __DIR__, 2 ).'/plugin.php'
+			dirname( __DIR__, 2 ).'/plugin.php',
+			new ExpirationDatePolicy()
 		);
 	}
 
@@ -984,7 +992,8 @@ final class MandateTest extends Wpm_Test_Case {
 			$repository,
 			new CapabilityCandidateProvider(),
 			$context,
-			new MetaCapabilityRegistry()
+			new MetaCapabilityRegistry(),
+			new ExpirationDatePolicy()
 		);
 	}
 
@@ -996,6 +1005,6 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	private function scopeRepository( ?PluginOptionsRepository $optionsRepository = null ) :ScopeRepository {
-		return new ScopeRepository( $optionsRepository ?? new PluginOptionsRepository() );
+		return new ScopeRepository( $optionsRepository ?? new PluginOptionsRepository(), new ExpirationDatePolicy() );
 	}
 }

@@ -5,6 +5,7 @@ declare( strict_types=1 );
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 
 if ( !defined( 'ABSPATH' ) ) {
@@ -12,14 +13,17 @@ if ( !defined( 'ABSPATH' ) ) {
 }
 
 /**
- * @phpstan-type CapabilityScopeRecord array{user_id:int,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,roles_at_update:list<string>|null,updated_at:int,updated_by:int}
+ * @phpstan-type CapabilityScopeRecord array{user_id:int,capabilities_restricted:bool,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,expires_on:string|null,roles_at_update:list<string>|null,updated_at:int,updated_by:int}
  */
 class ScopeRepository {
 
 	private PluginOptionsRepository $optionsRepository;
 
-	public function __construct( PluginOptionsRepository $optionsRepository ) {
+	private ExpirationDatePolicy $expirationDatePolicy;
+
+	public function __construct( PluginOptionsRepository $optionsRepository, ExpirationDatePolicy $expirationDatePolicy ) {
 		$this->optionsRepository = $optionsRepository;
+		$this->expirationDatePolicy = $expirationDatePolicy;
 	}
 
 	/**
@@ -78,21 +82,30 @@ class ScopeRepository {
 		array $allowedCaps,
 		array $allowedMetaCaps,
 		array $rolesAtUpdate,
-		int $updatedBy
+		int $updatedBy,
+		?string $expiresOn = null,
+		bool $capabilitiesRestricted = true
 	) :bool {
 		$uuid = ApplicationPasswordRepository::normalizeUuid( $uuid );
 		if ( $uuid === '' || $userId < 1 ) {
 			return false;
 		}
+		$submittedExpiresOn = $expiresOn;
+		$expiresOn = $submittedExpiresOn === null ? null : $this->expirationDatePolicy->normalize( $submittedExpiresOn );
+		if ( $submittedExpiresOn !== null && $expiresOn === null ) {
+			return false;
+		}
 
 		$all = $this->all();
 		$all[ $uuid ] = [
-			'user_id'           => $userId,
-			'allowed_caps'      => CapabilityName::normalizeMap( $allowedCaps ),
-			'allowed_meta_caps' => CapabilityName::normalizeMap( $allowedMetaCaps ),
-			'roles_at_update'   => $this->normalizeRoleSlugs( $rolesAtUpdate ),
-			'updated_at'        => time(),
-			'updated_by'        => max( 0, $updatedBy ),
+			'user_id'                 => $userId,
+			'capabilities_restricted' => $capabilitiesRestricted,
+			'allowed_caps'            => $capabilitiesRestricted ? CapabilityName::normalizeMap( $allowedCaps ) : [],
+			'allowed_meta_caps'       => $capabilitiesRestricted ? CapabilityName::normalizeMap( $allowedMetaCaps ) : [],
+			'expires_on'              => $expiresOn,
+			'roles_at_update'         => $capabilitiesRestricted ? $this->normalizeRoleSlugs( $rolesAtUpdate ) : null,
+			'updated_at'              => time(),
+			'updated_by'              => max( 0, $updatedBy ),
 		];
 
 		return $this->optionsRepository->replaceScopes( $all );
@@ -147,14 +160,22 @@ class ScopeRepository {
 		$rolesAtUpdate = isset( $record[ 'roles_at_update' ] ) && is_array( $record[ 'roles_at_update' ] )
 			? $this->normalizeRoleSlugs( $record[ 'roles_at_update' ] )
 			: null;
+		$capabilitiesRestricted = isset( $record[ 'capabilities_restricted' ] ) && is_bool( $record[ 'capabilities_restricted' ] )
+			? $record[ 'capabilities_restricted' ]
+			: true;
+		$expiresOn = array_key_exists( 'expires_on', $record )
+			? $this->expirationDatePolicy->normalize( $record[ 'expires_on' ] )
+			: null;
 
 		return [
-			'user_id'           => $userId,
-			'allowed_caps'      => $allowedCaps,
-			'allowed_meta_caps' => $allowedMetaCaps,
-			'roles_at_update'   => $rolesAtUpdate,
-			'updated_at'        => isset( $record[ 'updated_at' ] ) ? max( 0, (int)$record[ 'updated_at' ] ) : 0,
-			'updated_by'        => isset( $record[ 'updated_by' ] ) ? max( 0, (int)$record[ 'updated_by' ] ) : 0,
+			'user_id'                 => $userId,
+			'capabilities_restricted' => $capabilitiesRestricted,
+			'allowed_caps'            => $capabilitiesRestricted ? $allowedCaps : [],
+			'allowed_meta_caps'       => $capabilitiesRestricted ? $allowedMetaCaps : [],
+			'expires_on'              => $expiresOn,
+			'roles_at_update'         => $capabilitiesRestricted ? $rolesAtUpdate : null,
+			'updated_at'              => isset( $record[ 'updated_at' ] ) ? max( 0, (int)$record[ 'updated_at' ] ) : 0,
+			'updated_by'              => isset( $record[ 'updated_by' ] ) ? max( 0, (int)$record[ 'updated_by' ] ) : 0,
 		];
 	}
 

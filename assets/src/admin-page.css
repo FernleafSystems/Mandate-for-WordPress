@@ -43,6 +43,16 @@
 	min-width: min( 100%, 18rem );
 }
 
+.mandate-expiration-field {
+	margin: 0 0 1rem;
+	max-width: 18rem;
+}
+
+.mandate-expiration-field input[type="date"] {
+	box-sizing: border-box;
+	width: 100%;
+}
+
 .mandate-role-summary {
 	color: #50575e;
 	margin-top: .5rem;
