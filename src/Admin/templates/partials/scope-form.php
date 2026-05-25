@@ -13,8 +13,8 @@ echo $mandateSuperAdminNoticeHtml;
 ?>
 <form method="post" action="<?php echo esc_url( $hrefs[ 'scope_form_action' ] ); ?>" id="<?php echo esc_attr( $scopeForm[ 'id' ] ); ?>" class="mandate-scope-form">
 	<?php
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Trusted nonce field HTML produced by the view-data builder.
-	echo $content[ 'scope_nonce_fields' ];
+	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized trusted nonce field HTML produced by the view-data builder.
+	echo $trustedHtml[ 'scope_nonce_fields' ];
 	?>
 	<input type="hidden" name="user_id" value="<?php echo esc_attr( $scopeForm[ 'user_id' ] ); ?>" />
 	<input type="hidden" name="app_password_uuid" value="<?php echo esc_attr( $scopeForm[ 'uuid' ] ); ?>" />

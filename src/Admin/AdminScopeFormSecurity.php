@@ -19,6 +19,12 @@ class AdminScopeFormSecurity {
 
 	private const NONCE_ACTION_PREFIX = 'mandate_scope';
 
+	private AdminTrustedHtmlSanitizer $trustedHtmlSanitizer;
+
+	public function __construct( AdminTrustedHtmlSanitizer $trustedHtmlSanitizer ) {
+		$this->trustedHtmlSanitizer = $trustedHtmlSanitizer;
+	}
+
 	public function isSupportedAction( string $action ) :bool {
 		return isset( self::FORM_ACTIONS[ $action ] );
 	}
@@ -40,16 +46,16 @@ class AdminScopeFormSecurity {
 	}
 
 	public function nonceFields( int $userId, string $uuid ) :string {
-		return wp_nonce_field(
+		return $this->trustedHtmlSanitizer->nonceFields( wp_nonce_field(
 			$this->nonceAction( self::ACTION_SAVE, $userId, $uuid ),
 			$this->nonceName( self::ACTION_SAVE ),
-			true,
+			false,
 			false
 		).wp_nonce_field(
 			$this->nonceAction( self::ACTION_CLEAR, $userId, $uuid ),
 			$this->nonceName( self::ACTION_CLEAR ),
-			true,
+			false,
 			false
-		);
+		) );
 	}
 }

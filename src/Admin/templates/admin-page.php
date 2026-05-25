@@ -16,7 +16,7 @@ if ( !defined( 'ABSPATH' ) ) {
 		'strings'       => $strings,
 		'flags'         => $flags,
 		'selectionForm' => $vars[ 'selection_form' ],
-		'content'       => $content,
+		'trustedHtml'   => $trustedHtml,
 	] );
 	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
 	echo $mandateSelectionHtml;
@@ -29,7 +29,7 @@ if ( !defined( 'ABSPATH' ) ) {
 		$mandateScopeHtml = $this->render( 'partials/scope-form.php', [
 			'hrefs'     => $hrefs,
 			'scopeForm' => $vars[ 'scope_form' ],
-			'content'   => $content,
+			'trustedHtml' => $trustedHtml,
 		] );
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
 		echo $mandateScopeHtml;

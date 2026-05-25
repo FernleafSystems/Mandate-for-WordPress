@@ -32,7 +32,7 @@ if ( !defined( 'ABSPATH' ) ) {
  *   flags:AdminPageFlagsContract,
  *   classes:array{root:string},
  *   vars:array{message:AdminNoticeContract,page_notice:AdminNoticeContract,selection_form:AdminSelectionFormContract,scope_form:AdminScopeFormContract},
- *   content:array{user_dropdown:string,scope_nonce_fields:string}
+ *   trustedHtml:array{user_dropdown:string,scope_nonce_fields:string}
  * }
  */
 final class AdminPageRenderContracts {

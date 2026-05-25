@@ -207,7 +207,7 @@ class AdminPage {
 	public function render() :void {
 		$this->requireManageCapability();
 		$html = $this->templateRenderer->render( 'admin-page.php', $this->viewDataBuilder->build() );
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Admin templates escape scalar output and only emit trusted WordPress helper HTML from content.
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Admin templates escape scalar output and only emit sanitized trusted helper HTML.
 		echo $html;
 	}
 

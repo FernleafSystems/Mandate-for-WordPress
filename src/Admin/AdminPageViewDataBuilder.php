@@ -52,6 +52,8 @@ class AdminPageViewDataBuilder {
 
 	private AdminScopeFormSecurity $formSecurity;
 
+	private AdminTrustedHtmlSanitizer $trustedHtmlSanitizer;
+
 	public function __construct(
 		ScopeRepository $scopeRepository,
 		ApplicationPasswordRepository $passwordRepository,
@@ -61,7 +63,8 @@ class AdminPageViewDataBuilder {
 		CapabilityGroupProvider $groupProvider,
 		ExpirationDatePolicy $expirationDatePolicy,
 		AdminUserRoleProvider $roleProvider,
-		AdminScopeFormSecurity $formSecurity
+		AdminScopeFormSecurity $formSecurity,
+		AdminTrustedHtmlSanitizer $trustedHtmlSanitizer
 	) {
 		$this->scopeRepository = $scopeRepository;
 		$this->passwordRepository = $passwordRepository;
@@ -72,6 +75,7 @@ class AdminPageViewDataBuilder {
 		$this->expirationDatePolicy = $expirationDatePolicy;
 		$this->roleProvider = $roleProvider;
 		$this->formSecurity = $formSecurity;
+		$this->trustedHtmlSanitizer = $trustedHtmlSanitizer;
 	}
 
 	/**
@@ -126,7 +130,7 @@ class AdminPageViewDataBuilder {
 					$selectedMetaCaps
 				),
 			],
-			'content' => [
+			'trustedHtml' => [
 				'user_dropdown'      => $this->buildUserDropdown( $selectedUserId ),
 				'scope_nonce_fields' => $selectedUuid === ''
 					? ''
@@ -586,7 +590,7 @@ class AdminPageViewDataBuilder {
 	}
 
 	private function buildUserDropdown( int $selectedUserId ) :string {
-		return (string)wp_dropdown_users(
+		return $this->trustedHtmlSanitizer->dropdown( (string)wp_dropdown_users(
 			[
 				'name'     => 'user_id',
 				'id'       => 'mandate-user',
@@ -594,7 +598,7 @@ class AdminPageViewDataBuilder {
 				'show'     => 'display_name_with_login',
 				'echo'     => false,
 			]
-		);
+		) );
 	}
 
 	private function formatTimestamp( int $timestamp ) :string {

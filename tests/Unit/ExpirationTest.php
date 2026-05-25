@@ -6,6 +6,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
@@ -548,7 +549,8 @@ final class ExpirationTest extends Wpm_Test_Case {
 		$groupProvider = new CapabilityGroupProvider();
 		$expirationDatePolicy = new ExpirationDatePolicy();
 		$roleProvider = new AdminUserRoleProvider();
-		$formSecurity = new AdminScopeFormSecurity();
+		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
+		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
 		$viewDataBuilder = new AdminPageViewDataBuilder(
 			$repository,
 			$passwordRepository,
@@ -558,7 +560,8 @@ final class ExpirationTest extends Wpm_Test_Case {
 			$groupProvider,
 			$expirationDatePolicy,
 			$roleProvider,
-			$formSecurity
+			$formSecurity,
+			$trustedHtmlSanitizer
 		);
 
 		return new AdminPage(
@@ -602,7 +605,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 			'expiration_date'   => $expirationDate,
 		];
 		if ( $withNonce ) {
-			$formSecurity = new AdminScopeFormSecurity();
+			$formSecurity = new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() );
 			$nonceName = $formSecurity->nonceName( $action );
 			$_POST[ $nonceName ] = wpm_test_set_valid_nonce(
 				$nonceName,

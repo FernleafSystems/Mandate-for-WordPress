@@ -12,8 +12,8 @@ if ( !defined( 'ABSPATH' ) ) {
 			<div class="mandate-field">
 				<label class="mandate-field-title" for="mandate-user"><?php echo esc_html( $strings[ 'user_label' ] ); ?></label>
 				<?php
-				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Trusted user dropdown HTML produced by the view-data builder.
-				echo $content[ 'user_dropdown' ];
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized trusted user dropdown HTML produced by the view-data builder.
+				echo $trustedHtml[ 'user_dropdown' ];
 				?>
 			</div>
 			<?php

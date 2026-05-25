@@ -19,12 +19,20 @@ final class Wpm_Test_Roles {
 
 	/**
 	 * @param array<string,array<string,bool>> $roles
+	 * @param array<string,string> $role_names
 	 */
-	public function __construct( public array $roles ) {
+	public function __construct( public array $roles, public array $role_names = [] ) {
 	}
 
 	public function get_role( string $role ) :?object {
 		return isset( $this->roles[ $role ] ) ? (object)[ 'capabilities' => $this->roles[ $role ] ] : null;
+	}
+
+	/**
+	 * @return array<string,string>
+	 */
+	public function get_names() :array {
+		return $this->role_names;
 	}
 }
 
@@ -130,6 +138,46 @@ if ( !function_exists( 'esc_attr' ) ) {
 if ( !function_exists( 'esc_url' ) ) {
 	function esc_url( mixed $url ) :string {
 		return (string)$url;
+	}
+}
+
+if ( !function_exists( 'wp_kses' ) ) {
+	function wp_kses( string $html, array $allowed_html, array $allowed_protocols = [] ) :string {
+		unset( $allowed_protocols );
+
+		return (string)preg_replace_callback(
+			'/<\s*(\/?)\s*([a-z0-9]+)([^>]*)>/i',
+			static function ( array $matches ) use ( $allowed_html ) :string {
+				$closing = $matches[ 1 ] === '/';
+				$tag = strtolower( $matches[ 2 ] );
+				if ( !isset( $allowed_html[ $tag ] ) || !is_array( $allowed_html[ $tag ] ) ) {
+					return '';
+				}
+				if ( $closing ) {
+					return '</'.$tag.'>';
+				}
+
+				$attributes = '';
+				preg_match_all(
+					'/\s+([a-z0-9_-]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+)))?/i',
+					$matches[ 3 ],
+					$attributeMatches,
+					PREG_SET_ORDER
+				);
+				foreach ( $attributeMatches as $attributeMatch ) {
+					$name = strtolower( $attributeMatch[ 1 ] );
+					if ( !isset( $allowed_html[ $tag ][ $name ] ) ) {
+						continue;
+					}
+
+					$value = $attributeMatch[ 2 ] ?? $attributeMatch[ 3 ] ?? $attributeMatch[ 4 ] ?? $name;
+					$attributes .= ' '.$name.'="'.esc_attr( $value ).'"';
+				}
+
+				return '<'.$tag.$attributes.'>';
+			},
+			$html
+		);
 	}
 }
 
@@ -307,7 +355,10 @@ if ( !function_exists( 'wp_safe_redirect' ) ) {
 if ( !function_exists( 'wp_nonce_field' ) ) {
 	function wp_nonce_field( string $action = '-1', string $name = '_wpnonce', bool $referer = true, bool $display = true ) :string {
 		$nonce = wpm_test_set_valid_nonce( $name, $action );
-		$field = '<input type="hidden" name="'.esc_attr( $name ).'" value="'.esc_attr( $nonce ).'" />';
+		$field = '<input type="hidden" id="'.esc_attr( $name ).'" name="'.esc_attr( $name ).'" value="'.esc_attr( $nonce ).'" />';
+		if ( $referer ) {
+			$field .= '<input type="hidden" name="_wp_http_referer" value="/wp-admin/tools.php?page=mandate-app-security" />';
+		}
 		if ( $display ) {
 			echo $field;
 		}

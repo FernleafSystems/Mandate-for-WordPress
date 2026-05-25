@@ -6,6 +6,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
@@ -43,7 +44,8 @@ class Plugin {
 		$metaRegistry = new MetaCapabilityRegistry();
 		$context = new CurrentApplicationPasswordContext();
 		$roleProvider = new AdminUserRoleProvider();
-		$formSecurity = new AdminScopeFormSecurity();
+		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
+		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
 		$templateRenderer = new AdminTemplateRenderer();
 		$viewDataBuilder = new AdminPageViewDataBuilder(
 			$scopeRepository,
@@ -54,7 +56,8 @@ class Plugin {
 			$groupProvider,
 			$expirationDatePolicy,
 			$roleProvider,
-			$formSecurity
+			$formSecurity,
+			$trustedHtmlSanitizer
 		);
 
 		$adminPage = new AdminPage(
