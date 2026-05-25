@@ -139,6 +139,51 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	expect( Math.abs( selectionColumns[ 1 ].top - selectionColumns[ 2 ].top ) ).toBeLessThanOrEqual( 2 );
 	expect( selectionColumns[ 0 ].right ).toBeLessThanOrEqual( selectionColumns[ 1 ].left );
 	expect( selectionColumns[ 1 ].right ).toBeLessThanOrEqual( selectionColumns[ 2 ].left );
+	const selectionTitleTops = await page.locator( '.mandate-selection-grid' ).evaluate( ( grid ) => (
+		Array.from( grid.querySelectorAll( '.mandate-field-title' ) )
+			.map( ( title ) => Math.round( title.getBoundingClientRect().top ) )
+	) );
+	expect( selectionTitleTops ).toHaveLength( 3 );
+	expect( Math.abs( selectionTitleTops[ 0 ] - selectionTitleTops[ 1 ] ) ).toBeLessThanOrEqual( 2 );
+	expect( Math.abs( selectionTitleTops[ 1 ] - selectionTitleTops[ 2 ] ) ).toBeLessThanOrEqual( 2 );
+	const summaryCardStyles = await page.locator( '#mandate-role-summary' ).evaluate( ( roleSummary ) => {
+		const passwordSummary = document.querySelector( '#mandate-password-summary' );
+		const properties = [
+			'backgroundColor',
+			'borderTopColor',
+			'borderTopStyle',
+			'borderTopWidth',
+			'borderTopLeftRadius',
+			'boxSizing',
+			'paddingTop',
+			'paddingRight',
+			'paddingBottom',
+			'paddingLeft',
+		];
+
+		return properties.map( ( property ) => [
+			getComputedStyle( roleSummary )[ property ],
+			getComputedStyle( passwordSummary )[ property ],
+		] );
+	} );
+	summaryCardStyles.forEach( ( [ roleValue, passwordValue ] ) => {
+		expect( roleValue ).toBe( passwordValue );
+	} );
+	await page.setViewportSize( { width: 760, height: 900 } );
+	const mobileSelectionColumns = await page.locator( '.mandate-selection-grid > .mandate-selection-column' )
+		.evaluateAll( ( columns ) => columns.map( ( column ) => {
+			const rect = column.getBoundingClientRect();
+			return {
+				left: Math.round( rect.left ),
+				top: Math.round( rect.top ),
+			};
+		} ) );
+	expect( mobileSelectionColumns ).toHaveLength( 3 );
+	expect( Math.abs( mobileSelectionColumns[ 0 ].left - mobileSelectionColumns[ 1 ].left ) ).toBeLessThanOrEqual( 2 );
+	expect( Math.abs( mobileSelectionColumns[ 1 ].left - mobileSelectionColumns[ 2 ].left ) ).toBeLessThanOrEqual( 2 );
+	expect( mobileSelectionColumns[ 0 ].top ).toBeLessThan( mobileSelectionColumns[ 1 ].top );
+	expect( mobileSelectionColumns[ 1 ].top ).toBeLessThan( mobileSelectionColumns[ 2 ].top );
+	await page.setViewportSize( { width: 1280, height: 900 } );
 
 	const activeTabColors = await page.locator( '[data-wpm-tab="wordpress"]' ).evaluate( ( tab ) => {
 		const panel = document.querySelector( '[data-wpm-panel="wordpress"]' );

@@ -7,11 +7,17 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionP
 final class CapabilityDescriptionProviderTest extends Wpm_Test_Case {
 
 	public function testKnownPrimitiveCapabilityReturnsDescription() :void {
-		$this->assertNotSame( '', ( new CapabilityDescriptionProvider() )->descriptionFor( 'upload_files' ) );
+		$this->assertSame(
+			'Deselecting may prevent deleting posts.',
+			( new CapabilityDescriptionProvider() )->descriptionFor( 'delete_posts' )
+		);
 	}
 
 	public function testKnownMetaCapabilityReturnsDescription() :void {
-		$this->assertNotSame( '', ( new CapabilityDescriptionProvider() )->descriptionFor( 'edit_post' ) );
+		$this->assertSame(
+			'Deselecting may prevent editing a specific post.',
+			( new CapabilityDescriptionProvider() )->descriptionFor( 'edit_post' )
+		);
 	}
 
 	public function testUnknownCustomCapabilityReturnsEmptyDescription() :void {
@@ -22,8 +28,8 @@ final class CapabilityDescriptionProviderTest extends Wpm_Test_Case {
 		$provider = new CapabilityDescriptionProvider();
 
 		$this->assertSame(
-			$provider->descriptionFor( 'upload_files' ),
-			$provider->descriptionFor( " \tUPLOAD_FILES\n" )
+			$provider->descriptionFor( 'delete_posts' ),
+			$provider->descriptionFor( " \tDELETE_POSTS\n" )
 		);
 	}
 }

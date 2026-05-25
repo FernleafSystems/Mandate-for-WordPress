@@ -13,7 +13,7 @@
 	grid-template-columns: minmax( 14rem, .75fr ) minmax( 18rem, .9fr ) minmax( 20rem, 1fr );
 }
 
-.mandate-password-summary,
+.mandate-summary-card,
 .mandate-capability-panel {
 	background: #fff;
 	border: 1px solid #c3c4c7;
@@ -31,10 +31,13 @@
 	margin-bottom: .65rem;
 }
 
-.mandate-field label {
+.mandate-field-title {
+	color: #1d2327;
 	display: block;
+	font-size: inherit;
 	font-weight: 600;
-	margin-bottom: .35rem;
+	line-height: 1.4;
+	margin: 0 0 .35rem;
 }
 
 .mandate-field select {
@@ -68,11 +71,6 @@
 
 .mandate-password-summary {
 	margin-top: 0;
-}
-
-.mandate-password-summary h2 {
-	font-size: 1rem;
-	margin: 0 0 .75rem;
 }
 
 .mandate-password-summary-details {

@@ -299,7 +299,7 @@ class AdminPage {
 		echo '<div class="mandate-selection-grid">';
 		echo '<div class="mandate-selection-column">';
 		echo '<div class="mandate-field">';
-		echo '<label for="mandate-user">'.esc_html__( 'User', 'mandate' ).'</label>';
+		echo '<label class="mandate-field-title" for="mandate-user">'.esc_html__( 'User', 'mandate' ).'</label>';
 		wp_dropdown_users(
 			[
 				'name'     => 'user_id',
@@ -314,7 +314,7 @@ class AdminPage {
 
 		echo '<div class="mandate-selection-column">';
 		echo '<div class="mandate-field">';
-		echo '<label for="mandate-password">'.esc_html__( 'Application Password', 'mandate' ).'</label>';
+		echo '<label class="mandate-field-title" for="mandate-password">'.esc_html__( 'Application Password', 'mandate' ).'</label>';
 		if ( !empty( $passwords ) ) {
 			echo '<select id="mandate-password" name="app_password_uuid">';
 			foreach ( $passwords as $password ) {
@@ -342,7 +342,7 @@ class AdminPage {
 	 */
 	private function renderRoleSummary( array $roleSlugs ) :void {
 		$roles = $this->roleSummaries( $roleSlugs );
-		echo '<div id="mandate-role-summary" class="mandate-role-summary">';
+		echo '<div id="mandate-role-summary" class="mandate-role-summary mandate-summary-card">';
 		echo '<p class="mandate-role-summary-label">'.esc_html__( 'Roles for selected user', 'mandate' ).'</p>';
 		if ( empty( $roles ) ) {
 			echo '<p class="description">'.esc_html__( 'No roles assigned.', 'mandate' ).'</p>';
@@ -431,8 +431,8 @@ class AdminPage {
 			return;
 		}
 
-		echo '<div id="mandate-password-summary" class="mandate-password-summary">';
-		echo '<h2>'.esc_html__( 'Selected Password', 'mandate' ).'</h2>';
+		echo '<h2 id="mandate-password-summary-title" class="mandate-field-title">'.esc_html__( 'Selected Password Info', 'mandate' ).'</h2>';
+		echo '<div id="mandate-password-summary" class="mandate-password-summary mandate-summary-card" aria-labelledby="mandate-password-summary-title">';
 		echo '<dl class="mandate-password-summary-details">';
 		$this->renderDetailItem( __( 'Name', 'mandate' ), $password[ 'name' ] );
 		$this->renderDetailItem( __( 'UUID', 'mandate' ), $password[ 'uuid' ] );
@@ -548,8 +548,8 @@ class AdminPage {
 		echo '<input type="hidden" name="app_password_uuid" value="'.esc_attr( $selectedUuid ).'" />';
 
 		echo '<div class="mandate-tabs" role="tablist" aria-label="'.esc_attr__( 'Capability groups', 'mandate' ).'">';
-		$this->renderTabButton( 'wordpress', __( 'WordPress', 'mandate' ), true );
-		$this->renderTabButton( 'other', __( 'Everything Else', 'mandate' ), false );
+		$this->renderTabButton( 'wordpress', __( 'WordPress Capabilities', 'mandate' ), true );
+		$this->renderTabButton( 'other', __( 'Third-Party Capabilities', 'mandate' ), false );
 		echo '</div>';
 
 		$this->renderCapabilityPanel( 'wordpress', $capabilityGroups[ 'wordpress' ], $selectedCaps, $selectedMetaCaps );
