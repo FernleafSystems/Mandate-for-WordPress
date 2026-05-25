@@ -514,7 +514,9 @@ if ( !function_exists( 'wp_dropdown_users' ) ) {
 		$output = '<select name="'.esc_attr( $name ).'" id="'.esc_attr( $id ).'">'
 			.'<option value="'.esc_attr( $selectedUser ).'" selected="selected">'.esc_html( $selectedUser ).'</option>'
 			.'</select>';
-		echo $output;
+		if ( (bool)( $args[ 'echo' ] ?? true ) ) {
+			echo $output;
+		}
 		return $output;
 	}
 }

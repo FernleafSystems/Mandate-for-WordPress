@@ -1,13 +1,9 @@
-<?php
-
-declare( strict_types=1 );
+<?php declare( strict_types=1 );
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityName;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
@@ -18,20 +14,10 @@ if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/**
- * @phpstan-import-type ApplicationPasswordRecord from ApplicationPasswordRepository
- * @phpstan-import-type CapabilityScopeRecord from ScopeRepository
- */
 class AdminPage {
 
 	private const REQUIRED_CAPABILITY = 'manage_options';
-	private const NONCE_ACTION_PREFIX = 'mandate_scope';
 	private const ASSET_HANDLE = 'mandate-admin-page';
-	private const SCOPE_FORM_ID = 'mandate-scope-form';
-	private const FORM_ACTIONS = [
-		'save_scope'  => true,
-		'clear_scope' => true,
-	];
 
 	private ScopeRepository $scopeRepository;
 
@@ -39,15 +25,19 @@ class AdminPage {
 
 	private CapabilityCandidateProvider $candidateProvider;
 
-	private CapabilityDescriptionProvider $descriptionProvider;
-
 	private MetaCapabilityRegistry $metaRegistry;
-
-	private CapabilityGroupProvider $groupProvider;
 
 	private string $pluginFile;
 
 	private ExpirationDatePolicy $expirationDatePolicy;
+
+	private AdminUserRoleProvider $roleProvider;
+
+	private AdminScopeFormSecurity $formSecurity;
+
+	private AdminPageViewDataBuilder $viewDataBuilder;
+
+	private AdminTemplateRenderer $templateRenderer;
 
 	private string $pageHookSuffix = '';
 
@@ -55,20 +45,24 @@ class AdminPage {
 		ScopeRepository $scopeRepository,
 		ApplicationPasswordRepository $passwordRepository,
 		CapabilityCandidateProvider $candidateProvider,
-		CapabilityDescriptionProvider $descriptionProvider,
 		MetaCapabilityRegistry $metaRegistry,
-		CapabilityGroupProvider $groupProvider,
 		string $pluginFile,
-		ExpirationDatePolicy $expirationDatePolicy
+		ExpirationDatePolicy $expirationDatePolicy,
+		AdminUserRoleProvider $roleProvider,
+		AdminScopeFormSecurity $formSecurity,
+		AdminPageViewDataBuilder $viewDataBuilder,
+		AdminTemplateRenderer $templateRenderer
 	) {
 		$this->scopeRepository = $scopeRepository;
 		$this->passwordRepository = $passwordRepository;
 		$this->candidateProvider = $candidateProvider;
-		$this->descriptionProvider = $descriptionProvider;
 		$this->metaRegistry = $metaRegistry;
-		$this->groupProvider = $groupProvider;
 		$this->pluginFile = $pluginFile;
 		$this->expirationDatePolicy = $expirationDatePolicy;
+		$this->roleProvider = $roleProvider;
+		$this->formSecurity = $formSecurity;
+		$this->viewDataBuilder = $viewDataBuilder;
+		$this->templateRenderer = $templateRenderer;
 	}
 
 	public function registerHooks() :void {
@@ -135,57 +129,58 @@ class AdminPage {
 		$action = sanitize_key( $this->postScalar( 'mandate_action' ) );
 		$message = 'invalid';
 
-		if ( !isset( self::FORM_ACTIONS[ $action ] ) ) {
+		if ( !$this->formSecurity->isSupportedAction( $action ) ) {
 			$this->redirectAfterPost( $userId, $uuid, $message );
 		}
 
 		check_admin_referer(
-			$this->nonceAction( $action, $userId, $uuid ),
-			$this->nonceName( $action )
+			$this->formSecurity->nonceAction( $action, $userId, $uuid ),
+			$this->formSecurity->nonceName( $action )
 		);
 
 		if ( $userId > 0 && $uuid !== '' && $this->passwordRepository->userOwnsPassword( $userId, $uuid ) ) {
-			if ( $action === 'clear_scope' ) {
+			if ( $action === AdminScopeFormSecurity::ACTION_CLEAR ) {
 				$message = $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
 			}
-			elseif ( $action === 'save_scope' ) {
-				if ( $this->isSuperAdminUser( $userId ) ) {
-					$message = 'super_admin_unsupported';
-				}
-				else {
-					$candidates = $this->candidateProvider->forUser( $userId );
-					$submittedCaps = $this->verifiedPostScalarList( 'allowed_caps' );
-					$submittedMetaCaps = $this->verifiedPostScalarList( 'allowed_meta_caps' );
-					$expiresOn = $this->postedExpirationDate();
-
-					if ( $expiresOn === false ) {
-						$message = 'invalid';
-					}
-					else {
-						$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
-						$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
-						$capabilitiesRestricted = !( $allowedCaps === $candidates && $allowedMetaCaps === $this->metaRegistry->registered() );
-						if ( !$capabilitiesRestricted && $expiresOn === null ) {
-							$message = $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
-						}
-						else {
-							$message = $this->scopeRepository->save(
-								$uuid,
-								$userId,
-								$allowedCaps,
-								$allowedMetaCaps,
-								$this->roleSlugsForUser( $userId ),
-								get_current_user_id(),
-								$expiresOn,
-								$capabilitiesRestricted
-							) ? 'saved' : 'invalid';
-						}
-					}
-				}
+			elseif ( $action === AdminScopeFormSecurity::ACTION_SAVE ) {
+				$message = $this->handleSaveScopePost( $userId, $uuid );
 			}
 		}
 
 		$this->redirectAfterPost( $userId, $uuid, $message );
+	}
+
+	private function handleSaveScopePost( int $userId, string $uuid ) :string {
+		if ( $this->isSuperAdminUser( $userId ) ) {
+			return 'super_admin_unsupported';
+		}
+
+		$candidates = $this->candidateProvider->forUser( $userId );
+		$submittedCaps = $this->verifiedPostScalarList( 'allowed_caps' );
+		$submittedMetaCaps = $this->verifiedPostScalarList( 'allowed_meta_caps' );
+		$expiresOn = $this->postedExpirationDate();
+
+		if ( $expiresOn === false ) {
+			return 'invalid';
+		}
+
+		$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
+		$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
+		$capabilitiesRestricted = !( $allowedCaps === $candidates && $allowedMetaCaps === $this->metaRegistry->registered() );
+		if ( !$capabilitiesRestricted && $expiresOn === null ) {
+			return $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
+		}
+
+		return $this->scopeRepository->save(
+			$uuid,
+			$userId,
+			$allowedCaps,
+			$allowedMetaCaps,
+			$this->roleProvider->roleSlugsForUser( $userId ),
+			get_current_user_id(),
+			$expiresOn,
+			$capabilitiesRestricted
+		) ? 'saved' : 'invalid';
 	}
 
 	private function redirectAfterPost( int $userId, string $uuid, string $message ) :void {
@@ -211,437 +206,9 @@ class AdminPage {
 
 	public function render() :void {
 		$this->requireManageCapability();
-
-		$selectedUserId = $this->selectedUserId();
-		$passwords = $this->passwordRepository->forUser( $selectedUserId );
-		$selectedUuid = $this->selectedPasswordUuid( $passwords );
-		$scope = $selectedUuid !== '' ? $this->scopeRepository->findForUser( $selectedUserId, $selectedUuid ) : null;
-		$expiresOn = $scope === null ? null : $scope[ 'expires_on' ];
-		$candidateCaps = $this->candidateProvider->forUser( $selectedUserId );
-		$metaCaps = $this->metaRegistry->registered();
-		$selectedCaps = $scope === null || !$scope[ 'capabilities_restricted' ]
-			? $candidateCaps
-			: array_intersect_key( $scope[ 'allowed_caps' ], $candidateCaps );
-		$selectedMetaCaps = $scope === null || !$scope[ 'capabilities_restricted' ]
-			? $metaCaps
-			: array_intersect_key( $scope[ 'allowed_meta_caps' ], $metaCaps );
-		$capabilityGroups = $this->groupProvider->group( $candidateCaps, $metaCaps );
-
-		echo '<div class="wrap mandate">';
-		echo '<h1>'.esc_html__( 'Mandate App Security', 'mandate-app-security' ).'</h1>';
-		$this->renderMessage();
-		$this->renderSelectionForm( $selectedUserId, $passwords, $selectedUuid, $scope, $expiresOn );
-
-		if ( $selectedUserId < 1 ) {
-			echo '</div>';
-			return;
-		}
-
-		if ( empty( $passwords ) ) {
-			echo '<div class="notice notice-info"><p>'.esc_html__( 'The selected user has no application passwords.', 'mandate-app-security' ).'</p></div>';
-			echo '</div>';
-			return;
-		}
-
-		if ( $selectedUuid === '' ) {
-			echo '<div class="notice notice-warning"><p>'.esc_html__( 'Select an application password before saving a scope.', 'mandate-app-security' ).'</p></div>';
-			echo '</div>';
-			return;
-		}
-
-		$this->renderScopeForm(
-			$selectedUserId,
-			$selectedUuid,
-			$capabilityGroups,
-			$selectedCaps,
-			$selectedMetaCaps
-		);
-		echo '</div>';
-	}
-
-	private function selectedUserId() :int {
-		$userId = absint( $this->getScalar( 'user_id' ) );
-		if ( $userId > 0 && get_userdata( $userId ) ) {
-			return $userId;
-		}
-
-		return (int)get_current_user_id();
-	}
-
-	/**
-	 * @param list<ApplicationPasswordRecord> $passwords
-	 */
-	private function selectedPasswordUuid( array $passwords ) :string {
-		if ( $passwords === [] ) {
-			return '';
-		}
-
-		$requested = ApplicationPasswordRepository::normalizeUuid( $this->getScalar( 'app_password_uuid' ) );
-		foreach ( $passwords as $password ) {
-			if ( $password[ 'uuid' ] === $requested ) {
-				return $password[ 'uuid' ];
-			}
-		}
-
-		return $passwords[ 0 ][ 'uuid' ];
-	}
-
-	/**
-	 * @param list<ApplicationPasswordRecord> $passwords
-	 * @param CapabilityScopeRecord|null $scope
-	 * @param string|null $expiresOn
-	 */
-	private function renderSelectionForm( int $selectedUserId, array $passwords, string $selectedUuid, ?array $scope, ?string $expiresOn ) :void {
-		$currentRoleSlugs = $this->roleSlugsForUser( $selectedUserId );
-
-		echo '<form method="get" action="'.esc_url( admin_url( 'tools.php' ) ).'" class="mandate-selection" data-wpm-selection-form>';
-		echo '<input type="hidden" name="page" value="'.esc_attr( Plugin::MENU_SLUG ).'" />';
-		echo '<div class="mandate-selection-grid">';
-		echo '<div class="mandate-selection-column">';
-		echo '<div class="mandate-field">';
-		echo '<label class="mandate-field-title" for="mandate-user">'.esc_html__( 'User', 'mandate-app-security' ).'</label>';
-		wp_dropdown_users(
-			[
-				'name'     => 'user_id',
-				'id'       => 'mandate-user',
-				'selected' => $selectedUserId,
-				'show'     => 'display_name_with_login',
-			]
-		);
-		echo '</div>';
-		$this->renderRoleSummary( $currentRoleSlugs );
-		echo '</div>';
-
-		echo '<div class="mandate-selection-column">';
-		echo '<div class="mandate-field">';
-		echo '<label class="mandate-field-title" for="mandate-password">'.esc_html__( 'Application Password', 'mandate-app-security' ).'</label>';
-		if ( !empty( $passwords ) ) {
-			echo '<select id="mandate-password" name="app_password_uuid">';
-			foreach ( $passwords as $password ) {
-				echo '<option value="'.esc_attr( $password[ 'uuid' ] ).'" '.selected( $selectedUuid, $password[ 'uuid' ], false ).'>'.esc_html( $password[ 'name' ] ).'</option>';
-			}
-			echo '</select>';
-		}
-		else {
-			echo '<p class="description">'.esc_html__( 'No application passwords are available for this user.', 'mandate-app-security' ).'</p>';
-		}
-		echo '</div>';
-		echo '</div>';
-
-		echo '<div class="mandate-selection-column">';
-		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope, $expiresOn, $currentRoleSlugs );
-		echo '</div>';
-		echo '</div>';
-		echo '<p class="mandate-selection-status" data-wpm-selection-status hidden>'.esc_html__( 'Loading selection...', 'mandate-app-security' ).'</p>';
-		echo '<noscript><p class="mandate-selection-fallback"><button type="submit" class="button button-secondary">'.esc_html__( 'Apply Selection', 'mandate-app-security' ).'</button></p></noscript>';
-		echo '</form>';
-	}
-
-	/**
-	 * @param list<string> $roleSlugs
-	 */
-	private function renderRoleSummary( array $roleSlugs ) :void {
-		$roles = $this->roleSummaries( $roleSlugs );
-		echo '<div id="mandate-role-summary" class="mandate-role-summary mandate-summary-card">';
-		echo '<p class="mandate-role-summary-label">'.esc_html__( 'Roles for selected user', 'mandate-app-security' ).'</p>';
-		if ( empty( $roles ) ) {
-			echo '<p class="description">'.esc_html__( 'No roles assigned.', 'mandate-app-security' ).'</p>';
-			echo '</div>';
-			return;
-		}
-
-		echo '<ul>';
-		foreach ( $roles as $role ) {
-			echo '<li>';
-			echo esc_html( $role[ 'name' ] ).' ';
-			echo '<span class="mandate-role-slug">('.esc_html__( 'slug:', 'mandate-app-security' ).' <code>'.esc_html( $role[ 'slug' ] ).'</code>)</span>';
-			echo '</li>';
-		}
-		echo '</ul>';
-		echo '</div>';
-	}
-
-	/**
-	 * @return list<string>
-	 */
-	private function roleSlugsForUser( int $selectedUserId ) :array {
-		$user = $selectedUserId > 0 ? get_userdata( $selectedUserId ) : false;
-		if ( !is_object( $user ) || !isset( $user->roles ) || !is_array( $user->roles ) ) {
-			return [];
-		}
-
-		$slugs = [];
-		foreach ( $user->roles as $role ) {
-			if ( !is_scalar( $role ) ) {
-				continue;
-			}
-
-			$slug = sanitize_key( (string)$role );
-			if ( $slug !== '' ) {
-				$slugs[ $slug ] = $slug;
-			}
-		}
-
-		ksort( $slugs, SORT_NATURAL );
-		return array_values( $slugs );
-	}
-
-	/**
-	 * @param list<string> $roleSlugs
-	 * @return array<int,array{name:string,slug:string}>
-	 */
-	private function roleSummaries( array $roleSlugs ) :array {
-		$wpRoles = function_exists( 'wp_roles' ) ? wp_roles() : null;
-		$summaries = [];
-		foreach ( $roleSlugs as $roleSlug ) {
-			$registered = is_object( $wpRoles ) && method_exists( $wpRoles, 'get_role' )
-				? $wpRoles->get_role( $roleSlug )
-				: null;
-			$summaries[] = [
-				'name' => $registered === null ? $roleSlug : $this->roleDisplayName( $roleSlug, $wpRoles ),
-				'slug' => $roleSlug,
-			];
-		}
-
-		return $summaries;
-	}
-
-	private function roleDisplayName( string $roleSlug, mixed $wpRoles ) :string {
-		$roleNames = [];
-		if ( is_object( $wpRoles ) && method_exists( $wpRoles, 'get_names' ) ) {
-			$roleNames = $wpRoles->get_names();
-		}
-		elseif ( is_object( $wpRoles ) && isset( $wpRoles->role_names ) && is_array( $wpRoles->role_names ) ) {
-			$roleNames = $wpRoles->role_names;
-		}
-
-		$name = isset( $roleNames[ $roleSlug ] ) ? (string)$roleNames[ $roleSlug ] : $roleSlug;
-		return function_exists( 'translate_user_role' ) ? translate_user_role( $name ) : $name;
-	}
-
-	/**
-	 * @param list<ApplicationPasswordRecord> $passwords
-	 * @param CapabilityScopeRecord|null $scope
-	 * @param string|null $expiresOn
-	 * @param list<string> $currentRoleSlugs
-	 */
-	private function renderPasswordSummary( array $passwords, string $selectedUuid, ?array $scope, ?string $expiresOn, array $currentRoleSlugs ) :void {
-		$password = $this->selectedPassword( $passwords, $selectedUuid );
-		if ( $password === null ) {
-			return;
-		}
-
-		echo '<h2 id="mandate-password-summary-title" class="mandate-field-title">'.esc_html__( 'Selected Password Info', 'mandate-app-security' ).'</h2>';
-		echo '<div id="mandate-password-summary" class="mandate-password-summary mandate-summary-card" aria-labelledby="mandate-password-summary-title">';
-		echo '<dl class="mandate-password-summary-details">';
-		$this->renderDetailItem( __( 'Name', 'mandate-app-security' ), $password[ 'name' ] );
-		$this->renderDetailItem( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] );
-		$this->renderDetailItem( __( 'App ID', 'mandate-app-security' ), $password[ 'app_id' ] );
-		$this->renderDetailItem( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) );
-		$this->renderDetailItem( __( 'Last Used', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'last_used' ] ) );
-		echo '</dl>';
-		echo '<div class="mandate-password-summary-divider" aria-hidden="true"></div>';
-		echo '<dl class="mandate-password-summary-details">';
-		$this->renderDetailItem(
-			__( 'Restricted Scope', 'mandate-app-security' ),
-			$this->formatRestrictedScope( $scope, $expiresOn )
-		);
-		$this->renderExpirationDetailItem( $expiresOn );
-		if ( $scope !== null ) {
-			$this->renderDetailItem( __( 'Scope Last Saved', 'mandate-app-security' ), $this->formatTimestamp( $scope[ 'updated_at' ] ) );
-			$this->renderDetailItem(
-				__( 'Roles When Saved', 'mandate-app-security' ),
-				$scope[ 'roles_at_update' ] === null
-					? __( 'Not recorded', 'mandate-app-security' )
-					: $this->formatRoleSlugs( $scope[ 'roles_at_update' ] )
-			);
-		}
-		echo '</dl>';
-		if ( $scope !== null && $scope[ 'roles_at_update' ] !== null && $scope[ 'roles_at_update' ] !== $currentRoleSlugs ) {
-			echo '<div class="notice notice-warning inline" data-wpm-role-snapshot-status="changed"><p>'.esc_html__( 'The selected user roles have changed since this Mandate App Security record was saved. Review the saved restrictions before relying on this Application Password.', 'mandate-app-security' ).'</p></div>';
-		}
-		echo '</div>';
-	}
-
-	/**
-	 * @param CapabilityScopeRecord|null $scope
-	 */
-	private function formatRestrictedScope( ?array $scope, ?string $expiresOn ) :string {
-		$restrictions = [];
-		if ( $scope !== null && $scope[ 'capabilities_restricted' ] ) {
-			$restrictions[] = __( 'Capabilities', 'mandate-app-security' );
-		}
-		if ( $expiresOn !== null ) {
-			$restrictions[] = __( 'Expiration date', 'mandate-app-security' );
-		}
-
-		return empty( $restrictions ) ? __( 'Unrestricted', 'mandate-app-security' ) : implode( ' / ', $restrictions );
-	}
-
-	/**
-	 * @param list<string> $roleSlugs
-	 */
-	private function formatRoleSlugs( array $roleSlugs ) :string {
-		return $roleSlugs === [] ? __( 'No roles', 'mandate-app-security' ) : implode( ', ', $roleSlugs );
-	}
-
-	/**
-	 * @param list<ApplicationPasswordRecord> $passwords
-	 * @return ApplicationPasswordRecord|null
-	 */
-	private function selectedPassword( array $passwords, string $selectedUuid ) :?array {
-		foreach ( $passwords as $password ) {
-			if ( $password[ 'uuid' ] === $selectedUuid ) {
-				return $password;
-			}
-		}
-
-		return null;
-	}
-
-	private function renderDetailItem( string $label, string $value ) :void {
-		echo '<div class="mandate-password-summary-detail"><dt>'.esc_html( $label ).'</dt><dd>'.esc_html( $value === '' ? '-' : $value ).'</dd></div>';
-	}
-
-	private function renderExpirationDetailItem( ?string $expiresOn ) :void {
-		$expired = $this->expirationDatePolicy->isExpired( $expiresOn );
-		$state = $expiresOn === null ? 'never' : ( $expired ? 'expired' : 'date' );
-		$value = $expiresOn === null
-			? __( 'Never expires', 'mandate-app-security' )
-			// translators: %s: Application Password expiration date.
-			: ( $expired ? sprintf( __( '%s (expired)', 'mandate-app-security' ), $expiresOn ) : $expiresOn );
-		$classes = 'button-link mandate-expiration-summary'.( $expired ? ' is-expired' : '' );
-		echo '<div class="mandate-password-summary-detail"><dt>'.esc_html__( 'Expiration Date', 'mandate-app-security' ).'</dt><dd>';
-		echo '<button type="button" class="'.esc_attr( $classes ).'" data-wpm-expiration-summary data-wpm-expiration-state="'.esc_attr( $state ).'" aria-controls="mandate-expiration-date" hidden>'.esc_html( $value ).'</button>';
-		echo '<input type="date" id="mandate-expiration-date" class="mandate-expiration-input" name="expiration_date" value="'.esc_attr( $expiresOn ?? '' ).'" data-wpm-expiration-input form="'.esc_attr( self::SCOPE_FORM_ID ).'" aria-label="'.esc_attr__( 'Expiration Date', 'mandate-app-security' ).'" />';
-		echo '</dd></div>';
-	}
-
-	/**
-	 * @param array{wordpress:array{primitive:array<string,true>,meta:array<string,true>},other:array{primitive:array<string,true>,meta:array<string,true>}} $capabilityGroups
-	 * @param array<string,true> $selectedCaps
-	 * @param array<string,true> $selectedMetaCaps
-	 */
-	private function renderScopeForm(
-		int $selectedUserId,
-		string $selectedUuid,
-		array $capabilityGroups,
-		array $selectedCaps,
-		array $selectedMetaCaps
-	) :void {
-		echo '<h2>'.esc_html__( 'Capability Scope', 'mandate-app-security' ).'</h2>';
-
-		if ( $this->isSuperAdminUser( $selectedUserId ) ) {
-			echo '<div class="notice notice-warning"><p>'.esc_html__( 'Scopes for multisite super admins are not supported.', 'mandate-app-security' ).'</p></div>';
-		}
-
-		echo '<form method="post" action="'.esc_url( admin_url( 'tools.php?page='.Plugin::MENU_SLUG ) ).'" id="'.esc_attr( self::SCOPE_FORM_ID ).'" class="mandate-scope-form">';
-		wp_nonce_field(
-			$this->nonceAction( 'save_scope', $selectedUserId, $selectedUuid ),
-			$this->nonceName( 'save_scope' )
-		);
-		wp_nonce_field(
-			$this->nonceAction( 'clear_scope', $selectedUserId, $selectedUuid ),
-			$this->nonceName( 'clear_scope' )
-		);
-		echo '<input type="hidden" name="user_id" value="'.esc_attr( (string)$selectedUserId ).'" />';
-		echo '<input type="hidden" name="app_password_uuid" value="'.esc_attr( $selectedUuid ).'" />';
-
-		echo '<div class="mandate-tabs" role="tablist" aria-label="'.esc_attr__( 'Capability groups', 'mandate-app-security' ).'">';
-		$this->renderTabButton( 'wordpress', __( 'WordPress Capabilities', 'mandate-app-security' ), true );
-		$this->renderTabButton( 'other', __( 'Third-Party Capabilities', 'mandate-app-security' ), false );
-		echo '</div>';
-
-		$this->renderCapabilityPanel( 'wordpress', $capabilityGroups[ 'wordpress' ], $selectedCaps, $selectedMetaCaps );
-		$this->renderCapabilityPanel( 'other', $capabilityGroups[ 'other' ], $selectedCaps, $selectedMetaCaps );
-
-		echo '<p class="submit mandate-actions">';
-		echo '<button type="submit" class="button button-primary" name="mandate_action" value="save_scope" '.disabled( $this->isSuperAdminUser( $selectedUserId ), true, false ).'>'.esc_html__( 'Save Scope', 'mandate-app-security' ).'</button> ';
-		echo '<button type="submit" class="button" name="mandate_action" value="clear_scope">'.esc_html__( 'Reset to Defaults', 'mandate-app-security' ).'</button>';
-		echo '</p>';
-		echo '</form>';
-	}
-
-	private function renderTabButton( string $groupKey, string $label, bool $active ) :void {
-		echo '<button type="button" id="mandate-tab-'.esc_attr( $groupKey ).'" class="nav-tab'.( $active ? ' nav-tab-active' : '' ).'" role="tab" data-wpm-tab="'.esc_attr( $groupKey ).'" aria-controls="mandate-panel-'.esc_attr( $groupKey ).'" aria-selected="'.esc_attr( $active ? 'true' : 'false' ).'">'.esc_html( $label ).'</button>';
-	}
-
-	/**
-	 * @param array{primitive:array<string,true>,meta:array<string,true>} $capabilities
-	 * @param array<string,true> $selectedCaps
-	 * @param array<string,true> $selectedMetaCaps
-	 */
-	private function renderCapabilityPanel( string $groupKey, array $capabilities, array $selectedCaps, array $selectedMetaCaps ) :void {
-		echo '<section id="mandate-panel-'.esc_attr( $groupKey ).'" class="mandate-capability-panel" data-wpm-panel="'.esc_attr( $groupKey ).'" aria-labelledby="mandate-tab-'.esc_attr( $groupKey ).'">';
-		echo '<div class="mandate-panel-heading">';
-		echo '<p>';
-		echo '<button type="button" class="button" data-wpm-select-group="'.esc_attr( $groupKey ).'" data-wpm-select-state="checked">'.esc_html__( 'Select All', 'mandate-app-security' ).'</button> ';
-		echo '<button type="button" class="button" data-wpm-select-group="'.esc_attr( $groupKey ).'" data-wpm-select-state="unchecked">'.esc_html__( 'Deselect All', 'mandate-app-security' ).'</button>';
-		echo '</p>';
-		echo '</div>';
-		echo '<div class="mandate-capability-scroll">';
-		$this->renderCapabilitySection( $groupKey, 'primitive', __( 'Role-Derived Primitive Capabilities', 'mandate-app-security' ), 'allowed_caps', $capabilities[ 'primitive' ], $selectedCaps );
-		$this->renderCapabilitySection( $groupKey, 'meta', __( 'Registered Meta Capabilities', 'mandate-app-security' ), 'allowed_meta_caps', $capabilities[ 'meta' ], $selectedMetaCaps );
-		echo '</div>';
-		echo '</section>';
-	}
-
-	/**
-	 * @param array<string,true> $capabilities
-	 * @param array<string,true> $selected
-	 */
-	private function renderCapabilitySection( string $groupKey, string $type, string $label, string $fieldName, array $capabilities, array $selected ) :void {
-		echo '<fieldset id="mandate-'.esc_attr( $groupKey ).'-'.esc_attr( $type ).'-capabilities" class="mandate-capability-section">';
-		echo '<legend>'.esc_html( $label ).'</legend>';
-		if ( empty( $capabilities ) ) {
-			echo '<p class="description">'.esc_html__( 'No capabilities are available for this group.', 'mandate-app-security' ).'</p>';
-			echo '</fieldset>';
-			return;
-		}
-
-		echo '<div class="mandate-capability-list">';
-		foreach ( array_keys( $capabilities ) as $capability ) {
-			echo '<label>';
-			echo '<input type="checkbox" name="'.esc_attr( $fieldName ).'[]" value="'.esc_attr( $capability ).'" '.checked( isset( $selected[ $capability ] ), true, false ).' /> ';
-			$this->renderCapabilityName( $capability );
-			echo '</label>';
-		}
-		echo '</div>';
-		echo '</fieldset>';
-	}
-
-	private function renderCapabilityName( string $capability ) :void {
-		$description = $this->descriptionProvider->descriptionFor( $capability );
-		if ( $description === '' ) {
-			echo '<code>'.esc_html( $capability ).'</code>';
-			return;
-		}
-
-		echo '<code tabindex="0" data-wpm-tooltip data-wpm-tooltip-text="'.esc_attr( $description ).'">'.esc_html( $capability ).'</code>';
-	}
-
-	private function renderMessage() :void {
-		$message = sanitize_key( $this->getScalar( 'mandate_message' ) );
-		$messages = [
-			'saved' => [ 'success', __( 'Scope saved.', 'mandate-app-security' ) ],
-			'reset' => [ 'success', __( 'Scope reset to defaults.', 'mandate-app-security' ) ],
-			'invalid' => [ 'error', __( 'The selected application password could not be verified for that user.', 'mandate-app-security' ) ],
-			'super_admin_unsupported' => [ 'warning', __( 'Scopes for multisite super admins are not supported.', 'mandate-app-security' ) ],
-		];
-		if ( !isset( $messages[ $message ] ) ) {
-			return;
-		}
-
-		[ $type, $text ] = $messages[ $message ];
-		echo '<div class="notice notice-'.esc_attr( $type ).' is-dismissible"><p>'.esc_html( $text ).'</p></div>';
-	}
-
-	private function formatTimestamp( int $timestamp ) :string {
-		if ( $timestamp < 1 ) {
-			return __( 'Never', 'mandate-app-security' );
-		}
-
-		return function_exists( 'wp_date' ) ? wp_date( 'Y-m-d H:i:s', $timestamp ) : gmdate( 'Y-m-d H:i:s', $timestamp );
+		$html = $this->templateRenderer->render( 'admin-page.php', $this->viewDataBuilder->build() );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Admin templates escape scalar output and only emit trusted WordPress helper HTML from content.
+		echo $html;
 	}
 
 	private function isSuperAdminUser( int $userId ) :bool {
@@ -649,27 +216,6 @@ class AdminPage {
 			&& is_multisite()
 			&& function_exists( 'is_super_admin' )
 			&& is_super_admin( $userId );
-	}
-
-	private function nonceAction( string $action, int $userId, string $uuid ) :string {
-		return implode(
-			':',
-			[
-				self::NONCE_ACTION_PREFIX,
-				$action,
-				(string)max( 0, $userId ),
-				ApplicationPasswordRepository::normalizeUuid( $uuid ),
-			]
-		);
-	}
-
-	private function nonceName( string $action ) :string {
-		return 'mandate_'.$action.'_nonce';
-	}
-
-	private function getScalar( string $key ) :string {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Sanitized non-mutating admin view-state query arg.
-		return $this->requestScalar( $_GET, $key );
 	}
 
 	private function postScalar( string $key ) :string {
@@ -698,7 +244,7 @@ class AdminPage {
 	 * @return string[]
 	 */
 	private function verifiedPostScalarList( string $key ) :array {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce is verified in handlePost(); each list item is sanitized below.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce is verified in handlePost(); each list item is sanitized below.
 		$value = isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : [];
 		if ( !is_array( $value ) ) {
 			return [];

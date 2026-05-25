@@ -3,6 +3,10 @@
 declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
@@ -537,15 +541,37 @@ final class ExpirationTest extends Wpm_Test_Case {
 	}
 
 	private function adminPage( ScopeRepository $repository ) :AdminPage {
+		$passwordRepository = new ApplicationPasswordRepository();
+		$candidateProvider = new CapabilityCandidateProvider();
+		$descriptionProvider = new CapabilityDescriptionProvider();
+		$metaRegistry = new MetaCapabilityRegistry();
+		$groupProvider = new CapabilityGroupProvider();
+		$expirationDatePolicy = new ExpirationDatePolicy();
+		$roleProvider = new AdminUserRoleProvider();
+		$formSecurity = new AdminScopeFormSecurity();
+		$viewDataBuilder = new AdminPageViewDataBuilder(
+			$repository,
+			$passwordRepository,
+			$candidateProvider,
+			$descriptionProvider,
+			$metaRegistry,
+			$groupProvider,
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity
+		);
+
 		return new AdminPage(
 			$repository,
-			new ApplicationPasswordRepository(),
-			new CapabilityCandidateProvider(),
-			new CapabilityDescriptionProvider(),
-			new MetaCapabilityRegistry(),
-			new CapabilityGroupProvider(),
+			$passwordRepository,
+			$candidateProvider,
+			$metaRegistry,
 			$this->pluginFile(),
-			new ExpirationDatePolicy()
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity,
+			$viewDataBuilder,
+			new AdminTemplateRenderer()
 		);
 	}
 
@@ -576,10 +602,11 @@ final class ExpirationTest extends Wpm_Test_Case {
 			'expiration_date'   => $expirationDate,
 		];
 		if ( $withNonce ) {
-			$nonceName = $this->adminPagePrivateString( $action, 'nonceName', [ $action ] );
+			$formSecurity = new AdminScopeFormSecurity();
+			$nonceName = $formSecurity->nonceName( $action );
 			$_POST[ $nonceName ] = wpm_test_set_valid_nonce(
 				$nonceName,
-				$this->adminPagePrivateString( $action, 'nonceAction', [ $action, $userId, $uuid ] )
+				$formSecurity->nonceAction( $action, $userId, $uuid )
 			);
 		}
 	}
@@ -668,20 +695,6 @@ final class ExpirationTest extends Wpm_Test_Case {
 		}
 
 		return $node;
-	}
-
-	/**
-	 * @param array<int,mixed> $args
-	 */
-	private function adminPagePrivateString( string $action, string $method, array $args ) :string {
-		$reflection = new ReflectionMethod( AdminPage::class, $method );
-		$reflection->setAccessible( true );
-		$result = $reflection->invokeArgs( $this->adminPage( $this->scopeRepository() ), $args );
-		if ( !is_string( $result ) ) {
-			throw new RuntimeException( 'Expected AdminPage::'.$method.'() to return a string for '.$action.'.' );
-		}
-
-		return $result;
 	}
 
 	private function scopeRepository( ?PluginOptionsRepository $optionsRepository = null ) :ScopeRepository {

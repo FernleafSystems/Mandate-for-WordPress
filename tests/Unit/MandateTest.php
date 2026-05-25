@@ -5,6 +5,10 @@ declare( strict_types=1 );
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
@@ -496,15 +500,36 @@ final class MandateTest extends Wpm_Test_Case {
 		file_put_contents( $dist.'/admin-page.css', "body{}\n" );
 
 		try {
+			$scopeRepository = $this->scopeRepository();
+			$passwordRepository = new ApplicationPasswordRepository();
+			$candidateProvider = new CapabilityCandidateProvider();
+			$descriptionProvider = new CapabilityDescriptionProvider();
+			$metaRegistry = new MetaCapabilityRegistry();
+			$groupProvider = new CapabilityGroupProvider();
+			$expirationDatePolicy = new ExpirationDatePolicy();
+			$roleProvider = new AdminUserRoleProvider();
+			$formSecurity = new AdminScopeFormSecurity();
 			$adminPage = new AdminPage(
-				$this->scopeRepository(),
-				new ApplicationPasswordRepository(),
-				new CapabilityCandidateProvider(),
-				new CapabilityDescriptionProvider(),
-				new MetaCapabilityRegistry(),
-				new CapabilityGroupProvider(),
+				$scopeRepository,
+				$passwordRepository,
+				$candidateProvider,
+				$metaRegistry,
 				$pluginFile,
-				new ExpirationDatePolicy()
+				$expirationDatePolicy,
+				$roleProvider,
+				$formSecurity,
+				new AdminPageViewDataBuilder(
+					$scopeRepository,
+					$passwordRepository,
+					$candidateProvider,
+					$descriptionProvider,
+					$metaRegistry,
+					$groupProvider,
+					$expirationDatePolicy,
+					$roleProvider,
+					$formSecurity
+				),
+				new AdminTemplateRenderer()
 			);
 
 			$adminPage->registerMenu();
@@ -686,6 +711,112 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertArrayNotHasKey( 'tabindex', $custom );
 	}
 
+	public function testAdminPageViewDataBuilderEmitsStructuredContract() :void {
+		$this->seedAdminFixture();
+		$_GET = [
+			'page'              => Plugin::MENU_SLUG,
+			'user_id'           => '5',
+			'app_password_uuid' => self::UUID,
+		];
+
+		$data = $this->adminPageViewDataBuilder( $this->scopeRepository() )->build();
+
+		foreach ( [ 'hrefs', 'strings', 'flags', 'classes', 'vars', 'content' ] as $topLevelKey ) {
+			$this->assertArrayHasKey( $topLevelKey, $data );
+		}
+		$this->assertSame( 'wrap mandate', $data[ 'classes' ][ 'root' ] );
+		$this->assertTrue( $data[ 'flags' ][ 'has_passwords' ] );
+		$this->assertTrue( $data[ 'flags' ][ 'show_scope_form' ] );
+		$this->assertIsString( $data[ 'hrefs' ][ 'selection_form_action' ] );
+		$this->assertIsString( $data[ 'hrefs' ][ 'scope_form_action' ] );
+		$this->assertIsString( $data[ 'content' ][ 'user_dropdown' ] );
+		$this->assertIsString( $data[ 'content' ][ 'scope_nonce_fields' ] );
+
+		$selectionForm = $data[ 'vars' ][ 'selection_form' ];
+		$this->assertSame( 5, $selectionForm[ 'selected_user_id' ] );
+		$this->assertSame( self::UUID, $selectionForm[ 'selected_uuid' ] );
+		$this->assertSame( Plugin::MENU_SLUG, $selectionForm[ 'page_slug' ] );
+		$this->assertTrue( $selectionForm[ 'role_summary' ][ 'has_roles' ] );
+		$this->assertSame( 'wpm_editor', $selectionForm[ 'role_summary' ][ 'rows' ][ 0 ][ 'slug' ] );
+		$this->assertSame( self::UUID, $selectionForm[ 'password_options' ][ 0 ][ 'uuid' ] );
+		$this->assertTrue( $selectionForm[ 'password_options' ][ 0 ][ 'selected' ] );
+		$this->assertFalse( $selectionForm[ 'password_summary' ][ 'sections' ][ 0 ][ 'show_divider_before' ] );
+		$this->assertTrue( $selectionForm[ 'password_summary' ][ 'sections' ][ 1 ][ 'show_divider_before' ] );
+
+		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
+		$this->assertSame( 'mandate-scope-form', $scopeForm[ 'id' ] );
+		$this->assertSame( self::UUID, $scopeForm[ 'uuid' ] );
+		$this->assertSame( 'wordpress', $scopeForm[ 'tabs' ][ 0 ][ 'key' ] );
+		$this->assertSame( 'other', $scopeForm[ 'tabs' ][ 1 ][ 'key' ] );
+		$this->assertFalse( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
+
+		$uploadFiles = $this->capabilityItemFromViewData( $data, 'upload_files' );
+		$this->assertSame( 'allowed_caps', $uploadFiles[ 'field_name' ] );
+		$this->assertTrue( $uploadFiles[ 'checked' ] );
+		$this->assertTrue( $uploadFiles[ 'has_tooltip' ] );
+		$this->assertIsString( $uploadFiles[ 'tooltip_text' ] );
+	}
+
+	public function testAdminPageViewDataBuilderEmitsSuperAdminUnsupportedState() :void {
+		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_is_multisite' ] = true;
+		$GLOBALS[ 'wpm_test_super_admins' ] = [ 5 ];
+		$_GET = [
+			'page'              => Plugin::MENU_SLUG,
+			'user_id'           => '5',
+			'app_password_uuid' => self::UUID,
+		];
+
+		$data = $this->adminPageViewDataBuilder( $this->scopeRepository() )->build();
+		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
+
+		$this->assertTrue( $scopeForm[ 'super_admin_notice' ][ 'is_visible' ] );
+		$this->assertTrue( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
+		$this->assertFalse( $scopeForm[ 'actions' ][ 1 ][ 'disabled' ] );
+	}
+
+	public function testAdminPageViewDataBuilderEmitsRoleSnapshotAndExpirationState() :void {
+		$this->seedAdminFixture();
+		$_GET = [
+			'page'              => Plugin::MENU_SLUG,
+			'user_id'           => '5',
+			'app_password_uuid' => self::UUID,
+		];
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [], [], [], 1, '2026-05-24', false );
+
+		$data = $this->adminPageViewDataBuilder( $repository )->build();
+		$summary = $data[ 'vars' ][ 'selection_form' ][ 'password_summary' ];
+		$scopeDetails = $summary[ 'sections' ][ 1 ][ 'details' ];
+
+		$this->assertCount( 1, $summary[ 'warnings' ] );
+		$this->assertSame( 'changed', $summary[ 'warnings' ][ 0 ][ 'role_snapshot_status' ] );
+		$this->assertSame( 'date', $scopeDetails[ 1 ][ 'state' ] );
+		$this->assertSame( '2026-05-24', $scopeDetails[ 1 ][ 'input' ][ 'value' ] );
+	}
+
+	public function testAdminTemplateRendererRendersConfinedTemplate() :void {
+		$html = ( new AdminTemplateRenderer() )->render(
+			'partials/notice.php',
+			[
+				'notice' => [
+					'is_visible' => true,
+					'classes'    => 'notice notice-success',
+					'text'       => 'Rendered fixture',
+				],
+			]
+		);
+
+		$this->assertStringContainsString( 'Rendered fixture', $html );
+	}
+
+	public function testAdminTemplateRendererRejectsInvalidTemplatePaths() :void {
+		$renderer = new AdminTemplateRenderer();
+
+		$this->assertThrowsRuntimeException( static fn() => $renderer->render( '../AdminPage.php', [] ) );
+		$this->assertThrowsRuntimeException( static fn() => $renderer->render( 'partials/missing.php', [] ) );
+	}
+
 	public function testAdminPostClearsOnlyOwnedScope() :void {
 		$this->seedAdminFixture();
 		$repository = $this->scopeRepository();
@@ -767,15 +898,55 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	private function adminPage( ?ScopeRepository $repository = null ) :AdminPage {
+		$repository = $repository ?? $this->scopeRepository();
+		$passwordRepository = new ApplicationPasswordRepository();
+		$candidateProvider = new CapabilityCandidateProvider();
+		$descriptionProvider = new CapabilityDescriptionProvider();
+		$metaRegistry = new MetaCapabilityRegistry();
+		$groupProvider = new CapabilityGroupProvider();
+		$expirationDatePolicy = new ExpirationDatePolicy();
+		$roleProvider = new AdminUserRoleProvider();
+		$formSecurity = new AdminScopeFormSecurity();
+		$viewDataBuilder = new AdminPageViewDataBuilder(
+			$repository,
+			$passwordRepository,
+			$candidateProvider,
+			$descriptionProvider,
+			$metaRegistry,
+			$groupProvider,
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity
+		);
+
 		return new AdminPage(
-			$repository ?? $this->scopeRepository(),
+			$repository,
+			$passwordRepository,
+			$candidateProvider,
+			$metaRegistry,
+			$this->pluginFile(),
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity,
+			$viewDataBuilder,
+			new AdminTemplateRenderer()
+		);
+	}
+
+	private function adminPageViewDataBuilder( ScopeRepository $repository ) :AdminPageViewDataBuilder {
+		$roleProvider = new AdminUserRoleProvider();
+		$formSecurity = new AdminScopeFormSecurity();
+
+		return new AdminPageViewDataBuilder(
+			$repository,
 			new ApplicationPasswordRepository(),
 			new CapabilityCandidateProvider(),
 			new CapabilityDescriptionProvider(),
 			new MetaCapabilityRegistry(),
 			new CapabilityGroupProvider(),
-			$this->pluginFile(),
-			new ExpirationDatePolicy()
+			new ExpirationDatePolicy(),
+			$roleProvider,
+			$formSecurity
 		);
 	}
 
@@ -831,10 +1002,11 @@ final class MandateTest extends Wpm_Test_Case {
 			'allowed_meta_caps' => $allowedMetaCaps,
 		];
 		if ( $withNonce ) {
-			$nonceName = $this->adminPagePrivateString( 'nonceName', [ $action ] );
+			$formSecurity = new AdminScopeFormSecurity();
+			$nonceName = $formSecurity->nonceName( $action );
 			$_POST[ $nonceName ] = wpm_test_set_valid_nonce(
 				$nonceName,
-				$this->adminPagePrivateString( 'nonceAction', [ $action, $userId, $uuid ] )
+				$formSecurity->nonceAction( $action, $userId, $uuid )
 			);
 		}
 	}
@@ -949,17 +1121,21 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	/**
-	 * @param array<int,mixed> $args
+	 * @param array<string,mixed> $data
+	 * @return array<string,mixed>
 	 */
-	private function adminPagePrivateString( string $method, array $args ) :string {
-		$reflection = new ReflectionMethod( AdminPage::class, $method );
-		$reflection->setAccessible( true );
-		$result = $reflection->invokeArgs( $this->adminPage(), $args );
-		if ( !is_string( $result ) ) {
-			throw new RuntimeException( 'Expected AdminPage::'.$method.'() to return a string.' );
+	private function capabilityItemFromViewData( array $data, string $capability ) :array {
+		foreach ( $data[ 'vars' ][ 'scope_form' ][ 'panels' ] as $panel ) {
+			foreach ( $panel[ 'sections' ] as $section ) {
+				foreach ( $section[ 'items' ] as $item ) {
+					if ( $item[ 'name' ] === $capability ) {
+						return $item;
+					}
+				}
+			}
 		}
 
-		return $result;
+		throw new RuntimeException( 'Expected capability item for '.$capability.'.' );
 	}
 
 	/**
