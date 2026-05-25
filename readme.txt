@@ -4,7 +4,7 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -91,6 +91,14 @@ The public development repository is available at https://github.com/FernleafSys
 The distributed plugin includes built admin assets in `assets/dist`. To rebuild those assets from source, install the development dependencies with `composer install` and `npm ci`, run `npm run build`, and then run `composer build-zip` to create the release package.
 
 == Changelog ==
+
+= 0.2.0 =
+* Added optional per-Application-Password expiration dates and daily revocation of expired passwords.
+* Added saved-role snapshots, scope audit details, and role-change warnings.
+* Added capability descriptions and admin tooltips for common WordPress capabilities.
+* Moved scope storage into a versioned Mandate options document.
+* Improved the admin layout, selected password summary, and capability tab labels.
+* Added PHPUnit unit tests, WordPress integration tests, package verification, and GitHub release package support.
 
 = 0.1.0 =
 * Initial release.
