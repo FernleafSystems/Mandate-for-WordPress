@@ -1,7 +1,12 @@
 #!/usr/bin/env php
 <?php declare( strict_types=1 );
 
-const MANDATE_PACKAGE_ROOT = 'mandate/';
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+
+require_once dirname( __DIR__ ).'/src/PluginIdentity.php';
+
+const MANDATE_PACKAGE_ROOT = PluginIdentity::PACKAGE_ROOT;
+const MANDATE_MAIN_PLUGIN_FILE = PluginIdentity::MAIN_FILE;
 const MANDATE_VARIANT_WORDPRESS_ORG = 'wordpress-org';
 const MANDATE_VARIANT_GITHUB = 'github';
 const MANDATE_GITHUB_UPDATE_URI = 'Update URI: https://github.com/FernleafSystems/Mandate-for-WordPress';
@@ -89,7 +94,7 @@ function mandate_verify_zip_entries( ZipArchive $zip ) :array {
 	}
 
 	foreach ( [
-		MANDATE_PACKAGE_ROOT.'plugin.php',
+		MANDATE_PACKAGE_ROOT.MANDATE_MAIN_PLUGIN_FILE,
 		MANDATE_PACKAGE_ROOT.'init.php',
 		MANDATE_PACKAGE_ROOT.'composer.json',
 		MANDATE_PACKAGE_ROOT.'vendor/autoload.php',
@@ -115,7 +120,7 @@ function mandate_verify_wordpress_org_package( ZipArchive $zip, array $entries )
 		throw new \RuntimeException( 'WordPress.org package must not require Plugin Update Checker.' );
 	}
 
-	$plugin = mandate_verify_read_entry( $zip, MANDATE_PACKAGE_ROOT.'plugin.php' );
+	$plugin = mandate_verify_read_entry( $zip, MANDATE_PACKAGE_ROOT.MANDATE_MAIN_PLUGIN_FILE );
 	if ( \str_contains( $plugin, 'Update URI:' ) ) {
 		throw new \RuntimeException( 'WordPress.org package must not contain an Update URI header.' );
 	}
@@ -145,7 +150,7 @@ function mandate_verify_github_package( ZipArchive $zip, array $entries ) :void 
 		throw new \RuntimeException( 'GitHub package must require Plugin Update Checker '.MANDATE_GITHUB_UPDATER_VERSION.'.' );
 	}
 
-	$plugin = mandate_verify_read_entry( $zip, MANDATE_PACKAGE_ROOT.'plugin.php' );
+	$plugin = mandate_verify_read_entry( $zip, MANDATE_PACKAGE_ROOT.MANDATE_MAIN_PLUGIN_FILE );
 	if ( !\str_contains( $plugin, MANDATE_GITHUB_UPDATE_URI ) ) {
 		throw new \RuntimeException( 'GitHub package must contain the GitHub Update URI header.' );
 	}
@@ -159,7 +164,9 @@ function mandate_verify_github_package( ZipArchive $zip, array $entries ) :void 
 	foreach ( [
 		'YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory',
 		'https://github.com/FernleafSystems/Mandate-for-WordPress/',
-		'/mandate-github-[^\/?&#]+\.zip($|[?&#])/i',
+		'PluginIdentity::MAIN_FILE',
+		'PluginIdentity::SLUG',
+		'PluginIdentity::GITHUB_ASSET_PREFIX',
 	] as $token ) {
 		if ( !\str_contains( $updater, $token ) ) {
 			throw new \RuntimeException( 'GitHub updater bootstrap is missing expected token: '.$token );
@@ -213,7 +220,7 @@ function mandate_verify_no_updater_tokens( ZipArchive $zip, array $entries ) :vo
 		'PluginUpdateChecker',
 		'PucFactory',
 		'plugin-update-checker',
-		'mandate-github-',
+		PluginIdentity::GITHUB_ASSET_PREFIX.'-',
 	];
 
 	foreach ( $entries as $entry ) {

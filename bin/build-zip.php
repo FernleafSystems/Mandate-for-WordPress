@@ -5,6 +5,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ZipBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -112,7 +113,7 @@ function resolve_output_zip( mixed $output, string $projectRoot, string $buildDi
 	}
 	else {
 		$slug = $variant === RuntimePackageBuilder::VARIANT_GITHUB
-			? RuntimePackageBuilder::PLUGIN_SLUG.'-github'
+			? PluginIdentity::GITHUB_ASSET_PREFIX
 			: RuntimePackageBuilder::PLUGIN_SLUG;
 		$resolved = Path::join(
 			$buildDir,

@@ -3,6 +3,7 @@
 declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ZipBuilder;
@@ -155,7 +156,7 @@ final class ToolingTest extends Wpm_Test_Case {
 			);
 			$builder->build( $packageDir, $packageRoot, false );
 
-			$this->assertTrue( \is_file( Path::join( $packageDir, 'plugin.php' ) ) );
+			$this->assertTrue( \is_file( Path::join( $packageDir, RuntimePackageBuilder::MAIN_PLUGIN_FILE ) ) );
 			$this->assertTrue( \is_file( Path::join( $packageDir, 'assets/dist/admin-page.js' ) ) );
 			$this->assertFalse( \file_exists( Path::join( $packageDir, 'site' ) ) );
 			$this->assertPackageComposerJsonContainsRuntimeConfigOnly( $packageDir );
@@ -178,9 +179,9 @@ final class ToolingTest extends Wpm_Test_Case {
 				$zip->close();
 			}
 
-			$this->assertTrue( in_array( 'mandate/plugin.php', $names, true ) );
-			$this->assertTrue( in_array( 'mandate/assets/dist/admin-page.js', $names, true ) );
-			$this->assertFalse( in_array( 'mandate/site/index.html', $names, true ) );
+			$this->assertTrue( in_array( PluginIdentity::PACKAGE_ROOT.PluginIdentity::MAIN_FILE, $names, true ) );
+			$this->assertTrue( in_array( PluginIdentity::PACKAGE_ROOT.'assets/dist/admin-page.js', $names, true ) );
+			$this->assertFalse( in_array( PluginIdentity::PACKAGE_ROOT.'site/index.html', $names, true ) );
 		}
 		finally {
 			$filesystem->remove( [
@@ -201,7 +202,7 @@ final class ToolingTest extends Wpm_Test_Case {
 
 			$this->assertFalse( \file_exists( Path::join( $packageDir, 'github-updater.php' ) ) );
 			$this->assertPackageComposerJsonDoesNotRequireGithubUpdater( $packageDir );
-			$this->assertStringNotContainsString( 'Update URI:', $this->readPackageFile( $packageDir, 'plugin.php' ) );
+			$this->assertStringNotContainsString( 'Update URI:', $this->readPackageFile( $packageDir, RuntimePackageBuilder::MAIN_PLUGIN_FILE ) );
 			$this->assertStringNotContainsString( 'github-updater.php', $this->readPackageFile( $packageDir, 'init.php' ) );
 			$this->assertPackageDoesNotContainGithubUpdaterTokens( $packageDir );
 		}
@@ -213,7 +214,7 @@ final class ToolingTest extends Wpm_Test_Case {
 	public function testGithubPackageInjectsUpdaterOnlyForGithubVariant() :void {
 		$filesystem = new Filesystem();
 		$projectRoot = \dirname( __DIR__, 2 );
-		$packageRoot = Path::join( \sys_get_temp_dir(), 'mandate-github-package-'.\bin2hex( \random_bytes( 4 ) ) );
+		$packageRoot = Path::join( \sys_get_temp_dir(), PluginIdentity::GITHUB_ASSET_PREFIX.'-package-'.\bin2hex( \random_bytes( 4 ) ) );
 		$packageDir = Path::join( $packageRoot, RuntimePackageBuilder::PLUGIN_SLUG );
 
 		try {
@@ -223,13 +224,13 @@ final class ToolingTest extends Wpm_Test_Case {
 			$this->assertPackageComposerJsonRequiresGithubUpdater( $packageDir );
 			$this->assertStringContainsString(
 				'Update URI: https://github.com/FernleafSystems/Mandate-for-WordPress',
-				$this->readPackageFile( $packageDir, 'plugin.php' )
+				$this->readPackageFile( $packageDir, RuntimePackageBuilder::MAIN_PLUGIN_FILE )
 			);
 			$this->assertStringContainsString( "require_once __DIR__.'/github-updater.php';", $this->readPackageFile( $packageDir, 'init.php' ) );
 
 			$updater = $this->readPackageFile( $packageDir, 'github-updater.php' );
 			$this->assertStringContainsString( 'https://github.com/FernleafSystems/Mandate-for-WordPress/', $updater );
-			$this->assertStringContainsString( '/mandate-github-[^\/?&#]+\.zip($|[?&#])/i', $updater );
+			$this->assertStringContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIX', $updater );
 			$this->assertStringContainsString( "YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory", $updater );
 		}
 		finally {
@@ -253,6 +254,58 @@ final class ToolingTest extends Wpm_Test_Case {
 		finally {
 			$filesystem->remove( $packageRoot );
 		}
+	}
+
+	public function testRuntimeIdentityConstantsMatchPluginIdentity() :void {
+		$this->assertSame( PluginIdentity::SLUG, RuntimePackageBuilder::PLUGIN_SLUG );
+		$this->assertSame( PluginIdentity::MAIN_FILE, RuntimePackageBuilder::MAIN_PLUGIN_FILE );
+	}
+
+	public function testStaticWordPressIdentityFilesMatchPluginIdentity() :void {
+		$projectRoot = \dirname( __DIR__, 2 );
+
+		$this->assertFileExists( Path::join( $projectRoot, PluginIdentity::MAIN_FILE ) );
+		$this->assertFileDoesNotExist( Path::join( $projectRoot, 'plugin.php' ) );
+
+		$pluginHeader = $this->readProjectFile( PluginIdentity::MAIN_FILE );
+		$this->assertMatchesRegularExpression( '/^\s*\*\s*Plugin Name:\s*'.\preg_quote( PluginIdentity::NAME, '/' ).'\s*$/m', $pluginHeader );
+		$this->assertMatchesRegularExpression( '/^\s*\*\s*Text Domain:\s*'.\preg_quote( PluginIdentity::TEXT_DOMAIN, '/' ).'\s*$/m', $pluginHeader );
+
+		$readme = $this->readProjectFile( 'readme.txt' );
+		$this->assertStringContainsString( '=== '.PluginIdentity::NAME.' ===', $readme );
+		$this->assertStringContainsString( 'Contributors: '.PluginIdentity::CONTRIBUTOR, $readme );
+		$this->assertStringContainsString( '/wp-content/plugins/'.PluginIdentity::SLUG, $readme );
+	}
+
+	public function testStaticToolingIdentityFilesMatchPluginIdentity() :void {
+		$releaseWorkflow = $this->readProjectFile( '.github/workflows/release.yml' );
+		$this->assertStringContainsString( 'WORDPRESS_ORG_ZIP_NAME="'.PluginIdentity::SLUG.'-${GITHUB_REF_NAME}.zip"', $releaseWorkflow );
+		$this->assertStringContainsString( 'GITHUB_ZIP_NAME="'.PluginIdentity::GITHUB_ASSET_PREFIX.'-${GITHUB_REF_NAME}.zip"', $releaseWorkflow );
+
+		$browserCompose = $this->readProjectFile( 'tests/docker/docker-compose.browser.yml' );
+		$this->assertStringContainsString( '/wp-content/plugins/'.PluginIdentity::SLUG, $browserCompose );
+
+		$pluginCheckCompose = $this->readProjectFile( 'tests/docker/docker-compose.plugin-check.yml' );
+		$this->assertStringContainsString( '/wp-content/plugins/'.PluginIdentity::SLUG, $pluginCheckCompose );
+
+		$browserProvision = $this->readProjectFile( 'tests/docker/provision-browser-site.sh' );
+		$this->assertStringContainsString( 'PLUGIN_SLUG="'.PluginIdentity::SLUG.'"', $browserProvision );
+		$this->assertStringContainsString( 'PLUGIN_MAIN="${PLUGIN_SLUG}/'.PluginIdentity::MAIN_FILE.'"', $browserProvision );
+
+		$pluginCheckProvision = $this->readProjectFile( 'tests/plugin-check/provision-site.sh' );
+		$this->assertStringContainsString( 'wp plugin activate '.PluginIdentity::SLUG, $pluginCheckProvision );
+
+		$pluginCheckRunner = $this->readProjectFile( 'tests/plugin-check/run-plugin-check.php' );
+		$this->assertStringContainsString( "'".PluginIdentity::SLUG."'", $pluginCheckRunner );
+		$this->assertStringContainsString( "'--slug=".PluginIdentity::SLUG."'", $pluginCheckRunner );
+
+		$browserSpec = $this->readProjectFile( 'tests/browser/mandate-admin.spec.js' );
+		$this->assertStringContainsString( 'page='.PluginIdentity::SLUG, $browserSpec );
+
+		$githubUpdater = $this->readProjectFile( 'infrastructure/templates/github-updater.php' );
+		$this->assertStringContainsString( 'PluginIdentity::MAIN_FILE', $githubUpdater );
+		$this->assertStringContainsString( 'PluginIdentity::SLUG', $githubUpdater );
+		$this->assertStringContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIX', $githubUpdater );
 	}
 
 	private function buildPackage(
@@ -328,13 +381,22 @@ final class ToolingTest extends Wpm_Test_Case {
 		return $content;
 	}
 
+	private function readProjectFile( string $relativePath ) :string {
+		$content = \file_get_contents( Path::join( \dirname( __DIR__, 2 ), $relativePath ) );
+		if ( !\is_string( $content ) ) {
+			throw new RuntimeException( 'Failed to read project file: '.$relativePath );
+		}
+
+		return $content;
+	}
+
 	private function assertPackageDoesNotContainGithubUpdaterTokens( string $packageDir ) :void {
 		$tokens = [
 			'YahnisElsts',
 			'PluginUpdateChecker',
 			'PucFactory',
 			'plugin-update-checker',
-			'mandate-github-',
+			PluginIdentity::GITHUB_ASSET_PREFIX.'-',
 		];
 
 		$iterator = new RecursiveIteratorIterator(
@@ -370,8 +432,8 @@ final class ToolingTest extends Wpm_Test_Case {
 			Path::join( $fixtureRoot, 'infrastructure/templates' ),
 		] );
 
-		$filesystem->dumpFile( Path::join( $fixtureRoot, 'plugin.php' ), "<?php\n/*\n * Plugin Name: Fixture\n * Plugin URI: https://example.test\n * Version: 1.0.0\n */\n" );
-		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\\call_user_func( function () {\n\t\$mandate_autoload = __DIR__.'/vendor/autoload.php';\n\tif ( \\is_file( \$mandate_autoload ) ) {\n\t\trequire_once \$mandate_autoload;\n\t\tPlugin::boot( __DIR__.'/plugin.php' );\n\t}\n} );\n" );
+		$filesystem->dumpFile( Path::join( $fixtureRoot, RuntimePackageBuilder::MAIN_PLUGIN_FILE ), "<?php\n/*\n * Plugin Name: Fixture\n * Plugin URI: https://example.test\n * Version: 1.0.0\n */\n" );
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\\call_user_func( function () {\n\t\$mandate_autoload = __DIR__.'/vendor/autoload.php';\n\tif ( \\is_file( \$mandate_autoload ) ) {\n\t\trequire_once \$mandate_autoload;\n\t\tPlugin::boot( __DIR__.'/".RuntimePackageBuilder::MAIN_PLUGIN_FILE."' );\n\t}\n} );\n" );
 		$filesystem->dumpFile( Path::join( $fixtureRoot, 'infrastructure/templates/github-updater.php' ), "<?php\nuse YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory;\n" );
 
 		foreach ( [

@@ -21,7 +21,7 @@ Application Password scopes are now easier to audit, can expire automatically, a
 
 ### Changed
 
-- Scope persistence moved to a centralized Mandate options document.
+- Scope persistence moved to a centralized Mandate App Security options document.
 - Unrestricted saves delete the stored scope.
 - Expiration-only saves keep capabilities unrestricted until the saved date passes.
 - Expiration editing moved into the selected password summary.
@@ -65,7 +65,7 @@ First public release.
 ### Added
 
 - Application Password capability scoping.
-- Tools > Mandate admin page.
+- Tools > Mandate App Security admin page.
 - Role-derived, grouped capability list.
 - Per-password scope storage by UUID.
 - Primitive and registered meta-capability enforcement.

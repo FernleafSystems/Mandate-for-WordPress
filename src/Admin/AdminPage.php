@@ -79,8 +79,8 @@ class AdminPage {
 
 	public function registerMenu() :void {
 		$this->pageHookSuffix = (string)add_management_page(
-			__( 'Mandate', 'mandate' ),
-			__( 'Mandate', 'mandate' ),
+			__( 'Mandate App Security', 'mandate-app-security' ),
+			__( 'Mandate App Security', 'mandate-app-security' ),
 			self::REQUIRED_CAPABILITY,
 			Plugin::MENU_SLUG,
 			[ $this, 'render' ]
@@ -205,7 +205,7 @@ class AdminPage {
 
 	private function requireManageCapability() :void {
 		if ( !current_user_can( self::REQUIRED_CAPABILITY ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage application password scopes.', 'mandate' ) );
+			wp_die( esc_html__( 'You do not have permission to manage application password scopes.', 'mandate-app-security' ) );
 		}
 	}
 
@@ -228,7 +228,7 @@ class AdminPage {
 		$capabilityGroups = $this->groupProvider->group( $candidateCaps, $metaCaps );
 
 		echo '<div class="wrap mandate">';
-		echo '<h1>'.esc_html__( 'Mandate', 'mandate' ).'</h1>';
+		echo '<h1>'.esc_html__( 'Mandate App Security', 'mandate-app-security' ).'</h1>';
 		$this->renderMessage();
 		$this->renderSelectionForm( $selectedUserId, $passwords, $selectedUuid, $scope, $expiresOn );
 
@@ -238,13 +238,13 @@ class AdminPage {
 		}
 
 		if ( empty( $passwords ) ) {
-			echo '<div class="notice notice-info"><p>'.esc_html__( 'The selected user has no application passwords.', 'mandate' ).'</p></div>';
+			echo '<div class="notice notice-info"><p>'.esc_html__( 'The selected user has no application passwords.', 'mandate-app-security' ).'</p></div>';
 			echo '</div>';
 			return;
 		}
 
 		if ( $selectedUuid === '' ) {
-			echo '<div class="notice notice-warning"><p>'.esc_html__( 'Select an application password before saving a scope.', 'mandate' ).'</p></div>';
+			echo '<div class="notice notice-warning"><p>'.esc_html__( 'Select an application password before saving a scope.', 'mandate-app-security' ).'</p></div>';
 			echo '</div>';
 			return;
 		}
@@ -299,7 +299,7 @@ class AdminPage {
 		echo '<div class="mandate-selection-grid">';
 		echo '<div class="mandate-selection-column">';
 		echo '<div class="mandate-field">';
-		echo '<label class="mandate-field-title" for="mandate-user">'.esc_html__( 'User', 'mandate' ).'</label>';
+		echo '<label class="mandate-field-title" for="mandate-user">'.esc_html__( 'User', 'mandate-app-security' ).'</label>';
 		wp_dropdown_users(
 			[
 				'name'     => 'user_id',
@@ -314,7 +314,7 @@ class AdminPage {
 
 		echo '<div class="mandate-selection-column">';
 		echo '<div class="mandate-field">';
-		echo '<label class="mandate-field-title" for="mandate-password">'.esc_html__( 'Application Password', 'mandate' ).'</label>';
+		echo '<label class="mandate-field-title" for="mandate-password">'.esc_html__( 'Application Password', 'mandate-app-security' ).'</label>';
 		if ( !empty( $passwords ) ) {
 			echo '<select id="mandate-password" name="app_password_uuid">';
 			foreach ( $passwords as $password ) {
@@ -323,7 +323,7 @@ class AdminPage {
 			echo '</select>';
 		}
 		else {
-			echo '<p class="description">'.esc_html__( 'No application passwords are available for this user.', 'mandate' ).'</p>';
+			echo '<p class="description">'.esc_html__( 'No application passwords are available for this user.', 'mandate-app-security' ).'</p>';
 		}
 		echo '</div>';
 		echo '</div>';
@@ -332,8 +332,8 @@ class AdminPage {
 		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope, $expiresOn, $currentRoleSlugs );
 		echo '</div>';
 		echo '</div>';
-		echo '<p class="mandate-selection-status" data-wpm-selection-status hidden>'.esc_html__( 'Loading selection...', 'mandate' ).'</p>';
-		echo '<noscript><p class="mandate-selection-fallback"><button type="submit" class="button button-secondary">'.esc_html__( 'Apply Selection', 'mandate' ).'</button></p></noscript>';
+		echo '<p class="mandate-selection-status" data-wpm-selection-status hidden>'.esc_html__( 'Loading selection...', 'mandate-app-security' ).'</p>';
+		echo '<noscript><p class="mandate-selection-fallback"><button type="submit" class="button button-secondary">'.esc_html__( 'Apply Selection', 'mandate-app-security' ).'</button></p></noscript>';
 		echo '</form>';
 	}
 
@@ -343,9 +343,9 @@ class AdminPage {
 	private function renderRoleSummary( array $roleSlugs ) :void {
 		$roles = $this->roleSummaries( $roleSlugs );
 		echo '<div id="mandate-role-summary" class="mandate-role-summary mandate-summary-card">';
-		echo '<p class="mandate-role-summary-label">'.esc_html__( 'Roles for selected user', 'mandate' ).'</p>';
+		echo '<p class="mandate-role-summary-label">'.esc_html__( 'Roles for selected user', 'mandate-app-security' ).'</p>';
 		if ( empty( $roles ) ) {
-			echo '<p class="description">'.esc_html__( 'No roles assigned.', 'mandate' ).'</p>';
+			echo '<p class="description">'.esc_html__( 'No roles assigned.', 'mandate-app-security' ).'</p>';
 			echo '</div>';
 			return;
 		}
@@ -354,7 +354,7 @@ class AdminPage {
 		foreach ( $roles as $role ) {
 			echo '<li>';
 			echo esc_html( $role[ 'name' ] ).' ';
-			echo '<span class="mandate-role-slug">('.esc_html__( 'slug:', 'mandate' ).' <code>'.esc_html( $role[ 'slug' ] ).'</code>)</span>';
+			echo '<span class="mandate-role-slug">('.esc_html__( 'slug:', 'mandate-app-security' ).' <code>'.esc_html( $role[ 'slug' ] ).'</code>)</span>';
 			echo '</li>';
 		}
 		echo '</ul>';
@@ -431,34 +431,34 @@ class AdminPage {
 			return;
 		}
 
-		echo '<h2 id="mandate-password-summary-title" class="mandate-field-title">'.esc_html__( 'Selected Password Info', 'mandate' ).'</h2>';
+		echo '<h2 id="mandate-password-summary-title" class="mandate-field-title">'.esc_html__( 'Selected Password Info', 'mandate-app-security' ).'</h2>';
 		echo '<div id="mandate-password-summary" class="mandate-password-summary mandate-summary-card" aria-labelledby="mandate-password-summary-title">';
 		echo '<dl class="mandate-password-summary-details">';
-		$this->renderDetailItem( __( 'Name', 'mandate' ), $password[ 'name' ] );
-		$this->renderDetailItem( __( 'UUID', 'mandate' ), $password[ 'uuid' ] );
-		$this->renderDetailItem( __( 'App ID', 'mandate' ), $password[ 'app_id' ] );
-		$this->renderDetailItem( __( 'Created', 'mandate' ), $this->formatTimestamp( $password[ 'created' ] ) );
-		$this->renderDetailItem( __( 'Last Used', 'mandate' ), $this->formatTimestamp( $password[ 'last_used' ] ) );
+		$this->renderDetailItem( __( 'Name', 'mandate-app-security' ), $password[ 'name' ] );
+		$this->renderDetailItem( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] );
+		$this->renderDetailItem( __( 'App ID', 'mandate-app-security' ), $password[ 'app_id' ] );
+		$this->renderDetailItem( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) );
+		$this->renderDetailItem( __( 'Last Used', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'last_used' ] ) );
 		echo '</dl>';
 		echo '<div class="mandate-password-summary-divider" aria-hidden="true"></div>';
 		echo '<dl class="mandate-password-summary-details">';
 		$this->renderDetailItem(
-			__( 'Restricted Scope', 'mandate' ),
+			__( 'Restricted Scope', 'mandate-app-security' ),
 			$this->formatRestrictedScope( $scope, $expiresOn )
 		);
 		$this->renderExpirationDetailItem( $expiresOn );
 		if ( $scope !== null ) {
-			$this->renderDetailItem( __( 'Scope Last Saved', 'mandate' ), $this->formatTimestamp( $scope[ 'updated_at' ] ) );
+			$this->renderDetailItem( __( 'Scope Last Saved', 'mandate-app-security' ), $this->formatTimestamp( $scope[ 'updated_at' ] ) );
 			$this->renderDetailItem(
-				__( 'Roles When Saved', 'mandate' ),
+				__( 'Roles When Saved', 'mandate-app-security' ),
 				$scope[ 'roles_at_update' ] === null
-					? __( 'Not recorded', 'mandate' )
+					? __( 'Not recorded', 'mandate-app-security' )
 					: $this->formatRoleSlugs( $scope[ 'roles_at_update' ] )
 			);
 		}
 		echo '</dl>';
 		if ( $scope !== null && $scope[ 'roles_at_update' ] !== null && $scope[ 'roles_at_update' ] !== $currentRoleSlugs ) {
-			echo '<div class="notice notice-warning inline" data-wpm-role-snapshot-status="changed"><p>'.esc_html__( 'The selected user roles have changed since this Mandate record was saved. Review the saved restrictions before relying on this Application Password.', 'mandate' ).'</p></div>';
+			echo '<div class="notice notice-warning inline" data-wpm-role-snapshot-status="changed"><p>'.esc_html__( 'The selected user roles have changed since this Mandate App Security record was saved. Review the saved restrictions before relying on this Application Password.', 'mandate-app-security' ).'</p></div>';
 		}
 		echo '</div>';
 	}
@@ -469,20 +469,20 @@ class AdminPage {
 	private function formatRestrictedScope( ?array $scope, ?string $expiresOn ) :string {
 		$restrictions = [];
 		if ( $scope !== null && $scope[ 'capabilities_restricted' ] ) {
-			$restrictions[] = __( 'Capabilities', 'mandate' );
+			$restrictions[] = __( 'Capabilities', 'mandate-app-security' );
 		}
 		if ( $expiresOn !== null ) {
-			$restrictions[] = __( 'Expiration date', 'mandate' );
+			$restrictions[] = __( 'Expiration date', 'mandate-app-security' );
 		}
 
-		return empty( $restrictions ) ? __( 'Unrestricted', 'mandate' ) : implode( ' / ', $restrictions );
+		return empty( $restrictions ) ? __( 'Unrestricted', 'mandate-app-security' ) : implode( ' / ', $restrictions );
 	}
 
 	/**
 	 * @param list<string> $roleSlugs
 	 */
 	private function formatRoleSlugs( array $roleSlugs ) :string {
-		return $roleSlugs === [] ? __( 'No roles', 'mandate' ) : implode( ', ', $roleSlugs );
+		return $roleSlugs === [] ? __( 'No roles', 'mandate-app-security' ) : implode( ', ', $roleSlugs );
 	}
 
 	/**
@@ -507,13 +507,13 @@ class AdminPage {
 		$expired = $this->expirationDatePolicy->isExpired( $expiresOn );
 		$state = $expiresOn === null ? 'never' : ( $expired ? 'expired' : 'date' );
 		$value = $expiresOn === null
-			? __( 'Never expires', 'mandate' )
+			? __( 'Never expires', 'mandate-app-security' )
 			// translators: %s: Application Password expiration date.
-			: ( $expired ? sprintf( __( '%s (expired)', 'mandate' ), $expiresOn ) : $expiresOn );
+			: ( $expired ? sprintf( __( '%s (expired)', 'mandate-app-security' ), $expiresOn ) : $expiresOn );
 		$classes = 'button-link mandate-expiration-summary'.( $expired ? ' is-expired' : '' );
-		echo '<div class="mandate-password-summary-detail"><dt>'.esc_html__( 'Expiration Date', 'mandate' ).'</dt><dd>';
+		echo '<div class="mandate-password-summary-detail"><dt>'.esc_html__( 'Expiration Date', 'mandate-app-security' ).'</dt><dd>';
 		echo '<button type="button" class="'.esc_attr( $classes ).'" data-wpm-expiration-summary data-wpm-expiration-state="'.esc_attr( $state ).'" aria-controls="mandate-expiration-date" hidden>'.esc_html( $value ).'</button>';
-		echo '<input type="date" id="mandate-expiration-date" class="mandate-expiration-input" name="expiration_date" value="'.esc_attr( $expiresOn ?? '' ).'" data-wpm-expiration-input form="'.esc_attr( self::SCOPE_FORM_ID ).'" aria-label="'.esc_attr__( 'Expiration Date', 'mandate' ).'" />';
+		echo '<input type="date" id="mandate-expiration-date" class="mandate-expiration-input" name="expiration_date" value="'.esc_attr( $expiresOn ?? '' ).'" data-wpm-expiration-input form="'.esc_attr( self::SCOPE_FORM_ID ).'" aria-label="'.esc_attr__( 'Expiration Date', 'mandate-app-security' ).'" />';
 		echo '</dd></div>';
 	}
 
@@ -529,10 +529,10 @@ class AdminPage {
 		array $selectedCaps,
 		array $selectedMetaCaps
 	) :void {
-		echo '<h2>'.esc_html__( 'Capability Scope', 'mandate' ).'</h2>';
+		echo '<h2>'.esc_html__( 'Capability Scope', 'mandate-app-security' ).'</h2>';
 
 		if ( $this->isSuperAdminUser( $selectedUserId ) ) {
-			echo '<div class="notice notice-warning"><p>'.esc_html__( 'Scopes for multisite super admins are not supported.', 'mandate' ).'</p></div>';
+			echo '<div class="notice notice-warning"><p>'.esc_html__( 'Scopes for multisite super admins are not supported.', 'mandate-app-security' ).'</p></div>';
 		}
 
 		echo '<form method="post" action="'.esc_url( admin_url( 'tools.php?page='.Plugin::MENU_SLUG ) ).'" id="'.esc_attr( self::SCOPE_FORM_ID ).'" class="mandate-scope-form">';
@@ -547,17 +547,17 @@ class AdminPage {
 		echo '<input type="hidden" name="user_id" value="'.esc_attr( (string)$selectedUserId ).'" />';
 		echo '<input type="hidden" name="app_password_uuid" value="'.esc_attr( $selectedUuid ).'" />';
 
-		echo '<div class="mandate-tabs" role="tablist" aria-label="'.esc_attr__( 'Capability groups', 'mandate' ).'">';
-		$this->renderTabButton( 'wordpress', __( 'WordPress Capabilities', 'mandate' ), true );
-		$this->renderTabButton( 'other', __( 'Third-Party Capabilities', 'mandate' ), false );
+		echo '<div class="mandate-tabs" role="tablist" aria-label="'.esc_attr__( 'Capability groups', 'mandate-app-security' ).'">';
+		$this->renderTabButton( 'wordpress', __( 'WordPress Capabilities', 'mandate-app-security' ), true );
+		$this->renderTabButton( 'other', __( 'Third-Party Capabilities', 'mandate-app-security' ), false );
 		echo '</div>';
 
 		$this->renderCapabilityPanel( 'wordpress', $capabilityGroups[ 'wordpress' ], $selectedCaps, $selectedMetaCaps );
 		$this->renderCapabilityPanel( 'other', $capabilityGroups[ 'other' ], $selectedCaps, $selectedMetaCaps );
 
 		echo '<p class="submit mandate-actions">';
-		echo '<button type="submit" class="button button-primary" name="mandate_action" value="save_scope" '.disabled( $this->isSuperAdminUser( $selectedUserId ), true, false ).'>'.esc_html__( 'Save Scope', 'mandate' ).'</button> ';
-		echo '<button type="submit" class="button" name="mandate_action" value="clear_scope">'.esc_html__( 'Reset to Defaults', 'mandate' ).'</button>';
+		echo '<button type="submit" class="button button-primary" name="mandate_action" value="save_scope" '.disabled( $this->isSuperAdminUser( $selectedUserId ), true, false ).'>'.esc_html__( 'Save Scope', 'mandate-app-security' ).'</button> ';
+		echo '<button type="submit" class="button" name="mandate_action" value="clear_scope">'.esc_html__( 'Reset to Defaults', 'mandate-app-security' ).'</button>';
 		echo '</p>';
 		echo '</form>';
 	}
@@ -575,13 +575,13 @@ class AdminPage {
 		echo '<section id="mandate-panel-'.esc_attr( $groupKey ).'" class="mandate-capability-panel" data-wpm-panel="'.esc_attr( $groupKey ).'" aria-labelledby="mandate-tab-'.esc_attr( $groupKey ).'">';
 		echo '<div class="mandate-panel-heading">';
 		echo '<p>';
-		echo '<button type="button" class="button" data-wpm-select-group="'.esc_attr( $groupKey ).'" data-wpm-select-state="checked">'.esc_html__( 'Select All', 'mandate' ).'</button> ';
-		echo '<button type="button" class="button" data-wpm-select-group="'.esc_attr( $groupKey ).'" data-wpm-select-state="unchecked">'.esc_html__( 'Deselect All', 'mandate' ).'</button>';
+		echo '<button type="button" class="button" data-wpm-select-group="'.esc_attr( $groupKey ).'" data-wpm-select-state="checked">'.esc_html__( 'Select All', 'mandate-app-security' ).'</button> ';
+		echo '<button type="button" class="button" data-wpm-select-group="'.esc_attr( $groupKey ).'" data-wpm-select-state="unchecked">'.esc_html__( 'Deselect All', 'mandate-app-security' ).'</button>';
 		echo '</p>';
 		echo '</div>';
 		echo '<div class="mandate-capability-scroll">';
-		$this->renderCapabilitySection( $groupKey, 'primitive', __( 'Role-Derived Primitive Capabilities', 'mandate' ), 'allowed_caps', $capabilities[ 'primitive' ], $selectedCaps );
-		$this->renderCapabilitySection( $groupKey, 'meta', __( 'Registered Meta Capabilities', 'mandate' ), 'allowed_meta_caps', $capabilities[ 'meta' ], $selectedMetaCaps );
+		$this->renderCapabilitySection( $groupKey, 'primitive', __( 'Role-Derived Primitive Capabilities', 'mandate-app-security' ), 'allowed_caps', $capabilities[ 'primitive' ], $selectedCaps );
+		$this->renderCapabilitySection( $groupKey, 'meta', __( 'Registered Meta Capabilities', 'mandate-app-security' ), 'allowed_meta_caps', $capabilities[ 'meta' ], $selectedMetaCaps );
 		echo '</div>';
 		echo '</section>';
 	}
@@ -594,7 +594,7 @@ class AdminPage {
 		echo '<fieldset id="mandate-'.esc_attr( $groupKey ).'-'.esc_attr( $type ).'-capabilities" class="mandate-capability-section">';
 		echo '<legend>'.esc_html( $label ).'</legend>';
 		if ( empty( $capabilities ) ) {
-			echo '<p class="description">'.esc_html__( 'No capabilities are available for this group.', 'mandate' ).'</p>';
+			echo '<p class="description">'.esc_html__( 'No capabilities are available for this group.', 'mandate-app-security' ).'</p>';
 			echo '</fieldset>';
 			return;
 		}
@@ -623,10 +623,10 @@ class AdminPage {
 	private function renderMessage() :void {
 		$message = sanitize_key( $this->getScalar( 'mandate_message' ) );
 		$messages = [
-			'saved' => [ 'success', __( 'Scope saved.', 'mandate' ) ],
-			'reset' => [ 'success', __( 'Scope reset to defaults.', 'mandate' ) ],
-			'invalid' => [ 'error', __( 'The selected application password could not be verified for that user.', 'mandate' ) ],
-			'super_admin_unsupported' => [ 'warning', __( 'Scopes for multisite super admins are not supported.', 'mandate' ) ],
+			'saved' => [ 'success', __( 'Scope saved.', 'mandate-app-security' ) ],
+			'reset' => [ 'success', __( 'Scope reset to defaults.', 'mandate-app-security' ) ],
+			'invalid' => [ 'error', __( 'The selected application password could not be verified for that user.', 'mandate-app-security' ) ],
+			'super_admin_unsupported' => [ 'warning', __( 'Scopes for multisite super admins are not supported.', 'mandate-app-security' ) ],
 		];
 		if ( !isset( $messages[ $message ] ) ) {
 			return;
@@ -638,7 +638,7 @@ class AdminPage {
 
 	private function formatTimestamp( int $timestamp ) :string {
 		if ( $timestamp < 1 ) {
-			return __( 'Never', 'mandate' );
+			return __( 'Never', 'mandate-app-security' );
 		}
 
 		return function_exists( 'wp_date' ) ? wp_date( 'Y-m-d H:i:s', $timestamp ) : gmdate( 'Y-m-d H:i:s', $timestamp );

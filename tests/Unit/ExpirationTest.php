@@ -15,6 +15,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 
 final class ExpirationTest extends Wpm_Test_Case {
 
@@ -438,13 +439,14 @@ final class ExpirationTest extends Wpm_Test_Case {
 	}
 
 	public function testPluginBootRegistersExpirationHooksAndDeactivationCleanup() :void {
-		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		$pluginFile = $this->pluginFile();
+		Plugin::boot( $pluginFile );
 
 		$this->assertNotFalse( wp_next_scheduled( ApplicationPasswordExpirationReaper::HOOK ) );
 		$this->assertArrayHasKey( ApplicationPasswordExpirationReaper::HOOK, $GLOBALS[ 'wpm_test_actions' ] );
-		$this->assertArrayHasKey( dirname( __DIR__, 2 ).'/plugin.php', $GLOBALS[ 'wpm_test_deactivation_hooks' ] );
+		$this->assertArrayHasKey( $pluginFile, $GLOBALS[ 'wpm_test_deactivation_hooks' ] );
 
-		$GLOBALS[ 'wpm_test_deactivation_hooks' ][ dirname( __DIR__, 2 ).'/plugin.php' ]();
+		$GLOBALS[ 'wpm_test_deactivation_hooks' ][ $pluginFile ]();
 
 		$this->assertFalse( wp_next_scheduled( ApplicationPasswordExpirationReaper::HOOK ) );
 	}
@@ -542,9 +544,13 @@ final class ExpirationTest extends Wpm_Test_Case {
 			new CapabilityDescriptionProvider(),
 			new MetaCapabilityRegistry(),
 			new CapabilityGroupProvider(),
-			dirname( __DIR__, 2 ).'/plugin.php',
+			$this->pluginFile(),
 			new ExpirationDatePolicy()
 		);
+	}
+
+	private function pluginFile() :string {
+		return dirname( __DIR__, 2 ).'/'.PluginIdentity::MAIN_FILE;
 	}
 
 	/**

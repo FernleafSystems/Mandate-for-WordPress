@@ -14,6 +14,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 
 final class MandateTest extends Wpm_Test_Case {
 
@@ -487,7 +488,7 @@ final class MandateTest extends Wpm_Test_Case {
 	public function testAdminAssetsEnqueueOnlyForRegisteredPageHookAndExistingDistFiles() :void {
 		$root = sys_get_temp_dir().'/mandate-admin-assets-'.bin2hex( random_bytes( 4 ) );
 		$dist = $root.'/assets/dist';
-		$pluginFile = $root.'/plugin.php';
+		$pluginFile = $root.'/'.PluginIdentity::MAIN_FILE;
 		if ( !mkdir( $dist, 0777, true ) && !is_dir( $dist ) ) {
 			throw new RuntimeException( 'Failed to create admin asset fixture directory.' );
 		}
@@ -511,7 +512,7 @@ final class MandateTest extends Wpm_Test_Case {
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_styles' ] );
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
 
-			$adminPage->enqueueAssets( 'tools_page_mandate' );
+			$adminPage->enqueueAssets( 'tools_page_'.PluginIdentity::SLUG );
 			$this->assertArrayHasKey( 'mandate-admin-page', $GLOBALS[ 'wpm_test_enqueued_styles' ] );
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
 			$this->assertSame(
@@ -748,7 +749,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->scopeRepository()->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
 		$this->assertArrayHasKey( self::UUID, $this->storedScopes() );
 
-		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		Plugin::boot( $this->pluginFile() );
 		do_action( 'wp_delete_application_password', 5, [ 'uuid' => self::UUID ] );
 
 		$this->assertArrayNotHasKey( self::UUID, $this->storedScopes() );
@@ -757,7 +758,7 @@ final class MandateTest extends Wpm_Test_Case {
 	public function testPluginDeleteHookDoesNotPruneScopeForDifferentUser() :void {
 		$this->scopeRepository()->save( self::UUID, 9, [ 'read' => true ], [], [], 1 );
 
-		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		Plugin::boot( $this->pluginFile() );
 		do_action( 'wp_delete_application_password', 5, [ 'uuid' => self::UUID ] );
 
 		$storedScopes = $this->storedScopes();
@@ -773,9 +774,13 @@ final class MandateTest extends Wpm_Test_Case {
 			new CapabilityDescriptionProvider(),
 			new MetaCapabilityRegistry(),
 			new CapabilityGroupProvider(),
-			dirname( __DIR__, 2 ).'/plugin.php',
+			$this->pluginFile(),
 			new ExpirationDatePolicy()
 		);
+	}
+
+	private function pluginFile() :string {
+		return dirname( __DIR__, 2 ).'/'.PluginIdentity::MAIN_FILE;
 	}
 
 	private function seedAdminFixture() :void {

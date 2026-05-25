@@ -1,15 +1,16 @@
 <?php
 /*
- * Plugin Name: Mandate
+ * Plugin Name: Mandate App Security
  * Plugin URI: https://wpmandate.com
  * Description: Scoping AI access for WordPress by controlling Application Password capabilities.
  * Version: 0.2.0
- * Author: FernleafSystems
+ * Author: Shield Security
+ * Author URI: https://clk.shldscrty.com/wpmandateauthoruri
  * Requires at least: 7.0
  * Requires PHP: 8.2
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: mandate
+ * Text Domain: mandate-app-security
  */
 
 if ( !defined( 'ABSPATH' ) ) {

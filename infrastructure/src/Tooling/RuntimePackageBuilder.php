@@ -2,17 +2,19 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Tooling;
 
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
 class RuntimePackageBuilder {
 
-	public const PLUGIN_SLUG = 'mandate';
+	public const PLUGIN_SLUG = PluginIdentity::SLUG;
+	public const MAIN_PLUGIN_FILE = PluginIdentity::MAIN_FILE;
 	public const VARIANT_WORDPRESS_ORG = 'wordpress-org';
 	public const VARIANT_GITHUB = 'github';
 
 	private const RUNTIME_FILES = [
-		'plugin.php',
+		self::MAIN_PLUGIN_FILE,
 		'init.php',
 		'unsupported.php',
 		'readme.txt',
@@ -207,11 +209,11 @@ class RuntimePackageBuilder {
 	}
 
 	private function addGithubUpdateUri( string $targetDir ) :void {
-		$pluginPath = Path::join( $targetDir, 'plugin.php' );
+		$pluginPath = Path::join( $targetDir, self::MAIN_PLUGIN_FILE );
 		$content = $this->readPackageFile( $pluginPath );
 
 		if ( \preg_match( '/^\s*\*\s*Update URI:/mi', $content ) === 1 ) {
-			throw new \RuntimeException( 'Packaged plugin.php already contains an Update URI header.' );
+			throw new \RuntimeException( 'Packaged '.self::MAIN_PLUGIN_FILE.' already contains an Update URI header.' );
 		}
 
 		$updated = \preg_replace(
@@ -221,7 +223,7 @@ class RuntimePackageBuilder {
 			1
 		);
 		if ( !\is_string( $updated ) || $updated === $content ) {
-			throw new \RuntimeException( 'Failed to add GitHub Update URI header to packaged plugin.php.' );
+			throw new \RuntimeException( 'Failed to add GitHub Update URI header to packaged '.self::MAIN_PLUGIN_FILE.'.' );
 		}
 
 		$this->filesystem->dumpFile( $pluginPath, $updated );

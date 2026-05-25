@@ -1,6 +1,6 @@
-# Mandate
+# Mandate App Security
 
-Mandate is a lightweight WordPress plugin for scoping AI access for WordPress by controlling what a specific WordPress Application Password can do.
+Mandate App Security is a lightweight WordPress plugin for scoping AI access for WordPress by controlling what a specific WordPress Application Password can do.
 
 ## The Problem
 
@@ -16,7 +16,7 @@ WordPress core does not currently provide a built-in way to scope one Applicatio
 
 ## The Solution
 
-Mandate for WordPress adds a small guardrail inside WordPress itself: per-password access control through a capability allowlist.
+Mandate App Security adds a small guardrail inside WordPress itself: per-password access control through a capability allowlist.
 
 In WordPress, capabilities are the lower-level permissions behind roles, such as `read`, `edit_posts`, or `upload_files`.
 
@@ -27,9 +27,9 @@ An admin can choose:
 - the capabilities that password should be allowed to use
 - an optional expiration date for that password
 
-When a request is authenticated with that Application Password, Mandate checks the saved allowlist and removes capabilities that are not allowed for that password.
+When a request is authenticated with that Application Password, Mandate App Security checks the saved allowlist and removes capabilities that are not allowed for that password.
 
-Mandate never grants new permissions. It only allows you to narrow an Application Password to capabilities the selected user already receives from their assigned role or roles. If the selected Application Password is past its saved expiration date, Mandate removes all capabilities for that request.
+Mandate App Security never grants new permissions. It only allows you to narrow an Application Password to capabilities the selected user already receives from their assigned role or roles. If the selected Application Password is past its saved expiration date, Mandate App Security removes all capabilities for that request.
 
 Normal browser and wp-admin sessions for the same user are not changed.
 
@@ -37,7 +37,7 @@ Normal browser and wp-admin sessions for the same user are not changed.
 
 This is especially useful when WordPress is connected to lower-level API tooling, automation systems, MCP layers, or AI/agent workflows that need authorisation boundaries closer to WordPress itself.
 
-Even if a tool bypasses a higher-level integration layer and calls the WordPress REST API directly, WordPress capability checks still run. Mandate uses those checks as the enforcement point, so the password itself becomes more constrained.
+Even if a tool bypasses a higher-level integration layer and calls the WordPress REST API directly, WordPress capability checks still run. Mandate App Security uses those checks as the enforcement point, so the password itself becomes more constrained.
 
 It is not a replacement for careful user roles, secure integrations, or good operational controls. It is a practical extra layer for reducing the blast radius of broad Application Password access.
 
@@ -51,7 +51,7 @@ Saved scopes are stored by Application Password UUID. No raw Application Passwor
 
 If no scope or expiration has been saved for an Application Password, the password behaves normally. Resetting a scope returns that password to normal WordPress behavior.
 
-Expiration dates are calendar dates in the site's timezone. A password remains valid through the selected date and expires on the following day. Mandate also runs a daily WordPress cron task that revokes expired Application Passwords through WordPress core.
+Expiration dates are calendar dates in the site's timezone. A password remains valid through the selected date and expires on the following day. Mandate App Security also runs a daily WordPress cron task that revokes expired Application Passwords through WordPress core.
 
 ## Current Scope
 
@@ -69,7 +69,7 @@ This release focuses on the core safety mechanism:
 - cleanup when an Application Password is deleted
 - lightweight unit and browser smoke test coverage
 
-It does not provide Application Password management screens, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords. The only automatic Application Password deletion it performs is revocation of passwords that are past a saved Mandate expiration date.
+It does not provide Application Password management screens, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords. The only automatic Application Password deletion it performs is revocation of passwords that are past a saved Mandate App Security expiration date.
 
 ## Development Notes
 

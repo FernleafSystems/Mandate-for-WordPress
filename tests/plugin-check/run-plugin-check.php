@@ -99,10 +99,10 @@ try {
 				'wp',
 				'plugin',
 				'check',
-				'mandate',
+				'mandate-app-security',
 				'--format=json',
 				'--require=./wp-content/plugins/plugin-check/cli.php',
-				'--slug=mandate',
+				'--slug=mandate-app-security',
 				'--allow-root',
 			]
 		),
