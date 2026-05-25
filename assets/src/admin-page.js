@@ -102,29 +102,31 @@ function enhanceBulkControls( root ) {
 }
 
 function enhanceExpirationSummary( root ) {
-	root.addEventListener( 'click', ( event ) => {
-		const summary = event.target.closest( '[data-wpm-expiration-summary]' );
-		if ( !summary ) {
-			return;
-		}
-
+	root.querySelectorAll( '[data-wpm-expiration-summary]' ).forEach( ( summary ) => {
 		const inputId = summary.getAttribute( 'aria-controls' );
-		const controlledInput = inputId ? document.getElementById( inputId ) : null;
-		const input = controlledInput && root.contains( controlledInput )
-			? controlledInput
-			: root.querySelector( '[data-wpm-expiration-input]' );
-		if ( !input ) {
+		const input = inputId ? document.getElementById( inputId ) : null;
+		if ( !input || !root.contains( input ) ) {
 			return;
 		}
 
-		input.focus();
-		if ( typeof input.showPicker === 'function' ) {
-			try {
-				input.showPicker();
-			} catch ( error ) {
-				// Some browsers restrict showPicker() to specific activation paths.
+		summary.hidden = false;
+		summary.setAttribute( 'aria-expanded', 'false' );
+		input.hidden = true;
+
+		summary.addEventListener( 'click', () => {
+			summary.hidden = true;
+			summary.setAttribute( 'aria-expanded', 'true' );
+			input.hidden = false;
+			input.focus();
+
+			if ( typeof input.showPicker === 'function' ) {
+				try {
+					input.showPicker();
+				} catch ( error ) {
+					// Some browsers restrict showPicker() to specific activation paths.
+				}
 			}
-		}
+		} );
 	} );
 }
 

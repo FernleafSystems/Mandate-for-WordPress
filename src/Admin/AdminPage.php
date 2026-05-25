@@ -27,6 +27,7 @@ class AdminPage {
 	private const REQUIRED_CAPABILITY = 'manage_options';
 	private const NONCE_ACTION_PREFIX = 'mandate_scope';
 	private const ASSET_HANDLE = 'mandate-admin-page';
+	private const SCOPE_FORM_ID = 'mandate-scope-form';
 	private const FORM_ACTIONS = [
 		'save_scope'  => true,
 		'clear_scope' => true,
@@ -253,8 +254,7 @@ class AdminPage {
 			$selectedUuid,
 			$capabilityGroups,
 			$selectedCaps,
-			$selectedMetaCaps,
-			$expiresOn
+			$selectedMetaCaps
 		);
 		echo '</div>';
 	}
@@ -512,7 +512,8 @@ class AdminPage {
 			: ( $expired ? sprintf( __( '%s (expired)', 'mandate' ), $expiresOn ) : $expiresOn );
 		$classes = 'button-link mandate-expiration-summary'.( $expired ? ' is-expired' : '' );
 		echo '<div class="mandate-password-summary-detail"><dt>'.esc_html__( 'Expiration Date', 'mandate' ).'</dt><dd>';
-		echo '<button type="button" class="'.esc_attr( $classes ).'" data-wpm-expiration-summary data-wpm-expiration-state="'.esc_attr( $state ).'" aria-controls="mandate-expiration-date">'.esc_html( $value ).'</button>';
+		echo '<button type="button" class="'.esc_attr( $classes ).'" data-wpm-expiration-summary data-wpm-expiration-state="'.esc_attr( $state ).'" aria-controls="mandate-expiration-date" hidden>'.esc_html( $value ).'</button>';
+		echo '<input type="date" id="mandate-expiration-date" class="mandate-expiration-input" name="expiration_date" value="'.esc_attr( $expiresOn ?? '' ).'" data-wpm-expiration-input form="'.esc_attr( self::SCOPE_FORM_ID ).'" aria-label="'.esc_attr__( 'Expiration Date', 'mandate' ).'" />';
 		echo '</dd></div>';
 	}
 
@@ -520,15 +521,13 @@ class AdminPage {
 	 * @param array{wordpress:array{primitive:array<string,true>,meta:array<string,true>},other:array{primitive:array<string,true>,meta:array<string,true>}} $capabilityGroups
 	 * @param array<string,true> $selectedCaps
 	 * @param array<string,true> $selectedMetaCaps
-	 * @param string|null $expiresOn
 	 */
 	private function renderScopeForm(
 		int $selectedUserId,
 		string $selectedUuid,
 		array $capabilityGroups,
 		array $selectedCaps,
-		array $selectedMetaCaps,
-		?string $expiresOn
+		array $selectedMetaCaps
 	) :void {
 		echo '<h2>'.esc_html__( 'Capability Scope', 'mandate' ).'</h2>';
 
@@ -536,7 +535,7 @@ class AdminPage {
 			echo '<div class="notice notice-warning"><p>'.esc_html__( 'Scopes for multisite super admins are not supported.', 'mandate' ).'</p></div>';
 		}
 
-		echo '<form method="post" action="'.esc_url( admin_url( 'tools.php?page='.Plugin::MENU_SLUG ) ).'" class="mandate-scope-form">';
+		echo '<form method="post" action="'.esc_url( admin_url( 'tools.php?page='.Plugin::MENU_SLUG ) ).'" id="'.esc_attr( self::SCOPE_FORM_ID ).'" class="mandate-scope-form">';
 		wp_nonce_field(
 			$this->nonceAction( 'save_scope', $selectedUserId, $selectedUuid ),
 			$this->nonceName( 'save_scope' )
@@ -547,11 +546,6 @@ class AdminPage {
 		);
 		echo '<input type="hidden" name="user_id" value="'.esc_attr( (string)$selectedUserId ).'" />';
 		echo '<input type="hidden" name="app_password_uuid" value="'.esc_attr( $selectedUuid ).'" />';
-		echo '<div class="mandate-field mandate-expiration-field">';
-		echo '<label for="mandate-expiration-date">'.esc_html__( 'Expiration Date', 'mandate' ).'</label>';
-		echo '<input type="date" id="mandate-expiration-date" name="expiration_date" value="'.esc_attr( $expiresOn ?? '' ).'" data-wpm-expiration-input />';
-		echo '<p class="description">'.esc_html__( 'Leave empty for no expiration.', 'mandate' ).'</p>';
-		echo '</div>';
 
 		echo '<div class="mandate-tabs" role="tablist" aria-label="'.esc_attr__( 'Capability groups', 'mandate' ).'">';
 		$this->renderTabButton( 'wordpress', __( 'WordPress', 'mandate' ), true );

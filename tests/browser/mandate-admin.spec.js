@@ -161,9 +161,15 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	} );
 	expect( Math.abs( capabilitySectionLayout.primitiveTop - capabilitySectionLayout.metaTop ) ).toBeLessThanOrEqual( 2 );
 	expect( capabilitySectionLayout.primitiveRight ).toBeLessThanOrEqual( capabilitySectionLayout.metaLeft );
+	await expect( page.locator( '#mandate-password-summary [data-wpm-expiration-input]' ) ).toHaveCount( 1 );
+	await expect( page.locator( '#mandate-scope-form [data-wpm-expiration-input]' ) ).toHaveCount( 0 );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'never' );
 	await page.locator( '[data-wpm-expiration-summary]' ).click();
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeHidden();
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeVisible();
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeFocused();
 
 	await page.locator( '[data-wpm-expiration-input]' ).fill( fixture.expiration_dates.future );
@@ -172,6 +178,8 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
 	] );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( fixture.expiration_dates.future );
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'date' );
 
 	expect( new Set( await primitiveCapabilityValues( page, 'wordpress' ) ) ).toEqual( new Set( [
@@ -247,6 +255,8 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	] );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'never' );
 
 	capabilityResponse = await scopedRequest.get( '/wp-json/mandate-test/v1/caps' );
