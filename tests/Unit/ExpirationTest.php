@@ -63,7 +63,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 		$this->assertSame( [], $record[ 'allowed_caps' ] );
 		$this->assertSame( [], $record[ 'allowed_meta_caps' ] );
 		$this->assertSame( '2026-05-24', $record[ 'expires_on' ] );
-		$this->assertNull( $record[ 'roles_at_update' ] );
+		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
 		$this->assertSame(
 			PluginOptionsRepository::CURRENT_SCHEMA_VERSION,
 			$GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ][ 'metadata' ][ 'schema_version' ]
@@ -98,7 +98,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 		$this->assertNull( $record[ 'expires_on' ] );
 		$this->assertFalse( $record[ 'capabilities_restricted' ] );
 		$this->assertSame( [], $record[ 'allowed_caps' ] );
-		$this->assertNull( $record[ 'roles_at_update' ] );
+		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
 	}
 
 	public function testMalformedStoredRestrictionFlagDefaultsToRestricted() :void {
@@ -204,6 +204,101 @@ final class ExpirationTest extends Wpm_Test_Case {
 		$this->assertFalse( $record[ 'capabilities_restricted' ] );
 		$this->assertSame( '2026-05-24', $record[ 'expires_on' ] );
 		$this->assertSame( [], $record[ 'allowed_caps' ] );
+		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
+	}
+
+	public function testAdminRenderSummarizesRestrictionStates() :void {
+		$cases = [
+			'unrestricted'    => [
+				null,
+				'Unrestricted',
+				'Never expires',
+				'never',
+			],
+			'capabilities'    => [
+				static function ( ScopeRepository $repository ) :void {
+					$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1 );
+				},
+				'Capabilities',
+				'Never expires',
+				'never',
+			],
+			'expiration'      => [
+				static function ( ScopeRepository $repository ) :void {
+					$repository->save( self::UUID, 5, [], [], [ 'wpm_editor' ], 1, '2026-05-24', false );
+				},
+				'Expiration date',
+				'2026-05-24',
+				'date',
+			],
+			'combined'        => [
+				static function ( ScopeRepository $repository ) :void {
+					$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1, '2026-05-24' );
+				},
+				'Capabilities / Expiration date',
+				'2026-05-24',
+				'date',
+			],
+			'expired'         => [
+				static function ( ScopeRepository $repository ) :void {
+					$repository->save( self::UUID, 5, [], [], [ 'wpm_editor' ], 1, '2026-05-22', false );
+				},
+				'Expiration date',
+				'2026-05-22 (expired)',
+				'expired',
+			],
+		];
+
+		foreach ( $cases as $case => [ $seedScope, $restrictionSummary, $expirationSummary, $expirationState ] ) {
+			wpm_test_reset_state();
+			$this->seedAdminFixture();
+			$repository = $this->scopeRepository();
+			if ( is_callable( $seedScope ) ) {
+				$seedScope( $repository );
+			}
+
+			$document = $this->renderAdminDocument( $repository );
+			$xpath = new DOMXPath( $document );
+			$summary = $this->summaryDetailValue( $xpath, 'Restricted Scope' );
+			$expiration = $this->summaryDetailValue( $xpath, 'Expiration Date' );
+			$expirationButton = $this->firstElement( $xpath, '//*[@data-wpm-expiration-summary]' );
+
+			$this->assertSame( $restrictionSummary, $summary, $case );
+			$this->assertSame( $expirationSummary, $expiration, $case );
+			$this->assertSame( $expirationState, $expirationButton->getAttribute( 'data-wpm-expiration-state' ), $case );
+			$this->assertNull( $this->summaryDetailValueOrNull( $xpath, 'Current Roles' ), $case );
+		}
+	}
+
+	public function testAdminRenderKeepsLegacyUnknownRoleSnapshotAsNotRecorded() :void {
+		$this->seedAdminFixture();
+		$optionsRepository = new PluginOptionsRepository();
+		$repository = $this->scopeRepository( $optionsRepository );
+		$stored = [
+			'metadata' => [
+				'schema_version' => PluginOptionsRepository::CURRENT_SCHEMA_VERSION,
+				'plugin_version' => Plugin::VERSION,
+				'created_at'     => 100,
+				'updated_at'     => 200,
+			],
+			'scopes'   => [
+				self::UUID => [
+					'user_id'                 => 5,
+					'capabilities_restricted' => false,
+					'allowed_caps'            => [],
+					'allowed_meta_caps'       => [],
+					'expires_on'              => '2026-05-24',
+					'updated_at'              => 200,
+					'updated_by'              => 1,
+				],
+			],
+		];
+		$GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] = $stored;
+
+		$document = $this->renderAdminDocument( $repository );
+
+		$this->assertSame( 'Not recorded', $this->summaryDetailValue( new DOMXPath( $document ), 'Roles When Saved' ) );
+		$this->assertSame( $stored, $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] );
 	}
 
 	public function testAdminPostSavesRestrictedRecordWithExpirationDate() :void {
@@ -411,7 +506,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 			5,
 			$capabilitiesRestricted ? [ 'read' => true ] : [],
 			[],
-			$capabilitiesRestricted ? [ 'wpm_editor' ] : [],
+			[ 'wpm_editor' ],
 			1,
 			$expiresOn,
 			$capabilitiesRestricted
@@ -524,6 +619,40 @@ final class ExpirationTest extends Wpm_Test_Case {
 		return $document;
 	}
 
+	private function summaryDetailValue( DOMXPath $xpath, string $label ) :string {
+		$value = $this->summaryDetailValueOrNull( $xpath, $label );
+		if ( $value === null ) {
+			throw new RuntimeException( 'Expected selected password summary detail for '.$label.'.' );
+		}
+
+		return $value;
+	}
+
+	private function summaryDetailValueOrNull( DOMXPath $xpath, string $label ) :?string {
+		$labelLiteral = json_encode( $label, JSON_THROW_ON_ERROR );
+		$nodes = $xpath->query( '//*[@id="mandate-password-summary"]//dt[normalize-space(.) = '.$labelLiteral.']/following-sibling::dd[1]' );
+		if ( !$nodes instanceof DOMNodeList || $nodes->length < 1 ) {
+			return null;
+		}
+
+		$node = $nodes->item( 0 );
+		return $node === null ? null : trim( $node->textContent );
+	}
+
+	private function firstElement( DOMXPath $xpath, string $query ) :DOMElement {
+		$nodes = $xpath->query( $query );
+		if ( !$nodes instanceof DOMNodeList || $nodes->length < 1 ) {
+			throw new RuntimeException( 'Expected element for query '.$query.'.' );
+		}
+
+		$node = $nodes->item( 0 );
+		if ( !$node instanceof DOMElement ) {
+			throw new RuntimeException( 'Expected query '.$query.' to return an element.' );
+		}
+
+		return $node;
+	}
+
 	/**
 	 * @param array<int,mixed> $args
 	 */
@@ -538,7 +667,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 		return $result;
 	}
 
-	private function scopeRepository() :ScopeRepository {
-		return new ScopeRepository( new PluginOptionsRepository(), new ExpirationDatePolicy() );
+	private function scopeRepository( ?PluginOptionsRepository $optionsRepository = null ) :ScopeRepository {
+		return new ScopeRepository( $optionsRepository ?? new PluginOptionsRepository(), new ExpirationDatePolicy() );
 	}
 }

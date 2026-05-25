@@ -12,6 +12,9 @@ if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * @phpstan-import-type CapabilityScopeRecord from ScopeRepository
+ */
 class CapabilityScopeEnforcer {
 
 	private ScopeRepository $scopeRepository;
@@ -121,7 +124,7 @@ class CapabilityScopeEnforcer {
 	}
 
 	/**
-	 * @return array{user_id:int,capabilities_restricted:bool,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,expires_on:string|null,roles_at_update:list<string>|null,updated_at:int,updated_by:int}|null
+	 * @return CapabilityScopeRecord|null
 	 */
 	private function scopeForCurrentRequest() :?array {
 		$uuid = $this->context->uuid();

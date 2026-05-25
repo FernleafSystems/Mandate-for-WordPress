@@ -89,6 +89,7 @@ async function primitiveCapabilityValues( page, group ) {
 }
 
 test( 'admin can manage tabbed application password scopes with progressive enhancement', async ( { page, baseURL } ) => {
+	await page.setViewportSize( { width: 1280, height: 900 } );
 	await loginAsAdmin( page );
 
 	const fixtureResponse = await page.request.get( '/wp-json/mandate-test/v1/fixture' );
@@ -124,6 +125,42 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
 	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
 	await expect( page.locator( '#mandate-password' ) ).toHaveValue( primaryPassword.uuid );
+	const selectionColumns = await page.locator( '.mandate-selection-grid > .mandate-selection-column' )
+		.evaluateAll( ( columns ) => columns.map( ( column ) => {
+			const rect = column.getBoundingClientRect();
+			return {
+				left: Math.round( rect.left ),
+				top: Math.round( rect.top ),
+				right: Math.round( rect.right ),
+			};
+		} ) );
+	expect( selectionColumns ).toHaveLength( 3 );
+	expect( Math.abs( selectionColumns[ 0 ].top - selectionColumns[ 1 ].top ) ).toBeLessThanOrEqual( 2 );
+	expect( Math.abs( selectionColumns[ 1 ].top - selectionColumns[ 2 ].top ) ).toBeLessThanOrEqual( 2 );
+	expect( selectionColumns[ 0 ].right ).toBeLessThanOrEqual( selectionColumns[ 1 ].left );
+	expect( selectionColumns[ 1 ].right ).toBeLessThanOrEqual( selectionColumns[ 2 ].left );
+
+	const activeTabColors = await page.locator( '[data-wpm-tab="wordpress"]' ).evaluate( ( tab ) => {
+		const panel = document.querySelector( '[data-wpm-panel="wordpress"]' );
+		return {
+			tab: getComputedStyle( tab ).backgroundColor,
+			panel: getComputedStyle( panel ).backgroundColor,
+		};
+	} );
+	expect( activeTabColors.tab ).toBe( activeTabColors.panel );
+
+	const capabilitySectionLayout = await page.locator( '[data-wpm-panel="wordpress"]' ).evaluate( ( panel ) => {
+		const primitive = panel.querySelector( '#mandate-wordpress-primitive-capabilities' ).getBoundingClientRect();
+		const meta = panel.querySelector( '#mandate-wordpress-meta-capabilities' ).getBoundingClientRect();
+		return {
+			primitiveTop: Math.round( primitive.top ),
+			primitiveRight: Math.round( primitive.right ),
+			metaTop: Math.round( meta.top ),
+			metaLeft: Math.round( meta.left ),
+		};
+	} );
+	expect( Math.abs( capabilitySectionLayout.primitiveTop - capabilitySectionLayout.metaTop ) ).toBeLessThanOrEqual( 2 );
+	expect( capabilitySectionLayout.primitiveRight ).toBeLessThanOrEqual( capabilitySectionLayout.metaLeft );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'never' );
 	await page.locator( '[data-wpm-expiration-summary]' ).click();
@@ -238,6 +275,10 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	);
 	expect( expirationResponse.ok() ).toBeTruthy();
 	expect( ( await expirationResponse.json() ).saved ).toBe( true );
+	await page.goto( `/wp-admin/tools.php?page=mandate&user_id=${primary.user_id}&app_password_uuid=${secondaryPassword.uuid}`, { waitUntil: 'load' } );
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'expired' );
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveText( `${fixture.expiration_dates.expired} (expired)` );
+	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveCSS( 'color', 'rgb(179, 45, 46)' );
 
 	let authResponse = await secondaryRequest.get( '/wp-json/mandate-test/v1/auth' );
 	expect( authResponse.ok() ).toBeTruthy();

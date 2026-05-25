@@ -173,7 +173,7 @@ class AdminPage {
 								$userId,
 								$allowedCaps,
 								$allowedMetaCaps,
-								$capabilitiesRestricted ? $this->roleSlugsForUser( $userId ) : [],
+								$this->roleSlugsForUser( $userId ),
 								get_current_user_id(),
 								$expiresOn,
 								$capabilitiesRestricted
@@ -326,6 +326,9 @@ class AdminPage {
 			echo '<p class="description">'.esc_html__( 'No application passwords are available for this user.', 'mandate' ).'</p>';
 		}
 		echo '</div>';
+		echo '</div>';
+
+		echo '<div class="mandate-selection-column">';
 		$this->renderPasswordSummary( $passwords, $selectedUuid, $scope, $expiresOn, $currentRoleSlugs );
 		echo '</div>';
 		echo '</div>';
@@ -430,15 +433,18 @@ class AdminPage {
 
 		echo '<div id="mandate-password-summary" class="mandate-password-summary">';
 		echo '<h2>'.esc_html__( 'Selected Password', 'mandate' ).'</h2>';
-		echo '<dl>';
+		echo '<dl class="mandate-password-summary-details">';
 		$this->renderDetailItem( __( 'Name', 'mandate' ), $password[ 'name' ] );
 		$this->renderDetailItem( __( 'UUID', 'mandate' ), $password[ 'uuid' ] );
 		$this->renderDetailItem( __( 'App ID', 'mandate' ), $password[ 'app_id' ] );
 		$this->renderDetailItem( __( 'Created', 'mandate' ), $this->formatTimestamp( $password[ 'created' ] ) );
 		$this->renderDetailItem( __( 'Last Used', 'mandate' ), $this->formatTimestamp( $password[ 'last_used' ] ) );
+		echo '</dl>';
+		echo '<div class="mandate-password-summary-divider" aria-hidden="true"></div>';
+		echo '<dl class="mandate-password-summary-details">';
 		$this->renderDetailItem(
-			__( 'Scope', 'mandate' ),
-			$scope === null || !$scope[ 'capabilities_restricted' ] ? __( 'Unrestricted', 'mandate' ) : __( 'Restricted', 'mandate' )
+			__( 'Restricted Scope', 'mandate' ),
+			$this->formatRestrictedScope( $scope, $expiresOn )
 		);
 		$this->renderExpirationDetailItem( $expiresOn );
 		if ( $scope !== null ) {
@@ -449,13 +455,27 @@ class AdminPage {
 					? __( 'Not recorded', 'mandate' )
 					: $this->formatRoleSlugs( $scope[ 'roles_at_update' ] )
 			);
-			$this->renderDetailItem( __( 'Current Roles', 'mandate' ), $this->formatRoleSlugs( $currentRoleSlugs ) );
 		}
 		echo '</dl>';
 		if ( $scope !== null && $scope[ 'roles_at_update' ] !== null && $scope[ 'roles_at_update' ] !== $currentRoleSlugs ) {
-			echo '<div class="notice notice-warning inline" data-wpm-role-snapshot-status="changed"><p>'.esc_html__( 'The selected user roles have changed since this scope was saved. Review the selected capabilities before relying on this scope.', 'mandate' ).'</p></div>';
+			echo '<div class="notice notice-warning inline" data-wpm-role-snapshot-status="changed"><p>'.esc_html__( 'The selected user roles have changed since this Mandate record was saved. Review the saved restrictions before relying on this Application Password.', 'mandate' ).'</p></div>';
 		}
 		echo '</div>';
+	}
+
+	/**
+	 * @param CapabilityScopeRecord|null $scope
+	 */
+	private function formatRestrictedScope( ?array $scope, ?string $expiresOn ) :string {
+		$restrictions = [];
+		if ( $scope !== null && $scope[ 'capabilities_restricted' ] ) {
+			$restrictions[] = __( 'Capabilities', 'mandate' );
+		}
+		if ( $expiresOn !== null ) {
+			$restrictions[] = __( 'Expiration date', 'mandate' );
+		}
+
+		return empty( $restrictions ) ? __( 'Unrestricted', 'mandate' ) : implode( ' / ', $restrictions );
 	}
 
 	/**
@@ -480,14 +500,19 @@ class AdminPage {
 	}
 
 	private function renderDetailItem( string $label, string $value ) :void {
-		echo '<div><dt>'.esc_html( $label ).'</dt><dd>'.esc_html( $value === '' ? '-' : $value ).'</dd></div>';
+		echo '<div class="mandate-password-summary-detail"><dt>'.esc_html( $label ).'</dt><dd>'.esc_html( $value === '' ? '-' : $value ).'</dd></div>';
 	}
 
 	private function renderExpirationDetailItem( ?string $expiresOn ) :void {
-		$state = $expiresOn === null ? 'never' : 'date';
-		$value = $expiresOn ?? __( 'Never expires', 'mandate' );
-		echo '<div><dt>'.esc_html__( 'Expiration Date', 'mandate' ).'</dt><dd>';
-		echo '<button type="button" class="button-link" data-wpm-expiration-summary data-wpm-expiration-state="'.esc_attr( $state ).'" aria-controls="mandate-expiration-date">'.esc_html( $value ).'</button>';
+		$expired = $this->expirationDatePolicy->isExpired( $expiresOn );
+		$state = $expiresOn === null ? 'never' : ( $expired ? 'expired' : 'date' );
+		$value = $expiresOn === null
+			? __( 'Never expires', 'mandate' )
+			// translators: %s: Application Password expiration date.
+			: ( $expired ? sprintf( __( '%s (expired)', 'mandate' ), $expiresOn ) : $expiresOn );
+		$classes = 'button-link mandate-expiration-summary'.( $expired ? ' is-expired' : '' );
+		echo '<div class="mandate-password-summary-detail"><dt>'.esc_html__( 'Expiration Date', 'mandate' ).'</dt><dd>';
+		echo '<button type="button" class="'.esc_attr( $classes ).'" data-wpm-expiration-summary data-wpm-expiration-state="'.esc_attr( $state ).'" aria-controls="mandate-expiration-date">'.esc_html( $value ).'</button>';
 		echo '</dd></div>';
 	}
 

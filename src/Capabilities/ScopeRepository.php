@@ -103,7 +103,7 @@ class ScopeRepository {
 			'allowed_caps'            => $capabilitiesRestricted ? CapabilityName::normalizeMap( $allowedCaps ) : [],
 			'allowed_meta_caps'       => $capabilitiesRestricted ? CapabilityName::normalizeMap( $allowedMetaCaps ) : [],
 			'expires_on'              => $expiresOn,
-			'roles_at_update'         => $capabilitiesRestricted ? $this->normalizeRoleSlugs( $rolesAtUpdate ) : null,
+			'roles_at_update'         => $this->normalizeRoleSlugs( $rolesAtUpdate ),
 			'updated_at'              => time(),
 			'updated_by'              => max( 0, $updatedBy ),
 		];
@@ -173,7 +173,7 @@ class ScopeRepository {
 			'allowed_caps'            => $capabilitiesRestricted ? $allowedCaps : [],
 			'allowed_meta_caps'       => $capabilitiesRestricted ? $allowedMetaCaps : [],
 			'expires_on'              => $expiresOn,
-			'roles_at_update'         => $capabilitiesRestricted ? $rolesAtUpdate : null,
+			'roles_at_update'         => $rolesAtUpdate,
 			'updated_at'              => isset( $record[ 'updated_at' ] ) ? max( 0, (int)$record[ 'updated_at' ] ) : 0,
 			'updated_by'              => isset( $record[ 'updated_by' ] ) ? max( 0, (int)$record[ 'updated_by' ] ) : 0,
 		];
