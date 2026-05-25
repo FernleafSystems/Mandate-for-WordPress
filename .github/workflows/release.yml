@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache-dir
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.composer-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-php-8.3-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.3-composer-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          check-latest: true
+          cache: npm
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Build release zips
+        run: |
+          WORDPRESS_ORG_ZIP_NAME="mandate-${GITHUB_REF_NAME}.zip"
+          GITHUB_ZIP_NAME="mandate-github-${GITHUB_REF_NAME}.zip"
+          composer build-zip -- --output="$WORDPRESS_ORG_ZIP_NAME"
+          composer build-zip -- --variant=github --skip-assets --output="$GITHUB_ZIP_NAME"
+          echo "WORDPRESS_ORG_ZIP_NAME=$WORDPRESS_ORG_ZIP_NAME" >> "$GITHUB_ENV"
+          echo "GITHUB_ZIP_NAME=$GITHUB_ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Verify release packages
+        run: |
+          php bin/verify-package.php --variant=wordpress-org --zip="${GITHUB_WORKSPACE}/build/${WORDPRESS_ORG_ZIP_NAME}"
+          php bin/verify-package.php --variant=github --zip="${GITHUB_WORKSPACE}/build/${GITHUB_ZIP_NAME}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            ${{ github.workspace }}/build/${{ env.WORDPRESS_ORG_ZIP_NAME }}
+            ${{ github.workspace }}/build/${{ env.GITHUB_ZIP_NAME }}
+          generate_release_notes: true

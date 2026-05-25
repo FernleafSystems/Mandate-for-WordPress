@@ -6,10 +6,14 @@ use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPas
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
 final class MandateTest extends Wpm_Test_Case {
 
@@ -17,7 +21,7 @@ final class MandateTest extends Wpm_Test_Case {
 	private const OTHER_UUID = '22222222-2222-4222-8222-222222222222';
 
 	public function testScopeNormalizationStoresBooleanMaps() :void {
-		$record = ( new ScopeRepository() )->normalizeRecord(
+		$record = $this->scopeRepository()->normalizeRecord(
 			[
 				'user_id'           => '12',
 				'allowed_caps'      => [
@@ -51,8 +55,123 @@ final class MandateTest extends Wpm_Test_Case {
 			$record[ 'allowed_meta_caps' ]
 		);
 		$this->assertSame( 12, $record[ 'user_id' ] );
+		$this->assertSame( null, $record[ 'roles_at_update' ] );
 		$this->assertSame( 10, $record[ 'updated_at' ] );
 		$this->assertSame( 3, $record[ 'updated_by' ] );
+	}
+
+	public function testScopeNormalizationStoresRoleSlugSnapshot() :void {
+		$repository = $this->scopeRepository();
+		$record = $repository->normalizeRecord(
+			[
+				'user_id'           => 12,
+				'allowed_caps'      => [],
+				'allowed_meta_caps' => [],
+				'roles_at_update'   => [ 'wpm_editor', 'WPM_ADMIN', '', 'shop-manager', 'wpm_editor', [] ],
+			]
+		);
+
+		$this->assertSame( [ 'shop-manager', 'wpm_admin', 'wpm_editor' ], $record[ 'roles_at_update' ] );
+
+		$record = $repository->normalizeRecord(
+			[
+				'user_id'           => 12,
+				'allowed_caps'      => [],
+				'allowed_meta_caps' => [],
+				'roles_at_update'   => 'wpm_editor',
+			]
+		);
+
+		$this->assertSame( null, $record[ 'roles_at_update' ] );
+	}
+
+	public function testPluginOptionsRepositoryStoresVersionedDocumentContract() :void {
+		$repository = $this->scopeRepository();
+
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+
+		$stored = $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] ?? null;
+		$this->assertTrue( is_array( $stored ) );
+		$metadata = $stored[ 'metadata' ];
+		$this->assertSame( PluginOptionsRepository::CURRENT_SCHEMA_VERSION, $metadata[ 'schema_version' ] );
+		$this->assertSame( Plugin::VERSION, $metadata[ 'plugin_version' ] );
+		$this->assertTrue( $metadata[ 'created_at' ] > 0 );
+		$this->assertSame( $metadata[ 'created_at' ], $metadata[ 'updated_at' ] );
+		$this->assertArrayHasKey( self::UUID, $stored[ 'scopes' ] );
+		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
+	}
+
+	public function testPluginOptionsRepositoryPreservesCreatedAtAndRefreshesUpdatedAt() :void {
+		$GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] = [
+			'metadata' => [
+				'schema_version' => PluginOptionsRepository::CURRENT_SCHEMA_VERSION,
+				'plugin_version' => '0.0.1',
+				'created_at'     => 100,
+				'updated_at'     => 200,
+			],
+			'scopes'   => [],
+		];
+
+		$this->scopeRepository()->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+
+		$metadata = $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ][ 'metadata' ];
+		$this->assertSame( 100, $metadata[ 'created_at' ] );
+		$this->assertTrue( $metadata[ 'updated_at' ] > 200 );
+		$this->assertSame( Plugin::VERSION, $metadata[ 'plugin_version' ] );
+		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
+	}
+
+	public function testPluginOptionsRepositoryFailsOpenForMalformedStoredDocumentsWithoutReadMutation() :void {
+		$validMetadata = [
+			'schema_version' => PluginOptionsRepository::CURRENT_SCHEMA_VERSION,
+			'plugin_version' => Plugin::VERSION,
+			'created_at'     => 100,
+			'updated_at'     => 100,
+		];
+		$validScope = [
+			'user_id'           => 5,
+			'allowed_caps'      => [ 'read' => true ],
+			'allowed_meta_caps' => [],
+			'updated_at'        => 100,
+			'updated_by'        => 1,
+		];
+		$cases = [
+			'scalar'                => 'bad',
+			'missing_metadata'      => [ 'scopes' => [] ],
+			'missing_scopes'        => [ 'metadata' => $validMetadata ],
+			'future_schema'         => [
+				'metadata' => [ 'schema_version' => 99, 'plugin_version' => Plugin::VERSION, 'created_at' => 100, 'updated_at' => 100 ],
+				'scopes'   => [ self::UUID => $validScope ],
+			],
+			'non_array_scopes'      => [
+				'metadata' => $validMetadata,
+				'scopes'   => 'bad',
+			],
+			'invalid_metadata'      => [
+				'metadata' => [
+					'schema_version' => PluginOptionsRepository::CURRENT_SCHEMA_VERSION,
+					'plugin_version' => Plugin::VERSION,
+					'created_at'     => 'bad',
+					'updated_at'     => 100,
+				],
+				'scopes'   => [ self::UUID => $validScope ],
+			],
+			'invalid_scope_records' => [
+				'metadata' => $validMetadata,
+				'scopes'   => [
+					self::UUID  => [ 'user_id' => 0 ],
+					'not-a-uuid' => $validScope,
+				],
+			],
+		];
+
+		foreach ( $cases as $case => $stored ) {
+			wpm_test_reset_state();
+			$GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] = $stored;
+
+			$this->assertSame( [], $this->scopeRepository()->all(), $case );
+			$this->assertSame( $stored, $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ], $case );
+		}
 	}
 
 	public function testCapabilityCandidatesComeFromAssignedRolesOnly() :void {
@@ -81,35 +200,32 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertArrayNotHasKey( 'delete_posts', $candidates );
 	}
 
-	public function testApplicationPasswordRepositoryOwnsNormalizedPasswordRecordContract() :void {
-		WP_Application_Passwords::$passwordsByUser = [
-			5 => [
-				[
-					'uuid'      => '11111111-1111-4111-8111-111111111111',
-					'name'      => 'Client App',
-					'app_id'    => 123,
-					'created'   => '10',
-					'last_used' => null,
-				],
-				[
-					'uuid' => 'not-a-uuid',
-					'name' => 'Broken',
-				],
-			],
-		];
+	public function testApplicationPasswordContextCapturesOnlyValidAuthenticatedPasswordRecords() :void {
+		$context = new CurrentApplicationPasswordContext();
 
-		$this->assertSame(
-			[
-				[
-					'uuid'      => '11111111-1111-4111-8111-111111111111',
-					'name'      => 'Client App',
-					'app_id'    => '123',
-					'created'   => 10,
-					'last_used' => 0,
-				],
-			],
-			( new ApplicationPasswordRepository() )->forUser( 5 )
+		$context->captureAuthenticatedPassword(
+			(object)[ 'ID' => 5 ],
+			[ 'uuid' => strtoupper( self::UUID ) ]
 		);
+
+		$this->assertSame( 5, $context->userId() );
+		$this->assertSame( self::UUID, $context->uuid() );
+
+		$context = new CurrentApplicationPasswordContext();
+		$context->captureAuthenticatedPassword(
+			(object)[ 'ID' => 5 ],
+			[ 'uuid' => 'not-a-uuid' ]
+		);
+		$this->assertSame( 1, $context->userId() );
+		$this->assertSame( null, $context->uuid() );
+
+		$context = new CurrentApplicationPasswordContext();
+		$context->captureAuthenticatedPassword(
+			(object)[ 'ID' => 0 ],
+			[ 'uuid' => self::UUID ]
+		);
+		$this->assertSame( 1, $context->userId() );
+		$this->assertSame( null, $context->uuid() );
 	}
 
 	public function testCapabilityGroupsClassifyWordpressPrimitiveCaps() :void {
@@ -174,13 +290,14 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testNormalRequestWithoutApplicationPasswordContextIsUnchanged() :void {
-		$repository = new ScopeRepository();
-		$repository->save( self::UUID, 5, [ 'read' => true ], [], 1 );
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
 		$enforcer = new CapabilityScopeEnforcer(
 			$repository,
 			new CapabilityCandidateProvider(),
 			new CurrentApplicationPasswordContext(),
-			new MetaCapabilityRegistry()
+			new MetaCapabilityRegistry(),
+			new ExpirationDatePolicy()
 		);
 		$allcaps = [ 'read' => true, 'edit_posts' => true ];
 
@@ -194,10 +311,11 @@ final class MandateTest extends Wpm_Test_Case {
 		$context = new CurrentApplicationPasswordContext();
 		$context->setContext( 5, self::UUID );
 		$enforcer = new CapabilityScopeEnforcer(
-			new ScopeRepository(),
+			$this->scopeRepository(),
 			new CapabilityCandidateProvider(),
 			$context,
-			new MetaCapabilityRegistry()
+			new MetaCapabilityRegistry(),
+			new ExpirationDatePolicy()
 		);
 		$allcaps = [ 'read' => true, 'edit_posts' => true ];
 
@@ -239,6 +357,27 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertTrue( $filtered[ 'edit_posts' ] );
 		$this->assertFalse( $filtered[ 'upload_files' ] );
 		$this->assertFalse( $filtered[ 'delete_posts' ] );
+	}
+
+	public function testScopedApplicationPasswordDeniesSavedCapsThatAreNoLongerRoleDerived() :void {
+		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'read' => true, 'upload_files' => true ] );
+		$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles(
+			[
+				'wpm_editor' => [
+					'read' => true,
+				],
+			]
+		);
+
+		$filtered = $enforcer->filterUserCapabilities(
+			[ 'read' => true, 'upload_files' => true ],
+			[ 'upload_files' ],
+			[ 'upload_files', 5 ],
+			(object)[ 'ID' => 5 ]
+		);
+
+		$this->assertTrue( $filtered[ 'read' ] );
+		$this->assertFalse( $filtered[ 'upload_files' ] );
 	}
 
 	public function testEnforcementNeverGrantsMissingCaps() :void {
@@ -293,6 +432,36 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 	}
 
+	public function testScopedSuperAdminMappedPrimitiveCapsOutsideAllowlistAreDenied() :void {
+		$GLOBALS[ 'wpm_test_is_multisite' ] = true;
+		$GLOBALS[ 'wpm_test_super_admins' ] = [ 5 ];
+		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'read' => true ] );
+
+		$this->assertSame(
+			[ 'do_not_allow' ],
+			$enforcer->filterMetaCaps( [ 'manage_options' ], 'manage_network_options', 5, [] )
+		);
+	}
+
+	public function testScopedSuperAdminMappedPrimitiveCapsInsideAllowlistArePreserved() :void {
+		$GLOBALS[ 'wpm_test_is_multisite' ] = true;
+		$GLOBALS[ 'wpm_test_super_admins' ] = [ 5 ];
+		$enforcer = $this->enforcerWithScope( self::UUID, 5, [ 'manage_options' => true, 'read' => true ] );
+		$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles(
+			[
+				'wpm_editor' => [
+					'manage_options' => true,
+					'read'           => true,
+				],
+			]
+		);
+
+		$this->assertSame(
+			[ 'manage_options' ],
+			$enforcer->filterMetaCaps( [ 'manage_options' ], 'manage_network_options', 5, [] )
+		);
+	}
+
 	public function testMetaCapabilityRegistryUsesMandateFilter() :void {
 		add_filter(
 			'mandate_meta_capabilities',
@@ -312,7 +481,47 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$this->adminPage()->handlePost();
 
-		$this->assertSame( [], ( new ScopeRepository() )->all() );
+		$this->assertSame( [], $this->scopeRepository()->all() );
+	}
+
+	public function testAdminAssetsEnqueueOnlyForRegisteredPageHookAndExistingDistFiles() :void {
+		$root = sys_get_temp_dir().'/mandate-admin-assets-'.bin2hex( random_bytes( 4 ) );
+		$dist = $root.'/assets/dist';
+		$pluginFile = $root.'/plugin.php';
+		if ( !mkdir( $dist, 0777, true ) && !is_dir( $dist ) ) {
+			throw new RuntimeException( 'Failed to create admin asset fixture directory.' );
+		}
+		file_put_contents( $pluginFile, "<?php\n" );
+		file_put_contents( $dist.'/admin-page.css', "body{}\n" );
+
+		try {
+			$adminPage = new AdminPage(
+				$this->scopeRepository(),
+				new ApplicationPasswordRepository(),
+				new CapabilityCandidateProvider(),
+				new CapabilityDescriptionProvider(),
+				new MetaCapabilityRegistry(),
+				new CapabilityGroupProvider(),
+				$pluginFile,
+				new ExpirationDatePolicy()
+			);
+
+			$adminPage->registerMenu();
+			$adminPage->enqueueAssets( 'dashboard_page_not_mandate' );
+			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_styles' ] );
+			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
+
+			$adminPage->enqueueAssets( 'tools_page_mandate' );
+			$this->assertArrayHasKey( 'mandate-admin-page', $GLOBALS[ 'wpm_test_enqueued_styles' ] );
+			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
+			$this->assertSame(
+				'https://example.test/wp-content/plugins/'.basename( $root ).'/assets/dist/admin-page.css',
+				$GLOBALS[ 'wpm_test_enqueued_styles' ][ 'mandate-admin-page' ][ 'src' ]
+			);
+		}
+		finally {
+			$this->removeDirectory( $root );
+		}
 	}
 
 	public function testAdminPostIgnoresUnrelatedPostRequests() :void {
@@ -321,7 +530,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$this->adminPage()->handlePost();
 
-		$this->assertSame( [], ( new ScopeRepository() )->all() );
+		$this->assertSame( [], $this->scopeRepository()->all() );
 	}
 
 	public function testAdminPostRequiresManageOptionsBeforeMutation() :void {
@@ -332,7 +541,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertThrowsRuntimeException(
 			fn() => $this->adminPage()->handlePost()
 		);
-		$this->assertSame( [], ( new ScopeRepository() )->all() );
+		$this->assertSame( [], $this->scopeRepository()->all() );
 	}
 
 	public function testAdminPostRequiresActionScopedNonceBeforeMutation() :void {
@@ -342,17 +551,17 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertThrowsRuntimeException(
 			fn() => $this->adminPage()->handlePost()
 		);
-		$this->assertSame( [], ( new ScopeRepository() )->all() );
+		$this->assertSame( [], $this->scopeRepository()->all() );
 	}
 
 	public function testAdminPostRejectsUnownedPassword() :void {
 		$this->seedAdminFixture();
 		$this->submitScopePost( 'save_scope', 5, self::OTHER_UUID, [ 'read' ], [], true );
 
-		$this->handlePostExpectRedirect( $this->adminPage() );
+		$location = $this->handlePostExpectRedirect( $this->adminPage() );
 
-		$this->assertSame( [], ( new ScopeRepository() )->all() );
-		$this->assertTrue( str_contains( (string)$GLOBALS[ 'wpm_test_last_redirect' ], 'mandate_message=invalid' ) );
+		$this->assertSame( [], $this->scopeRepository()->all() );
+		$this->assertSame( 'invalid', $this->redirectMessage( $location ) );
 	}
 
 	public function testAdminPostSavesOwnedScopeWithCandidateCapsOnly() :void {
@@ -366,46 +575,148 @@ final class MandateTest extends Wpm_Test_Case {
 			true
 		);
 
-		$repository = new ScopeRepository();
+		$repository = $this->scopeRepository();
 		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
 		$record = $repository->findForUser( 5, self::UUID );
 
+		$this->assertNotNull( $record );
+		$this->assertTrue( $record[ 'capabilities_restricted' ] );
 		$this->assertSame(
 			[ 'read' => true, 'upload_files' => true ],
 			$record[ 'allowed_caps' ]
 		);
 		$this->assertSame( [ 'edit_post' => true ], $record[ 'allowed_meta_caps' ] );
-		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ ScopeRepository::OPTION_NAME ] );
+		$this->assertNull( $record[ 'expires_on' ] );
+		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
+		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
+	}
+
+	public function testAdminPostAllSelectedScopeDeletesStoredScope() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1 );
+		$repository->save( self::OTHER_UUID, 9, [ 'read' => true ], [], [], 1 );
+		$this->submitScopePost(
+			'save_scope',
+			5,
+			self::UUID,
+			[ 'read', 'edit_posts', 'upload_files' ],
+			array_keys( ( new MetaCapabilityRegistry() )->registered() ),
+			true
+		);
+
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$storedScopes = $this->storedScopes();
+		$this->assertArrayNotHasKey( self::UUID, $storedScopes );
+		$this->assertArrayHasKey( self::OTHER_UUID, $storedScopes );
+		$this->assertSame( 'reset', $this->redirectMessage( $location ) );
+	}
+
+	public function testAdminPostRefusesMultisiteSuperAdminScopeWithoutMutation() :void {
+		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_is_multisite' ] = true;
+		$GLOBALS[ 'wpm_test_super_admins' ] = [ 5 ];
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true );
+
+		$repository = $this->scopeRepository();
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$this->assertSame( [], $repository->all() );
+		$this->assertSame( 'super_admin_unsupported', $this->redirectMessage( $location ) );
+	}
+
+	public function testAdminRenderFlagsChangedRoleSnapshot() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+
+		$html = $this->renderAdminPage( $repository );
+
+		$this->assertTrue( str_contains( $html, 'data-wpm-role-snapshot-status="changed"' ) );
+	}
+
+	public function testAdminRenderDoesNotFlagMatchingRoleSnapshot() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1 );
+
+		$html = $this->renderAdminPage( $repository );
+
+		$this->assertFalse( str_contains( $html, 'data-wpm-role-snapshot-status="changed"' ) );
+	}
+
+	public function testAdminRenderDoesNotFlagLegacyUnknownRoleSnapshot() :void {
+		$this->seedAdminFixture();
+		$optionsRepository = new PluginOptionsRepository();
+		$repository = $this->scopeRepository( $optionsRepository );
+		$optionsRepository->replaceScopes(
+			[
+				self::UUID => [
+					'user_id'           => 5,
+					'allowed_caps'      => [ 'read' => true ],
+					'allowed_meta_caps' => [],
+					'updated_at'        => 100,
+					'updated_by'        => 1,
+				],
+			]
+		);
+
+		$html = $this->renderAdminPage( $repository );
+
+		$this->assertFalse( str_contains( $html, 'data-wpm-role-snapshot-status="changed"' ) );
+	}
+
+	public function testAdminRenderAddsTooltipAttributesForDescribedCapabilitiesOnly() :void {
+		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_roles' ]->roles[ 'wpm_editor' ][ 'wpm_manage_widget' ] = true;
+
+		$html = $this->renderAdminPage( $this->scopeRepository() );
+
+		$described = $this->capabilityCodeAttributes( $html, 'upload_files' );
+		$this->assertSame( '', $described[ 'data-wpm-tooltip' ] );
+		$this->assertArrayHasKey( 'data-wpm-tooltip-text', $described );
+		$this->assertNotSame( '', $described[ 'data-wpm-tooltip-text' ] );
+		$this->assertSame( '0', $described[ 'tabindex' ] );
+
+		$custom = $this->capabilityCodeAttributes( $html, 'wpm_manage_widget' );
+		$this->assertArrayNotHasKey( 'data-wpm-tooltip', $custom );
+		$this->assertArrayNotHasKey( 'data-wpm-tooltip-text', $custom );
+		$this->assertArrayNotHasKey( 'tabindex', $custom );
 	}
 
 	public function testAdminPostClearsOnlyOwnedScope() :void {
 		$this->seedAdminFixture();
-		$repository = new ScopeRepository();
-		$repository->save( self::UUID, 5, [ 'read' => true ], [], 1 );
-		$repository->save( self::OTHER_UUID, 9, [ 'read' => true ], [], 1 );
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+		$repository->save( self::OTHER_UUID, 9, [ 'read' => true ], [], [], 1 );
 		$this->submitScopePost( 'clear_scope', 5, self::UUID, [], [], true );
 
-		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
 
 		$this->assertSame( null, $repository->findForUser( 5, self::UUID ) );
-		$this->assertArrayHasKey( self::OTHER_UUID, $repository->all() );
+		$storedScopes = $this->storedScopes();
+		$this->assertArrayNotHasKey( self::UUID, $storedScopes );
+		$this->assertArrayHasKey( self::OTHER_UUID, $storedScopes );
+		$this->assertSame( 'reset', $this->redirectMessage( $location ) );
 	}
 
 	public function testAdminPostClearRefusesScopeOwnedByDifferentUser() :void {
 		$this->seedAdminFixture();
-		$repository = new ScopeRepository();
-		$repository->save( self::UUID, 9, [ 'read' => true ], [], 1 );
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 9, [ 'read' => true ], [], [], 1 );
 		$this->submitScopePost( 'clear_scope', 5, self::UUID, [], [], true );
 
-		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
 
 		$this->assertSame( 9, $repository->find( self::UUID )[ 'user_id' ] );
-		$this->assertTrue( str_contains( (string)$GLOBALS[ 'wpm_test_last_redirect' ], 'mandate_message=invalid' ) );
+		$this->assertArrayHasKey( self::UUID, $this->storedScopes() );
+		$this->assertSame( 'invalid', $this->redirectMessage( $location ) );
 	}
 
 	public function testScopeRepositoryFindAndDeleteRequireMatchingUser() :void {
-		$repository = new ScopeRepository();
-		$repository->save( self::UUID, 5, [ 'read' => true ], [], 1 );
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
 
 		$this->assertSame( null, $repository->findForUser( 9, self::UUID ) );
 		$this->assertFalse( $repository->deleteForUser( 9, self::UUID ) );
@@ -415,8 +726,8 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testDeletedApplicationPasswordPrunesScopeRecord() :void {
-		$repository = new ScopeRepository();
-		$repository->save( self::UUID, 5, [ 'read' => true ], [], 1 );
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
 		$this->assertArrayHasKey( self::UUID, $repository->all() );
 
 		$repository->deleteForApplicationPassword( 5, [ 'uuid' => self::UUID ] );
@@ -425,22 +736,45 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testDeletedApplicationPasswordDoesNotPruneScopeForDifferentUser() :void {
-		$repository = new ScopeRepository();
-		$repository->save( self::UUID, 9, [ 'read' => true ], [], 1 );
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 9, [ 'read' => true ], [], [], 1 );
 
 		$repository->deleteForApplicationPassword( 5, [ 'uuid' => self::UUID ] );
 
 		$this->assertSame( 9, $repository->find( self::UUID )[ 'user_id' ] );
 	}
 
+	public function testPluginDeleteHookPrunesStoredScopeRecord() :void {
+		$this->scopeRepository()->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+		$this->assertArrayHasKey( self::UUID, $this->storedScopes() );
+
+		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		do_action( 'wp_delete_application_password', 5, [ 'uuid' => self::UUID ] );
+
+		$this->assertArrayNotHasKey( self::UUID, $this->storedScopes() );
+	}
+
+	public function testPluginDeleteHookDoesNotPruneScopeForDifferentUser() :void {
+		$this->scopeRepository()->save( self::UUID, 9, [ 'read' => true ], [], [], 1 );
+
+		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		do_action( 'wp_delete_application_password', 5, [ 'uuid' => self::UUID ] );
+
+		$storedScopes = $this->storedScopes();
+		$this->assertArrayHasKey( self::UUID, $storedScopes );
+		$this->assertSame( 9, $storedScopes[ self::UUID ][ 'user_id' ] );
+	}
+
 	private function adminPage( ?ScopeRepository $repository = null ) :AdminPage {
 		return new AdminPage(
-			$repository ?? new ScopeRepository(),
+			$repository ?? $this->scopeRepository(),
 			new ApplicationPasswordRepository(),
 			new CapabilityCandidateProvider(),
+			new CapabilityDescriptionProvider(),
 			new MetaCapabilityRegistry(),
 			new CapabilityGroupProvider(),
-			dirname( __DIR__, 2 ).'/plugin.php'
+			dirname( __DIR__, 2 ).'/plugin.php',
+			new ExpirationDatePolicy()
 		);
 	}
 
@@ -500,15 +834,113 @@ final class MandateTest extends Wpm_Test_Case {
 		}
 	}
 
-	private function handlePostExpectRedirect( AdminPage $adminPage ) :void {
+	private function handlePostExpectRedirect( AdminPage $adminPage ) :string {
 		try {
 			$adminPage->handlePost();
 		}
-		catch ( Wpm_Test_Redirect_Exception ) {
-			return;
+		catch ( Wpm_Test_Redirect_Exception $redirect ) {
+			return $redirect->location;
 		}
 
 		throw new RuntimeException( 'Expected admin POST to redirect.' );
+	}
+
+	private function redirectMessage( string $location ) :string {
+		$query = parse_url( $location, PHP_URL_QUERY );
+		if ( !is_string( $query ) ) {
+			return '';
+		}
+
+		parse_str( $query, $params );
+		$message = $params[ 'mandate_message' ] ?? '';
+		return is_scalar( $message ) ? (string)$message : '';
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	private function storedScopes() :array {
+		$scopes = $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ][ 'scopes' ] ?? [];
+		return is_array( $scopes ) ? $scopes : [];
+	}
+
+	private function removeDirectory( string $directory ) :void {
+		if ( !is_dir( $directory ) ) {
+			return;
+		}
+
+		$items = scandir( $directory );
+		if ( $items === false ) {
+			return;
+		}
+
+		foreach ( $items as $item ) {
+			if ( $item === '.' || $item === '..' ) {
+				continue;
+			}
+
+			$path = $directory.DIRECTORY_SEPARATOR.$item;
+			if ( is_dir( $path ) && !is_link( $path ) ) {
+				$this->removeDirectory( $path );
+			}
+			elseif ( is_file( $path ) || is_link( $path ) ) {
+				unlink( $path );
+			}
+		}
+
+		rmdir( $directory );
+	}
+
+	private function renderAdminPage( ScopeRepository $repository ) :string {
+		$_GET = [
+			'page'              => Plugin::MENU_SLUG,
+			'user_id'           => '5',
+			'app_password_uuid' => self::UUID,
+		];
+
+		ob_start();
+		try {
+			$this->adminPage( $repository )->render();
+			return (string)ob_get_clean();
+		}
+		catch ( Throwable $throwable ) {
+			ob_end_clean();
+			throw $throwable;
+		}
+	}
+
+	/**
+	 * @return array<string,string>
+	 */
+	private function capabilityCodeAttributes( string $html, string $capability ) :array {
+		$document = new DOMDocument();
+		$previous = libxml_use_internal_errors( true );
+		try {
+			$document->loadHTML( '<!doctype html><html><body>'.$html.'</body></html>' );
+			libxml_clear_errors();
+		}
+		finally {
+			libxml_use_internal_errors( $previous );
+		}
+
+		$xpath = new DOMXPath( $document );
+		$capabilityLiteral = json_encode( $capability, JSON_THROW_ON_ERROR );
+		$nodes = $xpath->query( '//code[normalize-space(.) = '.$capabilityLiteral.']' );
+		if ( !$nodes instanceof DOMNodeList || $nodes->length < 1 ) {
+			throw new RuntimeException( 'Expected rendered capability code for '.$capability.'.' );
+		}
+
+		$node = $nodes->item( 0 );
+		if ( !$node instanceof DOMElement ) {
+			throw new RuntimeException( 'Expected capability node to be an element.' );
+		}
+
+		$attributes = [];
+		foreach ( $node->attributes ?? [] as $attribute ) {
+			$attributes[ $attribute->name ] = $attribute->value;
+		}
+
+		return $attributes;
 	}
 
 	/**
@@ -550,8 +982,8 @@ final class MandateTest extends Wpm_Test_Case {
 			'roles' => [ 'wpm_editor' ],
 		];
 
-		$repository = new ScopeRepository();
-		$repository->save( $uuid, $userId, $allowedCaps, $allowedMetaCaps, 1 );
+		$repository = $this->scopeRepository();
+		$repository->save( $uuid, $userId, $allowedCaps, $allowedMetaCaps, [ 'wpm_editor' ], 1 );
 
 		$context = new CurrentApplicationPasswordContext();
 		$context->setContext( $userId, $uuid );
@@ -560,7 +992,8 @@ final class MandateTest extends Wpm_Test_Case {
 			$repository,
 			new CapabilityCandidateProvider(),
 			$context,
-			new MetaCapabilityRegistry()
+			new MetaCapabilityRegistry(),
+			new ExpirationDatePolicy()
 		);
 	}
 
@@ -569,5 +1002,9 @@ final class MandateTest extends Wpm_Test_Case {
 		$property = $reflection->getProperty( 'context' );
 		$property->setAccessible( true );
 		return $property->getValue( $enforcer );
+	}
+
+	private function scopeRepository( ?PluginOptionsRepository $optionsRepository = null ) :ScopeRepository {
+		return new ScopeRepository( $optionsRepository ?? new PluginOptionsRepository(), new ExpirationDatePolicy() );
 	}
 }

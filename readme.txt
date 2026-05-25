@@ -4,7 +4,7 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,10 +25,11 @@ An administrator can choose:
 * a WordPress user
 * one of that user's Application Passwords
 * the capabilities that password should be allowed to use
+* an optional expiration date for that password
 
 When a request is authenticated with that Application Password, Mandate checks the saved allowlist and removes capabilities that are not allowed for that password.
 
-Mandate never grants new permissions. It only narrows an Application Password to capabilities the selected user already receives from assigned roles. Normal browser and wp-admin sessions for the same user are not changed.
+Mandate never grants new permissions. It only narrows an Application Password to capabilities the selected user already receives from assigned roles. If the selected Application Password is past its saved expiration date, Mandate removes all capabilities for that request. Normal browser and wp-admin sessions for the same user are not changed.
 
 This is especially useful when WordPress is connected to lower-level API tooling, automation systems, MCP layers, or AI/agent workflows. Even if a tool calls the WordPress REST API or other WordPress API endpoints directly, WordPress capability checks still run, so the password itself becomes more constrained.
 
@@ -41,11 +42,13 @@ This release focuses on the core safety mechanism:
 * role-derived capability allowlist
 * grouped WordPress and Everything Else capability lists
 * per-Application-Password scope storage
+* optional per-Application-Password expiration dates
 * primitive capability enforcement
 * registered meta-capability enforcement
+* automatic revocation of expired Application Passwords
 * cleanup when an Application Password is deleted
 
-It does not create or delete Application Passwords, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords.
+It does not provide Application Password management screens, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords. The only automatic Application Password deletion it performs is revocation of passwords that are past a saved Mandate expiration date.
 
 == Installation ==
 
@@ -61,7 +64,11 @@ No. Scope enforcement only applies to requests authenticated by a scoped applica
 
 = What happens when no scope is saved for an application password? =
 
-The application password keeps its normal WordPress behavior until an administrator saves a scope for it.
+The application password keeps its normal WordPress behavior until an administrator saves a scope or expiration date for it.
+
+= How do expiration dates work? =
+
+Expiration dates use the site's calendar date. A password remains valid through the selected date, expires on the following day, and is then revoked by a daily WordPress cron task.
 
 = Can this grant new permissions to an application password? =
 
@@ -84,6 +91,14 @@ The public development repository is available at https://github.com/FernleafSys
 The distributed plugin includes built admin assets in `assets/dist`. To rebuild those assets from source, install the development dependencies with `composer install` and `npm ci`, run `npm run build`, and then run `composer build-zip` to create the release package.
 
 == Changelog ==
+
+= 0.2.0 =
+* Added optional per-Application-Password expiration dates and daily revocation of expired passwords.
+* Added saved-role snapshots, scope audit details, and role-change warnings.
+* Added capability descriptions and admin tooltips for common WordPress capabilities.
+* Moved scope storage into a versioned Mandate options document.
+* Improved the admin layout, selected password summary, and capability tab labels.
+* Added PHPUnit unit tests, WordPress integration tests, package verification, and GitHub release package support.
 
 = 0.1.0 =
 * Initial release.

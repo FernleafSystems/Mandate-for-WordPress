@@ -8,8 +8,11 @@
   },
   "require-dev": {
     "ext-zip": "*",
+    "phpunit/phpunit": ">=11.5 <12",
     "symfony/filesystem": "^7.0",
-    "symfony/process": "^7.0"
+    "symfony/process": "^7.0",
+    "wp-phpunit/wp-phpunit": ">=7 <8",
+    "yoast/phpunit-polyfills": ">=4 <5"
   },
   "config": {
     "platform": {
@@ -34,7 +37,12 @@
       "@php bin/build-zip.php"
     ],
     "test": "@test:unit",
-    "test:unit": "@php tests/Unit/run.php",
+    "test:unit": "vendor/bin/phpunit -c phpunit-unit.xml",
+    "test:integration": [
+      "Composer\\Config::disableProcessTimeout",
+      "@php tests/Integration/run.php"
+    ],
+    "test:integration:install": "@php bin/install-wp-tests.php",
     "test:plugin-check": "@php tests/plugin-check/run-plugin-check.php",
     "test:browser": "@php tests/browser/run-browser.php"
   },

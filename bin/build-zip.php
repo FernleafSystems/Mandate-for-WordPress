@@ -35,12 +35,15 @@ if ( !\class_exists( \ZipArchive::class ) ) {
 
 $options = \getopt( '', [
 	'output::',
+	'variant::',
 	'keep-package',
+	'skip-assets',
 ] );
 
 $projectRoot = Path::normalize( $projectRoot );
 $buildDir = Path::join( $projectRoot, 'build' );
 $keepPackage = isset( $options[ 'keep-package' ] );
+$buildAssets = !isset( $options[ 'skip-assets' ] );
 $temporaryRoot = null;
 $packageDir = null;
 $logger = static function ( string $message ) :void {
@@ -51,7 +54,8 @@ $temporaryDirectoryManager = new TemporaryDirectoryManager( $filesystem );
 
 $exitCode = 0;
 try {
-	$outputZip = resolve_output_zip( $options[ 'output' ] ?? null, $projectRoot, $buildDir );
+	$variant = resolve_package_variant( $options[ 'variant' ] ?? null );
+	$outputZip = resolve_output_zip( $options[ 'output' ] ?? null, $projectRoot, $buildDir, $variant );
 	$commandRunner = new CommandRunner( $projectRoot, $logger );
 	$packageBuilder = new RuntimePackageBuilder( $projectRoot, $commandRunner, $filesystem, $logger );
 	$zipBuilder = new ZipBuilder( $filesystem, $logger );
@@ -59,7 +63,7 @@ try {
 	$temporaryRoot = $temporaryDirectoryManager->create( 'mandate-build' );
 	$packageDir = Path::join( $temporaryRoot, RuntimePackageBuilder::PLUGIN_SLUG );
 
-	$packageBuilder->build( $packageDir, $temporaryRoot );
+	$packageBuilder->build( $packageDir, $temporaryRoot, $buildAssets, $variant );
 	$zipBuilder->build( $packageDir, $outputZip, RuntimePackageBuilder::PLUGIN_SLUG );
 }
 catch ( \Throwable $throwable ) {
@@ -85,7 +89,15 @@ finally {
 
 exit( $exitCode );
 
-function resolve_output_zip( mixed $output, string $projectRoot, string $buildDir ) :string {
+function resolve_package_variant( mixed $variant ) :string {
+	if ( !\is_string( $variant ) || \trim( $variant ) === '' ) {
+		return RuntimePackageBuilder::VARIANT_WORDPRESS_ORG;
+	}
+
+	return \trim( $variant, " \t\n\r\0\x0B\"'" );
+}
+
+function resolve_output_zip( mixed $output, string $projectRoot, string $buildDir, string $variant ) :string {
 	if ( \is_string( $output ) && \trim( $output ) !== '' ) {
 		$output = \trim( $output, " \t\n\r\0\x0B\"'" );
 		if ( Path::isAbsolute( $output ) ) {
@@ -99,9 +111,12 @@ function resolve_output_zip( mixed $output, string $projectRoot, string $buildDi
 		}
 	}
 	else {
+		$slug = $variant === RuntimePackageBuilder::VARIANT_GITHUB
+			? RuntimePackageBuilder::PLUGIN_SLUG.'-github'
+			: RuntimePackageBuilder::PLUGIN_SLUG;
 		$resolved = Path::join(
 			$buildDir,
-			RuntimePackageBuilder::PLUGIN_SLUG.'-'.\date( 'Ymd-His' ).'.zip'
+			$slug.'-'.\date( 'Ymd-His' ).'.zip'
 		);
 	}
 

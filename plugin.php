@@ -3,7 +3,7 @@
  * Plugin Name: Mandate
  * Plugin URI: https://wpmandate.com
  * Description: Scoping AI access for WordPress by controlling Application Password capabilities.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Author: FernleafSystems
  * Requires at least: 7.0
  * Requires PHP: 8.2

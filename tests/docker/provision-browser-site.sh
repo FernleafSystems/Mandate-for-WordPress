@@ -155,7 +155,7 @@ $primaryPassword = wpm_browser_fixture_password( (int)$primaryUser->ID, 'WPM Bro
 $secondaryPassword = wpm_browser_fixture_password( (int)$primaryUser->ID, 'WPM Browser Secondary' );
 $otherPassword = wpm_browser_fixture_password( (int)$otherUser->ID, 'WPM Browser Other' );
 
-update_option( 'mandate_scopes', [], false );
+( new \FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository() )->replaceScopes( [] );
 update_option(
 	'mandate_browser_fixture',
 	[
@@ -170,6 +170,10 @@ update_option(
 			],
 			'role_caps'    => [ 'read', 'edit_posts', 'upload_files', 'wpm_manage_widget' ],
 			'direct_cap'   => 'delete_posts',
+		],
+		'expiration_dates' => [
+			'expired' => '2000-01-01',
+			'future'  => wp_date( 'Y-m-d', strtotime( '+1 day' ) ),
 		],
 		'secondary_user' => [
 			'user_id'      => (int)$otherUser->ID,
