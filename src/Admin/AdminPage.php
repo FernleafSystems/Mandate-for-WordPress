@@ -158,9 +158,13 @@ class AdminPage {
 		$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
 		$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
 		$capabilitiesRestricted = !( $allowedCaps === $candidates && $allowedMetaCaps === $this->metaRegistry->registered() );
-		$adminLocked = $this->accessPolicy->canManageAnyScope()
-			? $this->postedCheckbox( 'admin_locked' )
-			: ( $scope !== null && $scope[ 'admin_locked' ] );
+		$canAdminLockScope = $this->accessPolicy->canAdminLockScopeForCaps( $candidates );
+		$adminLocked = $canAdminLockScope
+			&& (
+				$this->accessPolicy->canManageAnyScope()
+					? $this->postedCheckbox( 'admin_locked' )
+					: ( $scope !== null && $scope[ 'admin_locked' ] )
+			);
 		if ( !$capabilitiesRestricted && $expiresOn === null && !$adminLocked ) {
 			return $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
 		}

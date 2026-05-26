@@ -8,8 +8,13 @@ if ( !$summary[ 'is_visible' ] ) {
 	return;
 }
 ?>
+<?php if ( $summary[ 'title_placement' ] === 'outside' ) { ?>
+	<p id="<?php echo esc_attr( $summary[ 'title_id' ] ); ?>" class="mandate-field-title"><?php echo esc_html( $summary[ 'title' ] ); ?></p>
+<?php } ?>
 <div id="<?php echo esc_attr( $summary[ 'container_id' ] ); ?>" class="mandate-detail-summary mandate-summary-card" aria-labelledby="<?php echo esc_attr( $summary[ 'title_id' ] ); ?>">
-	<p id="<?php echo esc_attr( $summary[ 'title_id' ] ); ?>" class="mandate-summary-title"><?php echo esc_html( $summary[ 'title' ] ); ?></p>
+	<?php if ( $summary[ 'title_placement' ] === 'inside' ) { ?>
+		<p id="<?php echo esc_attr( $summary[ 'title_id' ] ); ?>" class="mandate-summary-title"><?php echo esc_html( $summary[ 'title' ] ); ?></p>
+	<?php } ?>
 	<dl class="mandate-summary-details">
 		<?php
 		foreach ( $summary[ 'details' ] as $mandateDetail ) {

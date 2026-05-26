@@ -111,6 +111,8 @@ class AdminPageViewDataBuilder {
 		$isSuperAdmin = $this->isSuperAdminUser( $selectedUserId );
 		$isReadOnly = $this->accessPolicy->isReadOnlyScope( $selectedUserId, $scope );
 		$canManageAnyScope = $this->accessPolicy->canManageAnyScope();
+		$canAdminLockScope = $this->accessPolicy->canAdminLockScopeForCaps( $candidateCaps );
+		$adminLocked = $scope !== null && $scope[ 'admin_locked' ] && $canAdminLockScope;
 
 		return [
 			'hrefs'   => [
@@ -134,15 +136,16 @@ class AdminPageViewDataBuilder {
 					$selectedUuid,
 					$scope,
 					$currentRoleSlugs,
+					$adminLocked,
 					$isReadOnly,
 					$canManageAnyScope,
-					$isSuperAdmin
+					$isSuperAdmin || !$canAdminLockScope
 				),
 				'scope_form'     => $this->buildScopeForm(
 					$selectedUserId,
 					$selectedUuid,
 					$isSuperAdmin,
-					$scope !== null && $scope[ 'admin_locked' ],
+					$adminLocked,
 					$isReadOnly,
 					$capabilityGroups,
 					$selectedCaps,
@@ -231,9 +234,10 @@ class AdminPageViewDataBuilder {
 		string $selectedUuid,
 		?array $scope,
 		array $currentRoleSlugs,
+		bool $adminLocked,
 		bool $isReadOnly,
 		bool $canManageAnyScope,
-		bool $isSuperAdmin
+		bool $adminLockDisabled
 	) :array {
 		$selectedPassword = $this->selectedPassword( $passwords, $selectedUuid );
 
@@ -248,9 +252,10 @@ class AdminPageViewDataBuilder {
 				$selectedPassword,
 				$scope,
 				$currentRoleSlugs,
+				$adminLocked,
 				$isReadOnly,
 				$canManageAnyScope,
-				$isSuperAdmin
+				$adminLockDisabled
 			),
 		];
 	}
@@ -294,26 +299,28 @@ class AdminPageViewDataBuilder {
 	private function buildPasswordInfoSummary( ?array $password ) :array {
 		if ( $password === null ) {
 			return [
-				'is_visible'   => false,
-				'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
-				'title_id'     => 'mandate-password-info-title',
-				'container_id' => 'mandate-password-info',
-				'details'      => [],
-				'warnings'     => [],
+				'is_visible'      => false,
+				'title'           => __( 'Selected Password Info', 'mandate-app-security' ),
+				'title_id'        => 'mandate-password-info-title',
+				'title_placement' => 'inside',
+				'container_id'    => 'mandate-password-info',
+				'details'         => [],
+				'warnings'        => [],
 			];
 		}
 
 		return [
-			'is_visible'   => true,
-			'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
-			'title_id'     => 'mandate-password-info-title',
-			'container_id' => 'mandate-password-info',
-			'details'      => [
+			'is_visible'      => true,
+			'title'           => __( 'Selected Password Info', 'mandate-app-security' ),
+			'title_id'        => 'mandate-password-info-title',
+			'title_placement' => 'inside',
+			'container_id'    => 'mandate-password-info',
+			'details'         => [
 				$this->textDetail( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] ),
 				$this->textDetail( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) ),
 				$this->textDetail( __( 'Last Used', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'last_used' ] ) ),
 			],
-			'warnings'     => [],
+			'warnings'        => [],
 		];
 	}
 
@@ -327,23 +334,24 @@ class AdminPageViewDataBuilder {
 		?array $password,
 		?array $scope,
 		array $currentRoleSlugs,
+		bool $adminLocked,
 		bool $isReadOnly,
 		bool $canManageAnyScope,
-		bool $isSuperAdmin
+		bool $adminLockDisabled
 	) :array {
 		if ( $password === null ) {
 			return [
-				'is_visible'   => false,
-				'title'        => __( 'Mandate Rules', 'mandate-app-security' ),
-				'title_id'     => 'mandate-rules-summary-title',
-				'container_id' => 'mandate-rules-summary',
-				'details'      => [],
-				'warnings'     => [],
+				'is_visible'      => false,
+				'title'           => __( 'Mandate Rules', 'mandate-app-security' ),
+				'title_id'        => 'mandate-rules-summary-title',
+				'title_placement' => 'outside',
+				'container_id'    => 'mandate-rules-summary',
+				'details'         => [],
+				'warnings'        => [],
 			];
 		}
 
 		$expiresOn = $scope === null ? null : $scope[ 'expires_on' ];
-		$adminLocked = $scope !== null && $scope[ 'admin_locked' ];
 		$details = [
 			$this->textDetail(
 				__( 'Restricted Scope', 'mandate-app-security' ),
@@ -351,7 +359,7 @@ class AdminPageViewDataBuilder {
 			),
 			$this->expirationDetail( $expiresOn, $isReadOnly ),
 		];
-		$adminLockDetail = $this->adminLockDetail( $adminLocked, $canManageAnyScope, $isSuperAdmin );
+		$adminLockDetail = $this->adminLockDetail( $adminLocked, $canManageAnyScope, $adminLockDisabled );
 		if ( $adminLockDetail !== null ) {
 			$details[] = $adminLockDetail;
 		}
@@ -375,12 +383,13 @@ class AdminPageViewDataBuilder {
 		}
 
 		return [
-			'is_visible'   => true,
-			'title'        => __( 'Mandate Rules', 'mandate-app-security' ),
-			'title_id'     => 'mandate-rules-summary-title',
-			'container_id' => 'mandate-rules-summary',
-			'details'      => $details,
-			'warnings'     => $warnings,
+			'is_visible'      => true,
+			'title'           => __( 'Mandate Rules', 'mandate-app-security' ),
+			'title_id'        => 'mandate-rules-summary-title',
+			'title_placement' => 'outside',
+			'container_id'    => 'mandate-rules-summary',
+			'details'         => $details,
+			'warnings'        => $warnings,
 		];
 	}
 

@@ -170,6 +170,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await selectOptionAndWait( page, page.locator( '#mandate-user' ), otherUser.user_id );
 	expect( new URL( page.url() ).searchParams.get( 'app_password_uuid' ) ).toBeNull();
 	await expect( page.locator( '#mandate-password' ) ).toHaveValue( otherPassword.uuid );
+	await expect( page.locator( '#mandate-rules-summary [data-wpm-admin-lock-input]' ) ).toBeDisabled();
 
 	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
 	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
@@ -192,8 +193,10 @@ test( 'admin can manage grouped application password scopes with progressive enh
 		Array.from( grid.querySelectorAll( '.mandate-field-title' ) )
 			.map( ( title ) => Math.round( title.getBoundingClientRect().top ) )
 	) );
-	expect( selectionTitleTops ).toHaveLength( 2 );
+	expect( selectionTitleTops ).toHaveLength( 3 );
 	expect( Math.abs( selectionTitleTops[ 0 ] - selectionTitleTops[ 1 ] ) ).toBeLessThanOrEqual( 2 );
+	expect( Math.abs( selectionTitleTops[ 1 ] - selectionTitleTops[ 2 ] ) ).toBeLessThanOrEqual( 2 );
+	await expect( page.locator( '#mandate-rules-summary #mandate-rules-summary-title' ) ).toHaveCount( 0 );
 	const passwordInfoPlacement = await page.locator( '#mandate-password' ).evaluate( ( passwordSelect ) => {
 		const passwordInfo = document.querySelector( '#mandate-password-info' );
 		const rulesSummary = document.querySelector( '#mandate-rules-summary' );

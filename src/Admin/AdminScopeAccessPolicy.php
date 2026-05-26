@@ -22,6 +22,13 @@ class AdminScopeAccessPolicy {
 			&& ( $this->canManageAnyScope() || $this->canSelfManageOwnScope( $currentUserId ) );
 	}
 
+	/**
+	 * @param array<string,true> $candidateCaps
+	 */
+	public function canAdminLockScopeForCaps( array $candidateCaps ) :bool {
+		return !isset( $candidateCaps[ self::ADMIN_CAPABILITY ] );
+	}
+
 	public function canManageAnyScope() :bool {
 		return current_user_can( self::ADMIN_CAPABILITY );
 	}

@@ -1254,6 +1254,22 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertNull( $repository->findForUser( 5, self::UUID ) );
 	}
 
+	public function testAdminPostIgnoresAdminLockForAdministratorCapableTarget() :void {
+		$this->seedAdminFixture();
+		$this->makeFixtureUserAdministratorCapable( 9 );
+		$this->submitScopePost( 'save_scope', 9, self::OTHER_UUID, [ 'read' ], [], true, true );
+
+		$repository = $this->scopeRepository();
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$record = $repository->findForUser( 9, self::OTHER_UUID );
+
+		$this->assertSame( 'saved', $this->redirectMessage( $location ) );
+		$this->assertNotNull( $record );
+		$this->assertSame( [ 'read' => true ], $record[ 'allowed_caps' ] );
+		$this->assertFalse( $record[ 'admin_locked' ] );
+		$this->assertSame( [ 'wpm_admin' ], $record[ 'roles_at_update' ] );
+	}
+
 	public function testAdminPostCanUnlockRestrictedScopeWithoutChangingRestrictions() :void {
 		$this->seedAdminFixture();
 		$repository = $this->scopeRepository();
@@ -1373,11 +1389,13 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertTrue( $selectionForm[ 'password_options' ][ 0 ][ 'selected' ] );
 		$this->assertArrayNotHasKey( 'password_summary', $selectionForm );
 		$this->assertSame( 'mandate-password-info', $selectionForm[ 'password_info' ][ 'container_id' ] );
+		$this->assertSame( 'inside', $selectionForm[ 'password_info' ][ 'title_placement' ] );
 		$this->assertSame( [ 'UUID', 'Created', 'Last Used' ], array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ) );
 		$this->assertFalse( in_array( 'Name', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
 		$this->assertFalse( in_array( 'App ID', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
 		$this->assertFalse( in_array( 'Restricted Scope', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
 		$this->assertSame( 'mandate-rules-summary', $selectionForm[ 'mandate_rules' ][ 'container_id' ] );
+		$this->assertSame( 'outside', $selectionForm[ 'mandate_rules' ][ 'title_placement' ] );
 		$this->assertSame( [ 'Restricted Scope', 'Expiration Date', 'Lock This Scope' ], array_slice( array_column( $selectionForm[ 'mandate_rules' ][ 'details' ], 'label' ), 0, 3 ) );
 		$adminLockDetail = $selectionForm[ 'mandate_rules' ][ 'details' ][ 2 ];
 		$this->assertSame( 'admin_lock', $adminLockDetail[ 'kind' ] );
@@ -1496,6 +1514,37 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->actAsUser( 5 );
 		$userXpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
 		$this->assertSame( 0, $this->nodeCount( $userXpath, '//input[@name="admin_locked"]' ) );
+	}
+
+	public function testAdminPageViewDataBuilderDisablesAdminLockForAdministratorCapablePasswordOwner() :void {
+		$this->seedAdminFixture();
+		$this->makeFixtureUserAdministratorCapable( 9 );
+		$repository = $this->scopeRepository();
+		$repository->save( self::OTHER_UUID, 9, [ 'read' => true ], [], [ 'wpm_admin' ], 1, null, true, true );
+		$_GET = [
+			'page'              => Plugin::MENU_SLUG,
+			'user_id'           => '9',
+			'app_password_uuid' => self::OTHER_UUID,
+		];
+
+		$data = $this->adminPageViewDataBuilder( $repository )->build();
+		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
+		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'mandate_rules' ][ 'details' ][ 2 ];
+
+		$this->assertSame( 'unlocked', $scopeForm[ 'admin_lock_status' ] );
+		$this->assertSame( 'admin_lock', $adminLockDetail[ 'kind' ] );
+		$this->assertFalse( $adminLockDetail[ 'input' ][ 'checked' ] );
+		$this->assertTrue( $adminLockDetail[ 'input' ][ 'disabled' ] );
+	}
+
+	public function testAdminPageRenderPlacesMandateRulesTitleOutsideSummaryCard() :void {
+		$this->seedAdminFixture();
+
+		$xpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $this->scopeRepository() ) ) );
+
+		$this->assertSame( 3, $this->nodeCount( $xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " mandate-field-title ")]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-rules-summary-title" and contains(concat(" ", normalize-space(@class), " "), " mandate-field-title ")]' ) );
+		$this->assertSame( 0, $this->nodeCount( $xpath, '//*[@id="mandate-rules-summary"]//*[@id="mandate-rules-summary-title"]' ) );
 	}
 
 	public function testAdminPageViewDataBuilderEmitsSuperAdminUnsupportedState() :void {
@@ -1918,6 +1967,14 @@ final class MandateTest extends Wpm_Test_Case {
 				],
 			],
 		];
+	}
+
+	private function makeFixtureUserAdministratorCapable( int $userId ) :void {
+		$GLOBALS[ 'wpm_test_roles' ]->roles[ 'wpm_admin' ] = [
+			'read'           => true,
+			'manage_options' => true,
+		];
+		$GLOBALS[ 'wpm_test_users' ][ $userId ]->roles = [ 'wpm_admin' ];
 	}
 
 	private function actAsUser( int $userId ) :void {

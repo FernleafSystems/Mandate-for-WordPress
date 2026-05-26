@@ -18,7 +18,7 @@ if ( !defined( 'ABSPATH' ) ) {
  * @phpstan-type AdminSummaryDetailAdminLockContract array{kind:'admin_lock',label:string,help_text:string,input:array{id:string,name:string,value:string,form:string,checked:bool,disabled:bool}}
  * @phpstan-type AdminSummaryDetailContract AdminSummaryDetailTextContract|AdminSummaryDetailExpirationContract|AdminSummaryDetailAdminLockContract
  * @phpstan-type AdminSummaryWarningContract array{classes:string,text:string,role_snapshot_status:'changed'}
- * @phpstan-type AdminSummaryContract array{is_visible:bool,title:string,title_id:string,container_id:string,details:list<AdminSummaryDetailContract>,warnings:list<AdminSummaryWarningContract>}
+ * @phpstan-type AdminSummaryContract array{is_visible:bool,title:string,title_id:string,title_placement:'inside'|'outside',container_id:string,details:list<AdminSummaryDetailContract>,warnings:list<AdminSummaryWarningContract>}
  * @phpstan-type AdminSelectionFormContract array{selected_user_id:int,selected_uuid:string,page_slug:string,role_summary:AdminRoleSummaryContract,password_options:list<AdminPasswordOptionContract>,password_info:AdminSummaryContract,mandate_rules:AdminSummaryContract}
  * @phpstan-type AdminScopeActionContract array{name:string,value:string,label:string,classes:string,disabled:bool}
  * @phpstan-type AdminCapabilityGroupingModeContract array{key:'area'|'action',label:string,checked:bool}
