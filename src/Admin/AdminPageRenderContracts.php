@@ -22,11 +22,12 @@ if ( !defined( 'ABSPATH' ) ) {
  * @phpstan-type AdminSelectionFormContract array{selected_user_id:int,selected_uuid:string,page_slug:string,role_summary:AdminRoleSummaryContract,password_options:list<AdminPasswordOptionContract>,password_summary:AdminPasswordSummaryContract}
  * @phpstan-type AdminScopeActionContract array{name:string,value:string,label:string,classes:string,disabled:bool}
  * @phpstan-type AdminScopeAdminLockContract array{is_visible:bool,name:string,value:string,label:string,checked:bool,disabled:bool}
- * @phpstan-type AdminScopeTabContract array{key:string,id:string,panel_id:string,label:string,classes:string,aria_selected:string}
- * @phpstan-type AdminCapabilityItemContract array{name:string,field_name:string,checked:bool,disabled:bool,has_tooltip:bool,tooltip_text:string}
+ * @phpstan-type AdminCapabilityGroupingModeContract array{key:'area'|'action',label:string,checked:bool}
+ * @phpstan-type AdminCapabilityGroupingContract array{label:string,default_mode:'area',config_json:string,modes:list<AdminCapabilityGroupingModeContract>}
+ * @phpstan-type AdminCapabilityItemContract array{name:string,type:'primitive'|'meta',field_name:'allowed_caps'|'allowed_meta_caps',checked:bool,disabled:bool,area:'posts'|'pages'|'media'|'taxonomy'|'comments'|'users'|'plugins'|'themes'|'general'|'network'|'privacy'|'updates'|'legacy'|'third_party',action:'read'|'create'|'edit'|'delete',has_tooltip:bool,tooltip_text:string}
  * @phpstan-type AdminCapabilitySectionContract array{id:string,label:string,empty_text:string,is_empty:bool,items:list<AdminCapabilityItemContract>}
- * @phpstan-type AdminCapabilityPanelContract array{key:string,id:string,tab_id:string,sections:list<AdminCapabilitySectionContract>,bulk_actions:array{select_all:array{label:string,state:string,disabled:bool},deselect_all:array{label:string,state:string,disabled:bool}}}
- * @phpstan-type AdminScopeFormContract array{id:string,user_id:int,uuid:string,heading:string,tablist_label:string,admin_lock_status:'locked'|'unlocked',super_admin_notice:AdminNoticeContract,lock_notice:AdminNoticeContract,admin_lock:AdminScopeAdminLockContract,tabs:list<AdminScopeTabContract>,panels:list<AdminCapabilityPanelContract>,actions:list<AdminScopeActionContract>}
+ * @phpstan-type AdminCapabilityPanelContract array{key:string,id:string,label:string,sections:list<AdminCapabilitySectionContract>,bulk_actions:array{select_all:array{label:string,state:string,disabled:bool},deselect_all:array{label:string,state:string,disabled:bool}}}
+ * @phpstan-type AdminScopeFormContract array{id:string,user_id:int,uuid:string,heading:string,admin_lock_status:'locked'|'unlocked',super_admin_notice:AdminNoticeContract,lock_notice:AdminNoticeContract,admin_lock:AdminScopeAdminLockContract,grouping:AdminCapabilityGroupingContract,panels:list<AdminCapabilityPanelContract>,actions:list<AdminScopeActionContract>}
  * @phpstan-type AdminPageRenderData array{
  *   hrefs:array{selection_form_action:string,scope_form_action:string},
  *   strings:AdminPageStringsContract,

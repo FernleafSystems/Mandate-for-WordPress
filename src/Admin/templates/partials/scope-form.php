@@ -22,23 +22,28 @@ echo $mandateLockNoticeHtml;
 	<input type="hidden" name="user_id" value="<?php echo esc_attr( $scopeForm[ 'user_id' ] ); ?>" />
 	<input type="hidden" name="app_password_uuid" value="<?php echo esc_attr( $scopeForm[ 'uuid' ] ); ?>" />
 
-	<div class="mandate-tabs" role="tablist" aria-label="<?php echo esc_attr( $scopeForm[ 'tablist_label' ] ); ?>">
+	<fieldset class="mandate-grouping-controls" data-wpm-capability-grouping>
+		<legend><?php echo esc_html( $scopeForm[ 'grouping' ][ 'label' ] ); ?></legend>
 		<?php
-		foreach ( $scopeForm[ 'tabs' ] as $mandateTab ) {
+		foreach ( $scopeForm[ 'grouping' ][ 'modes' ] as $mandateGroupingMode ) {
 			?>
-			<button type="button" id="<?php echo esc_attr( $mandateTab[ 'id' ] ); ?>" class="<?php echo esc_attr( $mandateTab[ 'classes' ] ); ?>" role="tab" data-wpm-tab="<?php echo esc_attr( $mandateTab[ 'key' ] ); ?>" aria-controls="<?php echo esc_attr( $mandateTab[ 'panel_id' ] ); ?>" aria-selected="<?php echo esc_attr( $mandateTab[ 'aria_selected' ] ); ?>"><?php echo esc_html( $mandateTab[ 'label' ] ); ?></button>
+			<label>
+				<input type="radio" name="capability_grouping_mode" value="<?php echo esc_attr( $mandateGroupingMode[ 'key' ] ); ?>" data-wpm-capability-grouping-mode<?php if ( $mandateGroupingMode[ 'checked' ] ) { ?> checked="checked"<?php } ?> />
+				<?php echo esc_html( $mandateGroupingMode[ 'label' ] ); ?>
+			</label>
 			<?php
 		}
 		?>
+	</fieldset>
+	<div class="mandate-capability-groups" data-wpm-capability-groups data-wpm-capability-mode="<?php echo esc_attr( $scopeForm[ 'grouping' ][ 'default_mode' ] ); ?>" data-wpm-capability-grouping-config="<?php echo esc_attr( $scopeForm[ 'grouping' ][ 'config_json' ] ); ?>">
+		<?php
+		foreach ( $scopeForm[ 'panels' ] as $mandatePanel ) {
+			$mandatePanelHtml = $this->render( 'partials/capability-panel.php', [ 'panel' => $mandatePanel ] );
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
+			echo $mandatePanelHtml;
+		}
+		?>
 	</div>
-
-	<?php
-	foreach ( $scopeForm[ 'panels' ] as $mandatePanel ) {
-		$mandatePanelHtml = $this->render( 'partials/capability-panel.php', [ 'panel' => $mandatePanel ] );
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-		echo $mandatePanelHtml;
-	}
-	?>
 
 	<?php
 	if ( $scopeForm[ 'admin_lock' ][ 'is_visible' ] ) {

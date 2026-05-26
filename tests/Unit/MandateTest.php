@@ -283,65 +283,179 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( null, $context->uuid() );
 	}
 
-	public function testCapabilityGroupsClassifyWordpressPrimitiveCaps() :void {
+	public function testCapabilityGroupDefinitionsCoverKnownWordpressCapabilities() :void {
+		$provider = new CapabilityGroupProvider();
+		$definitions = $provider->definitions();
+		$knownWordpressCapabilities = [
+			'activate_plugins',
+			'add_users',
+			'assign_term',
+			'create_sites',
+			'create_users',
+			'customize',
+			'delete_others_pages',
+			'delete_others_posts',
+			'delete_page',
+			'delete_pages',
+			'delete_plugins',
+			'delete_post',
+			'delete_posts',
+			'delete_private_pages',
+			'delete_private_posts',
+			'delete_published_pages',
+			'delete_published_posts',
+			'delete_site',
+			'delete_sites',
+			'delete_term',
+			'delete_themes',
+			'delete_user',
+			'delete_users',
+			'edit_comment',
+			'edit_dashboard',
+			'edit_files',
+			'edit_others_pages',
+			'edit_others_posts',
+			'edit_page',
+			'edit_pages',
+			'edit_plugins',
+			'edit_post',
+			'edit_posts',
+			'edit_private_pages',
+			'edit_private_posts',
+			'edit_published_pages',
+			'edit_published_posts',
+			'edit_term',
+			'edit_theme_options',
+			'edit_themes',
+			'edit_user',
+			'edit_users',
+			'erase_others_personal_data',
+			'export',
+			'export_others_personal_data',
+			'import',
+			'install_plugins',
+			'install_themes',
+			'level_0',
+			'level_1',
+			'level_2',
+			'level_3',
+			'level_4',
+			'level_5',
+			'level_6',
+			'level_7',
+			'level_8',
+			'level_9',
+			'level_10',
+			'list_users',
+			'manage_categories',
+			'manage_links',
+			'manage_network',
+			'manage_network_options',
+			'manage_network_plugins',
+			'manage_network_themes',
+			'manage_network_users',
+			'manage_options',
+			'manage_privacy_options',
+			'manage_sites',
+			'moderate_comments',
+			'promote_users',
+			'publish_pages',
+			'publish_posts',
+			'read',
+			'read_page',
+			'read_post',
+			'read_private_pages',
+			'read_private_posts',
+			'remove_users',
+			'resume_plugins',
+			'resume_themes',
+			'setup_network',
+			'switch_themes',
+			'unfiltered_html',
+			'unfiltered_upload',
+			'update_core',
+			'update_languages',
+			'update_plugins',
+			'update_themes',
+			'upgrade_network',
+			'upload_files',
+			'upload_plugins',
+			'upload_themes',
+			'view_site_health_checks',
+		];
+
+		$this->assertSame( [], array_values( array_diff( $knownWordpressCapabilities, array_keys( $definitions ) ) ) );
+		foreach ( $definitions as $definition ) {
+			$this->assertContains( $definition[ 'area' ], $provider->areaKeys() );
+			$this->assertContains( $definition[ 'action' ], $provider->actionKeys() );
+		}
+	}
+
+	public function testCapabilityGroupsClassifyCapabilitiesByAreaAndAction() :void {
 		$groups = ( new CapabilityGroupProvider() )->group(
 			[
 				'read'              => true,
 				'edit_posts'        => true,
+				'upload_files'      => true,
 				'wpm_manage_widget' => true,
+			],
+			[ 'read_post' => true ]
+		);
+
+		$this->assertSame(
+			[ 'posts', 'media', 'general', 'third_party' ],
+			array_column( $groups[ 'area' ], 'key' )
+		);
+		$this->assertSame(
+			[ 'read', 'create', 'edit' ],
+			array_column( $groups[ 'action' ], 'key' )
+		);
+
+		$items = $this->capabilityItemsByName( $groups[ 'items' ] );
+		$this->assertSame( [ 'area' => 'general', 'action' => 'read', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'read' ] ) );
+		$this->assertSame( [ 'area' => 'posts', 'action' => 'edit', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'edit_posts' ] ) );
+		$this->assertSame( [ 'area' => 'media', 'action' => 'create', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'upload_files' ] ) );
+		$this->assertSame( [ 'area' => 'posts', 'action' => 'read', 'type' => 'meta', 'known' => true ], $this->capabilityItemSummary( $items[ 'read_post' ] ) );
+		$this->assertSame( [ 'area' => 'third_party', 'action' => 'edit', 'type' => 'primitive', 'known' => false ], $this->capabilityItemSummary( $items[ 'wpm_manage_widget' ] ) );
+	}
+
+	public function testCapabilityGroupsInferThirdPartyActionsDeterministically() :void {
+		$groups = ( new CapabilityGroupProvider() )->group(
+			[
+				'view_widget'   => true,
+				'add_widget'    => true,
+				'delete_widget' => true,
+				'manage_widget' => true,
 			],
 			[]
 		);
+		$items = $this->capabilityItemsByName( $groups[ 'items' ] );
 
-		$this->assertSame(
-			[ 'edit_posts' => true, 'read' => true ],
-			$groups[ 'wordpress' ][ 'primitive' ]
-		);
-		$this->assertSame(
-			[ 'wpm_manage_widget' => true ],
-			$groups[ 'other' ][ 'primitive' ]
-		);
+		$this->assertSame( 'read', $items[ 'view_widget' ][ 'action' ] );
+		$this->assertSame( 'create', $items[ 'add_widget' ][ 'action' ] );
+		$this->assertSame( 'delete', $items[ 'delete_widget' ][ 'action' ] );
+		$this->assertSame( 'edit', $items[ 'manage_widget' ][ 'action' ] );
+		foreach ( $items as $item ) {
+			$this->assertSame( 'third_party', $item[ 'area' ] );
+			$this->assertFalse( $item[ 'known' ] );
+		}
 	}
 
-	public function testCapabilityGroupsSortCapabilitiesAlphabetically() :void {
-		$groups = ( new CapabilityGroupProvider() )->group(
-			[
-				'upload_files' => true,
-				'read'         => true,
-				'edit_posts'   => true,
-			],
-			[
-				'read_post'   => true,
-				'delete_post' => true,
-				'edit_post'   => true,
-			]
-		);
-
-		$this->assertSame(
-			[ 'edit_posts', 'read', 'upload_files' ],
-			array_keys( $groups[ 'wordpress' ][ 'primitive' ] )
-		);
-		$this->assertSame(
-			[ 'delete_post', 'edit_post', 'read_post' ],
-			array_keys( $groups[ 'wordpress' ][ 'meta' ] )
-		);
-	}
-
-	public function testCapabilityGroupsClassifyRegisteredMetaCaps() :void {
+	public function testCapabilityGroupsClassifyRegisteredMetaCapsWithDefinitions() :void {
 		$defaultMetaCaps = ( new MetaCapabilityRegistry() )->registered();
 		$groups = ( new CapabilityGroupProvider() )->group(
 			[],
 			$defaultMetaCaps + [ 'wpm_manage_meta' => true ]
 		);
+		$items = $this->capabilityItemsByName( $groups[ 'items' ] );
 
-		$this->assertSame(
-			$defaultMetaCaps,
-			$groups[ 'wordpress' ][ 'meta' ]
-		);
-		$this->assertSame(
-			[ 'wpm_manage_meta' => true ],
-			$groups[ 'other' ][ 'meta' ]
-		);
+		foreach ( array_keys( $defaultMetaCaps ) as $capability ) {
+			$this->assertArrayHasKey( $capability, $items );
+			$this->assertSame( 'meta', $items[ $capability ][ 'type' ] );
+			$this->assertTrue( $items[ $capability ][ 'known' ] );
+		}
+		$this->assertSame( 'third_party', $items[ 'wpm_manage_meta' ][ 'area' ] );
+		$this->assertSame( 'edit', $items[ 'wpm_manage_meta' ][ 'action' ] );
 	}
 
 	public function testNormalRequestWithoutApplicationPasswordContextIsUnchanged() :void {
@@ -905,10 +1019,12 @@ final class MandateTest extends Wpm_Test_Case {
 			[ 'edit_post', 'wpm_missing_meta' ],
 			true
 		);
+		$_POST[ 'capability_grouping_mode' ] = 'action';
 
 		$repository = $this->scopeRepository();
 		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
 		$record = $repository->findForUser( 5, self::UUID );
+		$stored = $this->storedScopes()[ self::UUID ];
 
 		$this->assertNotNull( $record );
 		$this->assertTrue( $record[ 'capabilities_restricted' ] );
@@ -919,6 +1035,9 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [ 'edit_post' => true ], $record[ 'allowed_meta_caps' ] );
 		$this->assertNull( $record[ 'expires_on' ] );
 		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
+		$this->assertArrayNotHasKey( 'grouping', $stored );
+		$this->assertArrayNotHasKey( 'area', $stored );
+		$this->assertArrayNotHasKey( 'action', $stored );
 		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
 	}
 
@@ -1122,15 +1241,25 @@ final class MandateTest extends Wpm_Test_Case {
 		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
 		$this->assertSame( 'mandate-scope-form', $scopeForm[ 'id' ] );
 		$this->assertSame( self::UUID, $scopeForm[ 'uuid' ] );
-		$this->assertSame( 'wordpress', $scopeForm[ 'tabs' ][ 0 ][ 'key' ] );
-		$this->assertSame( 'other', $scopeForm[ 'tabs' ][ 1 ][ 'key' ] );
+		$this->assertArrayNotHasKey( 'tabs', $scopeForm );
+		$this->assertSame( 'area', $scopeForm[ 'grouping' ][ 'default_mode' ] );
+		$this->assertSame( [ 'area', 'action' ], array_column( $scopeForm[ 'grouping' ][ 'modes' ], 'key' ) );
+		$this->assertSame( [ 'posts', 'pages', 'media', 'taxonomy', 'users', 'general' ], array_column( $scopeForm[ 'panels' ], 'key' ) );
 		$this->assertFalse( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
 		$this->assertSame( 'unlocked', $scopeForm[ 'admin_lock_status' ] );
 		$this->assertTrue( $scopeForm[ 'admin_lock' ][ 'is_visible' ] );
 		$this->assertFalse( $scopeForm[ 'admin_lock' ][ 'checked' ] );
 
+		$groupingConfig = json_decode( $scopeForm[ 'grouping' ][ 'config_json' ], true, 512, JSON_THROW_ON_ERROR );
+		$this->assertSame( 'area', $groupingConfig[ 'defaultMode' ] );
+		$this->assertSame( [ 'posts', 'pages', 'media', 'taxonomy', 'users', 'general' ], array_column( $groupingConfig[ 'modes' ][ 'area' ][ 'groups' ], 'key' ) );
+		$this->assertSame( [ 'read', 'create', 'edit', 'delete' ], array_column( $groupingConfig[ 'modes' ][ 'action' ][ 'groups' ], 'key' ) );
+
 		$uploadFiles = $this->capabilityItemFromViewData( $data, 'upload_files' );
 		$this->assertSame( 'allowed_caps', $uploadFiles[ 'field_name' ] );
+		$this->assertSame( 'primitive', $uploadFiles[ 'type' ] );
+		$this->assertSame( 'media', $uploadFiles[ 'area' ] );
+		$this->assertSame( 'create', $uploadFiles[ 'action' ] );
 		$this->assertTrue( $uploadFiles[ 'checked' ] );
 		$this->assertFalse( $uploadFiles[ 'disabled' ] );
 		$this->assertTrue( $uploadFiles[ 'has_tooltip' ] );
@@ -1168,7 +1297,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//div[contains(@class, "notice-info")]/p[contains(., "locked by an administrator")]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@name="allowed_caps[]" and @value="read" and @disabled="disabled"]' ) );
-		$this->assertSame( 4, $this->nodeCount( $xpath, '//*[@data-wpm-select-group and @disabled="disabled"]' ) );
+		$this->assertSame( 12, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-input and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="save_scope" and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="clear_scope" and @disabled="disabled"]' ) );
@@ -1617,6 +1746,32 @@ final class MandateTest extends Wpm_Test_Case {
 		parse_str( $query, $params );
 		$message = $params[ 'mandate_message' ] ?? '';
 		return is_scalar( $message ) ? (string)$message : '';
+	}
+
+	/**
+	 * @param list<array{name:string,type:string,area:string,action:string,known:bool}> $items
+	 * @return array<string,array{name:string,type:string,area:string,action:string,known:bool}>
+	 */
+	private function capabilityItemsByName( array $items ) :array {
+		$indexed = [];
+		foreach ( $items as $item ) {
+			$indexed[ $item[ 'name' ] ] = $item;
+		}
+
+		return $indexed;
+	}
+
+	/**
+	 * @param array{name:string,type:string,area:string,action:string,known:bool} $item
+	 * @return array{area:string,action:string,type:string,known:bool}
+	 */
+	private function capabilityItemSummary( array $item ) :array {
+		return [
+			'area'   => $item[ 'area' ],
+			'action' => $item[ 'action' ],
+			'type'   => $item[ 'type' ],
+			'known'  => $item[ 'known' ],
+		];
 	}
 
 	private function actionLinkHref( string $html ) :string {

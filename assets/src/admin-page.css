@@ -105,39 +105,38 @@
 	width: 100%;
 }
 
-.mandate-tabs {
-	align-items: flex-end;
-	border-bottom: 1px solid #c3c4c7;
+.mandate-grouping-controls {
+	align-items: center;
+	border: 0;
 	display: flex;
 	flex-wrap: wrap;
-	gap: .25rem;
-	margin: 1rem 0 0;
-	padding: .25rem .25rem 0;
+	gap: .5rem 1rem;
+	margin: 1rem 0;
+	padding: 0;
 }
 
-.mandate-tabs .nav-tab {
-	align-items: center;
-	box-sizing: border-box;
-	cursor: pointer;
-	display: inline-flex;
-	float: none;
-	margin: 0 0 -1px;
-	min-height: 36px;
-}
-
-.mandate-tabs .nav-tab.nav-tab-active,
-.mandate-tabs .nav-tab.nav-tab-active:hover,
-.mandate-tabs .nav-tab.nav-tab-active:focus {
-	background: #fff;
-	border-bottom-color: #fff;
+.mandate-grouping-controls legend {
 	color: #1d2327;
+	font-weight: 600;
+	margin-right: .25rem;
+	padding: 0;
+}
+
+.mandate-grouping-controls label {
+	align-items: center;
+	display: inline-flex;
+	gap: .35rem;
+	margin: 0;
+}
+
+.mandate-capability-groups {
+	display: grid;
+	gap: .85rem;
+	margin-bottom: 1rem;
 }
 
 .mandate-capability-panel {
-	border-top: 0;
-	border-top-left-radius: 0;
-	border-top-right-radius: 0;
-	margin-bottom: 1rem;
+	margin: 0;
 }
 
 .mandate-panel-heading {
@@ -145,8 +144,14 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: .75rem;
-	justify-content: flex-end;
+	justify-content: space-between;
 	margin-bottom: .75rem;
+}
+
+.mandate-panel-heading h3 {
+	font-size: 1rem;
+	line-height: 1.4;
+	margin: 0;
 }
 
 .mandate-panel-heading p {

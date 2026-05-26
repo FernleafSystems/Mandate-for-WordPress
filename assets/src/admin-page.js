@@ -53,42 +53,18 @@ function enhanceSelectionForm( root ) {
 	}
 }
 
-function enhanceTabs( root ) {
-	const tabs = Array.from( root.querySelectorAll( '[data-wpm-tab]' ) );
-	const panels = Array.from( root.querySelectorAll( '[data-wpm-panel]' ) );
-	if ( !tabs.length || !panels.length ) {
-		return;
-	}
-
-	function activate( group ) {
-		tabs.forEach( ( tab ) => {
-			const active = tab.dataset.wpmTab === group;
-			tab.classList.toggle( 'nav-tab-active', active );
-			tab.setAttribute( 'aria-selected', active ? 'true' : 'false' );
-			tab.tabIndex = active ? 0 : -1;
-		} );
-
-		panels.forEach( ( panel ) => {
-			panel.hidden = panel.dataset.wpmPanel !== group;
-		} );
-	}
-
-	tabs.forEach( ( tab ) => {
-		tab.addEventListener( 'click', () => activate( tab.dataset.wpmTab ) );
-	} );
-
-	activate( tabs[ 0 ].dataset.wpmTab );
-}
-
 function enhanceBulkControls( root ) {
 	root.addEventListener( 'click', ( event ) => {
-		const button = event.target.closest( '[data-wpm-select-group]' );
+		if ( !( event.target instanceof Element ) ) {
+			return;
+		}
+
+		const button = event.target.closest( '[data-wpm-select-panel]' );
 		if ( !button || button.disabled ) {
 			return;
 		}
 
-		const group = button.dataset.wpmSelectGroup;
-		const panel = root.querySelector( `[data-wpm-panel="${group}"]` );
+		const panel = button.closest( '[data-wpm-capability-panel]' );
 		if ( !panel ) {
 			return;
 		}
@@ -98,6 +74,139 @@ function enhanceBulkControls( root ) {
 			.forEach( ( input ) => {
 				input.checked = checked;
 			} );
+	} );
+}
+
+function parseGroupingConfig( container ) {
+	const configValue = container.dataset.wpmCapabilityGroupingConfig;
+	if ( !configValue ) {
+		return null;
+	}
+
+	try {
+		return JSON.parse( configValue );
+	} catch ( error ) {
+		return null;
+	}
+}
+
+function capabilityItemAttribute( item, mode ) {
+	return mode === 'action' ? item.dataset.wpmCapabilityAction : item.dataset.wpmCapabilityArea;
+}
+
+function capabilityItemSubAttribute( item, mode ) {
+	return mode === 'action' ? item.dataset.wpmCapabilityArea : item.dataset.wpmCapabilityAction;
+}
+
+function createBulkButton( action ) {
+	const button = document.createElement( 'button' );
+	button.type = 'button';
+	button.className = 'button';
+	button.dataset.wpmSelectPanel = '';
+	button.dataset.wpmSelectState = action.state;
+	button.textContent = action.label;
+	button.disabled = Boolean( action.disabled );
+	return button;
+}
+
+function createCapabilitySection( mode, group, subgroup, items ) {
+	const section = document.createElement( 'fieldset' );
+	section.id = `mandate-${mode}-${group.key}-${subgroup.key}-capabilities`;
+	section.className = 'mandate-capability-section';
+
+	const legend = document.createElement( 'legend' );
+	legend.textContent = subgroup.label;
+	section.appendChild( legend );
+
+	const list = document.createElement( 'div' );
+	list.className = 'mandate-capability-list';
+	items.forEach( ( item ) => list.appendChild( item ) );
+	section.appendChild( list );
+
+	return section;
+}
+
+function createCapabilityPanel( mode, group, config, allItems ) {
+	const sections = [];
+	group.subgroups.forEach( ( subgroup ) => {
+		const items = allItems.filter( ( item ) => (
+			capabilityItemAttribute( item, mode ) === group.key
+			&& capabilityItemSubAttribute( item, mode ) === subgroup.key
+		) );
+		if ( items.length ) {
+			sections.push( createCapabilitySection( mode, group, subgroup, items ) );
+		}
+	} );
+
+	if ( !sections.length ) {
+		return null;
+	}
+
+	const panel = document.createElement( 'section' );
+	panel.id = `mandate-capability-${mode}-${group.key}`;
+	panel.className = 'mandate-capability-panel';
+	panel.dataset.wpmCapabilityPanel = group.key;
+
+	const heading = document.createElement( 'div' );
+	heading.className = 'mandate-panel-heading';
+	const title = document.createElement( 'h3' );
+	title.textContent = group.label;
+	heading.appendChild( title );
+
+	const actions = document.createElement( 'p' );
+	actions.appendChild( createBulkButton( config.bulkActions.selectAll ) );
+	actions.appendChild( document.createTextNode( ' ' ) );
+	actions.appendChild( createBulkButton( config.bulkActions.deselectAll ) );
+	heading.appendChild( actions );
+	panel.appendChild( heading );
+
+	const scroll = document.createElement( 'div' );
+	scroll.className = 'mandate-capability-scroll';
+	sections.forEach( ( section ) => scroll.appendChild( section ) );
+	panel.appendChild( scroll );
+
+	return panel;
+}
+
+function renderCapabilityGroups( container, config, mode ) {
+	const modeConfig = config.modes[ mode ];
+	if ( !modeConfig ) {
+		return;
+	}
+
+	const allItems = Array.from( container.querySelectorAll( '[data-wpm-capability-item]' ) );
+	const fragment = document.createDocumentFragment();
+	modeConfig.groups.forEach( ( group ) => {
+		const panel = createCapabilityPanel( mode, group, config, allItems );
+		if ( panel ) {
+			fragment.appendChild( panel );
+		}
+	} );
+
+	container.replaceChildren( fragment );
+	container.dataset.wpmCapabilityMode = mode;
+}
+
+function enhanceCapabilityGrouping( root ) {
+	const form = root.querySelector( '.mandate-scope-form' );
+	if ( !form ) {
+		return;
+	}
+
+	const container = form.querySelector( '[data-wpm-capability-groups]' );
+	const config = container ? parseGroupingConfig( container ) : null;
+	const controls = Array.from( form.querySelectorAll( '[data-wpm-capability-grouping-mode]' ) );
+	if ( !container || !config || !controls.length ) {
+		return;
+	}
+
+	controls.forEach( ( control ) => {
+		control.addEventListener( 'change', () => {
+			if ( control.checked ) {
+				hideTooltip();
+				renderCapabilityGroups( container, config, control.value );
+			}
+		} );
 	} );
 }
 
@@ -253,7 +362,7 @@ function enhanceTooltips( root ) {
 	} );
 
 	root.addEventListener( 'click', ( event ) => {
-		if ( event.target instanceof Element && event.target.closest( '[data-wpm-tab]' ) ) {
+		if ( event.target instanceof Element && event.target.closest( '[data-wpm-capability-grouping], [data-wpm-select-panel]' ) ) {
 			hideTooltip();
 		}
 	} );
@@ -263,8 +372,8 @@ document.addEventListener( 'DOMContentLoaded', () => {
 	document.querySelectorAll( '.mandate' ).forEach( ( root ) => {
 		root.classList.add( 'is-wpm-enhanced' );
 		enhanceSelectionForm( root );
-		enhanceTabs( root );
 		enhanceBulkControls( root );
+		enhanceCapabilityGrouping( root );
 		enhanceExpirationSummary( root );
 		enhanceTooltips( root );
 	} );

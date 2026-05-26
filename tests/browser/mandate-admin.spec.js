@@ -81,11 +81,11 @@ async function selectOptionWithDelayedNavigation( page, locator, value, expected
 }
 
 function primitiveCapInput( page, group, capability ) {
-	return page.locator( `#mandate-${group}-primitive-capabilities input[name="allowed_caps[]"][value="${capability}"]` );
+	return page.locator( `[data-wpm-capability-panel="${group}"] input[name="allowed_caps[]"][value="${capability}"]` );
 }
 
 function primitiveCapTooltipTarget( page, group, capability ) {
-	return page.locator( `#mandate-${group}-primitive-capabilities [data-wpm-tooltip]` ).filter( { hasText: capability } );
+	return page.locator( `[data-wpm-capability-panel="${group}"] [data-wpm-tooltip]` ).filter( { hasText: capability } );
 }
 
 function anyPrimitiveCapInput( page, capability ) {
@@ -93,11 +93,15 @@ function anyPrimitiveCapInput( page, capability ) {
 }
 
 async function primitiveCapabilityValues( page, group ) {
-	return page.locator( `#mandate-${group}-primitive-capabilities input[name="allowed_caps[]"]` )
+	return page.locator( `[data-wpm-capability-panel="${group}"] input[name="allowed_caps[]"]` )
 		.evaluateAll( ( inputs ) => inputs.map( ( input ) => input.value ) );
 }
 
-test( 'admin can manage tabbed application password scopes with progressive enhancement', async ( { page, baseURL } ) => {
+async function selectGroupingMode( page, mode ) {
+	await page.locator( `input[name="capability_grouping_mode"][value="${mode}"]` ).check();
+}
+
+test( 'admin can manage grouped application password scopes with progressive enhancement', async ( { page, baseURL } ) => {
 	await page.setViewportSize( { width: 1280, height: 900 } );
 	await loginAsAdmin( page );
 
@@ -194,27 +198,18 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	expect( mobileSelectionColumns[ 1 ].top ).toBeLessThan( mobileSelectionColumns[ 2 ].top );
 	await page.setViewportSize( { width: 1280, height: 900 } );
 
-	const activeTabColors = await page.locator( '[data-wpm-tab="wordpress"]' ).evaluate( ( tab ) => {
-		const panel = document.querySelector( '[data-wpm-panel="wordpress"]' );
-		return {
-			tab: getComputedStyle( tab ).backgroundColor,
-			panel: getComputedStyle( panel ).backgroundColor,
-		};
-	} );
-	expect( activeTabColors.tab ).toBe( activeTabColors.panel );
-
-	const capabilitySectionLayout = await page.locator( '[data-wpm-panel="wordpress"]' ).evaluate( ( panel ) => {
-		const primitive = panel.querySelector( '#mandate-wordpress-primitive-capabilities' ).getBoundingClientRect();
-		const meta = panel.querySelector( '#mandate-wordpress-meta-capabilities' ).getBoundingClientRect();
-		return {
-			primitiveTop: Math.round( primitive.top ),
-			primitiveRight: Math.round( primitive.right ),
-			metaTop: Math.round( meta.top ),
-			metaLeft: Math.round( meta.left ),
-		};
-	} );
-	expect( Math.abs( capabilitySectionLayout.primitiveTop - capabilitySectionLayout.metaTop ) ).toBeLessThanOrEqual( 2 );
-	expect( capabilitySectionLayout.primitiveRight ).toBeLessThanOrEqual( capabilitySectionLayout.metaLeft );
+	await expect( page.locator( 'input[name="capability_grouping_mode"][value="area"]' ) ).toBeChecked();
+	await expect( page.locator( 'input[name="capability_grouping_mode"][value="action"]' ) ).not.toBeChecked();
+	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).toBeChecked();
+	await selectGroupingMode( page, 'action' );
+	await expect( page.locator( '[data-wpm-capability-groups]' ) ).toHaveAttribute( 'data-wpm-capability-mode', 'action' );
+	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
+	await expect( primitiveCapInput( page, 'create', 'upload_files' ) ).toBeChecked();
+	await primitiveCapInput( page, 'create', 'upload_files' ).uncheck();
+	await selectGroupingMode( page, 'area' );
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).not.toBeChecked();
+	await primitiveCapInput( page, 'media', 'upload_files' ).check();
 	await expect( page.locator( '#mandate-password-summary [data-wpm-expiration-input]' ) ).toHaveCount( 1 );
 	await expect( page.locator( '#mandate-scope-form [data-wpm-expiration-input]' ) ).toHaveCount( 0 );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
@@ -236,19 +231,17 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'date' );
 
-	expect( new Set( await primitiveCapabilityValues( page, 'wordpress' ) ) ).toEqual( new Set( [
-		'edit_posts',
-		'read',
-		'upload_files',
-	] ) );
-	expect( new Set( await primitiveCapabilityValues( page, 'other' ) ) ).toEqual( new Set( [ 'wpm_manage_widget' ] ) );
+	expect( new Set( await primitiveCapabilityValues( page, 'posts' ) ) ).toEqual( new Set( [ 'edit_posts' ] ) );
+	expect( new Set( await primitiveCapabilityValues( page, 'general' ) ) ).toEqual( new Set( [ 'read' ] ) );
+	expect( new Set( await primitiveCapabilityValues( page, 'media' ) ) ).toEqual( new Set( [ 'upload_files' ] ) );
+	expect( new Set( await primitiveCapabilityValues( page, 'third_party' ) ) ).toEqual( new Set( [ 'wpm_manage_widget' ] ) );
 
 	await expect( anyPrimitiveCapInput( page, primary.direct_cap ) ).toHaveCount( 0 );
 	await expect( anyPrimitiveCapInput( page, fixture.unassigned_role_cap ) ).toHaveCount( 0 );
 
-	const uploadFilesName = primitiveCapTooltipTarget( page, 'wordpress', 'upload_files' );
+	const uploadFilesName = primitiveCapTooltipTarget( page, 'media', 'upload_files' );
 	await expect( uploadFilesName ).toHaveAttribute( 'data-wpm-tooltip', '' );
-	await expect( primitiveCapTooltipTarget( page, 'other', 'wpm_manage_widget' ) ).toHaveCount( 0 );
+	await expect( primitiveCapTooltipTarget( page, 'third_party', 'wpm_manage_widget' ) ).toHaveCount( 0 );
 
 	const scopedRequest = await request.newContext( {
 		baseURL,
@@ -267,30 +260,27 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	expect( capabilities.delete_posts ).toBe( true );
 	expect( capabilities.wpm_manage_widget ).toBe( true );
 
-	await page.locator( '[data-wpm-panel="wordpress"] [data-wpm-select-state="unchecked"]' ).click();
-	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).not.toBeChecked();
-	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
-	await expect( primitiveCapInput( page, 'other', 'wpm_manage_widget' ) ).toBeChecked();
+	await page.locator( '[data-wpm-capability-panel="media"] [data-wpm-select-state="unchecked"]' ).click();
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).not.toBeChecked();
+	await expect( primitiveCapInput( page, 'general', 'read' ) ).toBeChecked();
+	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
 
-	await page.locator( '[data-wpm-panel="wordpress"] [data-wpm-select-state="checked"]' ).click();
-	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).toBeChecked();
-	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
+	await page.locator( '[data-wpm-capability-panel="media"] [data-wpm-select-state="checked"]' ).click();
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).toBeChecked();
 
-	await page.locator( '[data-wpm-tab="other"]' ).click();
-	await page.locator( '[data-wpm-panel="other"] [data-wpm-select-state="unchecked"]' ).click();
-	await expect( primitiveCapInput( page, 'other', 'wpm_manage_widget' ) ).not.toBeChecked();
-	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).toBeChecked();
-	await page.locator( '[data-wpm-panel="other"] [data-wpm-select-state="checked"]' ).click();
-	await expect( primitiveCapInput( page, 'other', 'wpm_manage_widget' ) ).toBeChecked();
+	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-state="unchecked"]' ).click();
+	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).not.toBeChecked();
+	await expect( primitiveCapInput( page, 'general', 'read' ) ).toBeChecked();
+	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-state="checked"]' ).click();
+	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
 
-	await page.locator( '[data-wpm-tab="wordpress"]' ).click();
-	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
+	await primitiveCapInput( page, 'media', 'upload_files' ).uncheck();
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
 		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
 	] );
-	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
-	await expect( primitiveCapInput( page, 'wordpress', 'edit_posts' ) ).toBeChecked();
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).not.toBeChecked();
+	await expect( primitiveCapInput( page, 'posts', 'edit_posts' ) ).toBeChecked();
 
 	capabilityResponse = await scopedRequest.get( '/wp-json/mandate-test/v1/caps' );
 	expect( capabilityResponse.ok() ).toBeTruthy();
@@ -307,7 +297,7 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 		page.waitForNavigation( { waitUntil: 'load' } ),
 		page.locator( 'button[name="mandate_action"][value="clear_scope"]' ).click(),
 	] );
-	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).toBeChecked();
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
@@ -387,7 +377,7 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await page.goto( '/wp-admin/tools.php?page=mandate-app-security', { waitUntil: 'load' } );
 	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
 	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
-	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
+	await primitiveCapInput( page, 'media', 'upload_files' ).uncheck();
 	await page.locator( 'input[name="admin_locked"]' ).check();
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
@@ -407,10 +397,10 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
 	await expect( page.getByText( 'This application password scope is locked by an administrator.' ) ).toBeVisible();
 	await expect( page.locator( 'input[name="admin_locked"]' ) ).toHaveCount( 0 );
-	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
-	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeDisabled();
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).not.toBeChecked();
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).toBeDisabled();
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeDisabled();
-	await expect( page.locator( '[data-wpm-panel="wordpress"] [data-wpm-select-state="unchecked"]' ) ).toBeDisabled();
+	await expect( page.locator( '[data-wpm-capability-panel="media"] [data-wpm-select-state="unchecked"]' ) ).toBeDisabled();
 	await expect( page.locator( 'button[name="mandate_action"][value="save_scope"]' ) ).toBeDisabled();
 	await expect( page.locator( 'button[name="mandate_action"][value="clear_scope"]' ) ).toBeDisabled();
 
@@ -440,6 +430,6 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	expect( new URL( forged.url ).searchParams.get( 'mandate_message' ) ).toBe( 'locked' );
 
 	await page.reload( { waitUntil: 'load' } );
-	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
+	await expect( primitiveCapInput( page, 'media', 'upload_files' ) ).not.toBeChecked();
 	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
 } );
