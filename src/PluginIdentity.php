@@ -15,4 +15,9 @@ final class PluginIdentity {
 	public const CONTRIBUTOR = 'paultgoodchild';
 	public const PACKAGE_ROOT = self::SLUG.'/';
 	public const GITHUB_ASSET_PREFIX = self::SLUG.'-github';
+	public const LEGACY_GITHUB_ASSET_PREFIX = 'mandate-github';
+	public const GITHUB_ASSET_PREFIXES = [
+		self::GITHUB_ASSET_PREFIX,
+		self::LEGACY_GITHUB_ASSET_PREFIX,
+	];
 }

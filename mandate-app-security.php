@@ -3,7 +3,7 @@
  * Plugin Name: Mandate App Security
  * Plugin URI: https://wpmandate.com
  * Description: Scoping AI access for WordPress by controlling Application Password capabilities.
- * Version: 0.3.0
+ * Version: 0.3.1
  * Author: Shield Security
  * Author URI: https://clk.shldscrty.com/wpmandateauthoruri
  * Requires at least: 7.0

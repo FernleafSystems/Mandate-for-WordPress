@@ -97,6 +97,7 @@ function mandate_verify_zip_entries( ZipArchive $zip ) :array {
 		MANDATE_PACKAGE_ROOT.MANDATE_MAIN_PLUGIN_FILE,
 		MANDATE_PACKAGE_ROOT.'init.php',
 		MANDATE_PACKAGE_ROOT.'composer.json',
+		MANDATE_PACKAGE_ROOT.'src/PluginIdentity.php',
 		MANDATE_PACKAGE_ROOT.'vendor/autoload.php',
 	] as $requiredEntry ) {
 		if ( !\in_array( $requiredEntry, $entries, true ) ) {
@@ -166,10 +167,21 @@ function mandate_verify_github_package( ZipArchive $zip, array $entries ) :void 
 		'https://github.com/FernleafSystems/Mandate-for-WordPress/',
 		'PluginIdentity::MAIN_FILE',
 		'PluginIdentity::SLUG',
-		'PluginIdentity::GITHUB_ASSET_PREFIX',
+		'PluginIdentity::GITHUB_ASSET_PREFIXES',
 	] as $token ) {
 		if ( !\str_contains( $updater, $token ) ) {
 			throw new \RuntimeException( 'GitHub updater bootstrap is missing expected token: '.$token );
+		}
+	}
+
+	$identity = mandate_verify_read_entry( $zip, MANDATE_PACKAGE_ROOT.'src/PluginIdentity.php' );
+	foreach ( [
+		'GITHUB_ASSET_PREFIX',
+		'LEGACY_GITHUB_ASSET_PREFIX',
+		'GITHUB_ASSET_PREFIXES',
+	] as $token ) {
+		if ( !\str_contains( $identity, $token ) ) {
+			throw new \RuntimeException( 'GitHub package identity is missing expected token: '.$token );
 		}
 	}
 
@@ -220,7 +232,10 @@ function mandate_verify_no_updater_tokens( ZipArchive $zip, array $entries ) :vo
 		'PluginUpdateChecker',
 		'PucFactory',
 		'plugin-update-checker',
-		PluginIdentity::GITHUB_ASSET_PREFIX.'-',
+		...array_map(
+			static fn( string $assetPrefix ) :string => $assetPrefix.'-',
+			PluginIdentity::GITHUB_ASSET_PREFIXES
+		),
 	];
 
 	foreach ( $entries as $entry ) {

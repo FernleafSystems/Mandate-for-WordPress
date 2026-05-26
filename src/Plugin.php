@@ -26,7 +26,7 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class Plugin {
 
-	public const VERSION = '0.3.0';
+	public const VERSION = '0.3.1';
 	public const MENU_SLUG = PluginIdentity::SLUG;
 
 	public static function boot( string $pluginFile ) :void {

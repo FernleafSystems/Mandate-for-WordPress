@@ -69,6 +69,19 @@ class AdminPage {
 		add_action( 'admin_menu', [ $this, 'registerMenu' ] );
 		add_action( 'admin_init', [ $this, 'handlePost' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueueAssets' ] );
+		add_filter( 'plugin_action_links_'.plugin_basename( $this->pluginFile ), [ $this, 'addSettingsActionLink' ] );
+	}
+
+	/**
+	 * @param array<int|string,string> $links
+	 * @return array<int|string,string>
+	 */
+	public function addSettingsActionLink( array $links ) :array {
+		$url = add_query_arg( [ 'page' => Plugin::MENU_SLUG ], admin_url( 'tools.php' ) );
+
+		return [
+			'settings' => '<a href="'.esc_url( $url ).'">'.esc_html__( 'Settings', 'mandate-app-security' ).'</a>',
+		] + $links;
 	}
 
 	public function registerMenu() :void {
