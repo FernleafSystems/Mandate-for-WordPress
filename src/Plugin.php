@@ -8,6 +8,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\ApplicationPasswordScopeColumn;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
@@ -80,8 +81,10 @@ class Plugin {
 			$expirationDatePolicy
 		);
 		$expirationReaper = new ApplicationPasswordExpirationReaper( $scopeRepository, $expirationDatePolicy );
+		$scopeColumn = new ApplicationPasswordScopeColumn();
 
 		$adminPage->registerHooks();
+		$scopeColumn->registerHooks();
 		$context->registerHooks();
 		$enforcer->registerHooks();
 		$expirationReaper->registerHooks();

@@ -10,6 +10,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\ApplicationPasswordScopeColumn;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
@@ -500,6 +501,137 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertCount( 1, $callbacks );
 		$this->assertSame( [ $adminPage, 'addSettingsActionLink' ], $callbacks[ 0 ][ 'callback' ] );
 		$this->assertSame( 1, $callbacks[ 0 ][ 'accepted_args' ] );
+	}
+
+	public function testApplicationPasswordScopeColumnRegistersTableHooks() :void {
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$scopeColumn->registerHooks();
+
+		$columnCallbacks = $GLOBALS[ 'wpm_test_filters' ][ 'manage_application-passwords-user_columns' ][ 10 ] ?? [];
+		$this->assertCount( 1, $columnCallbacks );
+		$this->assertSame( [ $scopeColumn, 'addColumn' ], $columnCallbacks[ 0 ][ 'callback' ] );
+		$this->assertSame( 1, $columnCallbacks[ 0 ][ 'accepted_args' ] );
+
+		$renderCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column' ][ 10 ] ?? [];
+		$this->assertCount( 1, $renderCallbacks );
+		$this->assertSame( [ $scopeColumn, 'renderColumn' ], $renderCallbacks[ 0 ][ 'callback' ] );
+		$this->assertSame( 2, $renderCallbacks[ 0 ][ 'accepted_args' ] );
+
+		$templateCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column_js_template' ][ 10 ] ?? [];
+		$this->assertCount( 1, $templateCallbacks );
+		$this->assertSame( [ $scopeColumn, 'renderColumnJsTemplate' ], $templateCallbacks[ 0 ][ 'callback' ] );
+		$this->assertSame( 1, $templateCallbacks[ 0 ][ 'accepted_args' ] );
+	}
+
+	public function testApplicationPasswordScopeColumnOrdersScopeBeforeRevoke() :void {
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$columns = $scopeColumn->addColumn(
+			[
+				'name'   => 'Name',
+				'revoke' => 'Revoke',
+			]
+		);
+
+		$this->assertSame( [ 'name', ApplicationPasswordScopeColumn::COLUMN_KEY, 'revoke' ], array_keys( $columns ) );
+
+		$columns = $scopeColumn->addColumn( [ 'name' => 'Name' ] );
+
+		$this->assertSame( [ 'name', ApplicationPasswordScopeColumn::COLUMN_KEY ], array_keys( $columns ) );
+	}
+
+	public function testApplicationPasswordScopeColumnRequiresManageOptions() :void {
+		$GLOBALS[ 'wpm_test_current_user_caps' ] = [];
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$this->assertSame( [ 'revoke' => 'Revoke' ], $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] ) );
+		$GLOBALS[ 'user_id' ] = 5;
+
+		$html = $this->captureOutput(
+			fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] )
+		);
+
+		$this->assertSame( '', $html );
+	}
+
+	public function testApplicationPasswordScopeColumnRendersSanitizedDeepLink() :void {
+		$GLOBALS[ 'user_id' ] = 5;
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$html = $this->captureOutput(
+			fn() => $scopeColumn->renderColumn(
+				ApplicationPasswordScopeColumn::COLUMN_KEY,
+				[
+					'uuid'     => strtoupper( self::UUID ),
+					'name'     => 'Client',
+					'password' => 'plain-secret',
+				]
+			)
+		);
+
+		$this->assertStringNotContainsString( 'Client', $html );
+		$this->assertStringNotContainsString( 'plain-secret', $html );
+
+		$href = $this->actionLinkHref( $html );
+		$this->assertSame( 'https', parse_url( $href, PHP_URL_SCHEME ) );
+		$this->assertSame( 'example.test', parse_url( $href, PHP_URL_HOST ) );
+		$this->assertSame( '/wp-admin/tools.php', parse_url( $href, PHP_URL_PATH ) );
+
+		$query = parse_url( $href, PHP_URL_QUERY );
+		$this->assertIsString( $query );
+		parse_str( $query, $params );
+		$this->assertSame(
+			[
+				'page'              => Plugin::MENU_SLUG,
+				'user_id'           => '5',
+				'app_password_uuid' => self::UUID,
+			],
+			$params
+		);
+	}
+
+	public function testApplicationPasswordScopeColumnRendersNoActiveLinkForInvalidReferences() :void {
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		unset( $GLOBALS[ 'user_id' ] );
+		$html = $this->captureOutput(
+			fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] )
+		);
+		$this->assertSame( '&mdash;', $html );
+
+		$GLOBALS[ 'user_id' ] = 5;
+		$html = $this->captureOutput(
+			fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => 'not-a-uuid' ] )
+		);
+		$this->assertSame( '&mdash;', $html );
+	}
+
+	public function testApplicationPasswordScopeColumnRendersJsTemplateDeepLink() :void {
+		$GLOBALS[ 'user_id' ] = 5;
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$this->assertSame(
+			'',
+			$this->captureOutput( fn() => $scopeColumn->renderColumnJsTemplate( 'name' ) )
+		);
+
+		$html = $this->captureOutput(
+			fn() => $scopeColumn->renderColumnJsTemplate( ApplicationPasswordScopeColumn::COLUMN_KEY )
+		);
+
+		$this->assertStringContainsString( 'page='.Plugin::MENU_SLUG, $html );
+		$this->assertStringContainsString( 'user_id=5', $html );
+		$this->assertStringContainsString( 'app_password_uuid={{ data.uuid }}', $html );
+		$this->assertStringContainsString( 'Restrict Scope', $html );
+		$this->assertStringNotContainsString( 'data.name', $html );
+		$this->assertStringNotContainsString( 'plain-secret', $html );
+
+		unset( $GLOBALS[ 'user_id' ] );
+		$this->assertSame(
+			'&mdash;',
+			$this->captureOutput( fn() => $scopeColumn->renderColumnJsTemplate( ApplicationPasswordScopeColumn::COLUMN_KEY ) )
+		);
 	}
 
 	public function testAdminPagePrependsSettingsPluginActionLink() :void {
@@ -1043,6 +1175,25 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 9, $storedScopes[ self::UUID ][ 'user_id' ] );
 	}
 
+	public function testPluginBootRegistersApplicationPasswordScopeColumnHooks() :void {
+		Plugin::boot( $this->pluginFile() );
+
+		$columnCallbacks = $GLOBALS[ 'wpm_test_filters' ][ 'manage_application-passwords-user_columns' ][ 10 ] ?? [];
+		$this->assertCount( 1, $columnCallbacks );
+		$this->assertInstanceOf( ApplicationPasswordScopeColumn::class, $columnCallbacks[ 0 ][ 'callback' ][ 0 ] );
+		$this->assertSame( 'addColumn', $columnCallbacks[ 0 ][ 'callback' ][ 1 ] );
+
+		$renderCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column' ][ 10 ] ?? [];
+		$this->assertCount( 1, $renderCallbacks );
+		$this->assertInstanceOf( ApplicationPasswordScopeColumn::class, $renderCallbacks[ 0 ][ 'callback' ][ 0 ] );
+		$this->assertSame( 'renderColumn', $renderCallbacks[ 0 ][ 'callback' ][ 1 ] );
+
+		$templateCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column_js_template' ][ 10 ] ?? [];
+		$this->assertCount( 1, $templateCallbacks );
+		$this->assertInstanceOf( ApplicationPasswordScopeColumn::class, $templateCallbacks[ 0 ][ 'callback' ][ 0 ] );
+		$this->assertSame( 'renderColumnJsTemplate', $templateCallbacks[ 0 ][ 'callback' ][ 1 ] );
+	}
+
 	private function adminPage( ?ScopeRepository $repository = null ) :AdminPage {
 		$repository = $repository ?? $this->scopeRepository();
 		$passwordRepository = new ApplicationPasswordRepository();
@@ -1186,6 +1337,18 @@ final class MandateTest extends Wpm_Test_Case {
 	private function actionLinkHref( string $html ) :string {
 		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
 		return $this->firstElement( $xpath, '//a' )->getAttribute( 'href' );
+	}
+
+	private function captureOutput( callable $callback ) :string {
+		ob_start();
+		try {
+			$callback();
+			return (string)ob_get_clean();
+		}
+		catch ( Throwable $throwable ) {
+			ob_end_clean();
+			throw $throwable;
+		}
 	}
 
 	/**
