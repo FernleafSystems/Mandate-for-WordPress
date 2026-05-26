@@ -29,11 +29,11 @@ if ( !defined( 'ABSPATH' ) ) {
  * @phpstan-import-type AdminPageStringsContract from AdminPageRenderContracts
  * @phpstan-import-type AdminRoleSummaryContract from AdminPageRenderContracts
  * @phpstan-import-type AdminSelectionFormContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordSummaryContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordWarningContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordDetailTextContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordDetailExpirationContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordDetailAdminLockContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryWarningContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryDetailTextContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryDetailExpirationContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryDetailAdminLockContract from AdminPageRenderContracts
  * @phpstan-import-type AdminScopeFormContract from AdminPageRenderContracts
  */
 class AdminPageViewDataBuilder {
@@ -235,15 +235,17 @@ class AdminPageViewDataBuilder {
 		bool $canManageAnyScope,
 		bool $isSuperAdmin
 	) :array {
+		$selectedPassword = $this->selectedPassword( $passwords, $selectedUuid );
+
 		return [
 			'selected_user_id' => $selectedUserId,
 			'selected_uuid'    => $selectedUuid,
 			'page_slug'        => Plugin::MENU_SLUG,
 			'role_summary'     => $this->buildRoleSummary( $currentRoleSlugs ),
 			'password_options' => $this->buildPasswordOptions( $passwords, $selectedUuid ),
-			'password_summary' => $this->buildPasswordSummary(
-				$passwords,
-				$selectedUuid,
+			'password_info'    => $this->buildPasswordInfoSummary( $selectedPassword ),
+			'mandate_rules'    => $this->buildMandateRulesSummary(
+				$selectedPassword,
 				$scope,
 				$currentRoleSlugs,
 				$isReadOnly,
@@ -286,35 +288,63 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @param list<ApplicationPasswordRecord> $passwords
+	 * @param ApplicationPasswordRecord|null $password
+	 * @return AdminSummaryContract
+	 */
+	private function buildPasswordInfoSummary( ?array $password ) :array {
+		if ( $password === null ) {
+			return [
+				'is_visible'   => false,
+				'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
+				'title_id'     => 'mandate-password-info-title',
+				'container_id' => 'mandate-password-info',
+				'details'      => [],
+				'warnings'     => [],
+			];
+		}
+
+		return [
+			'is_visible'   => true,
+			'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
+			'title_id'     => 'mandate-password-info-title',
+			'container_id' => 'mandate-password-info',
+			'details'      => [
+				$this->textDetail( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] ),
+				$this->textDetail( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) ),
+				$this->textDetail( __( 'Last Used', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'last_used' ] ) ),
+			],
+			'warnings'     => [],
+		];
+	}
+
+	/**
+	 * @param ApplicationPasswordRecord|null $password
 	 * @param CapabilityScopeRecord|null $scope
 	 * @param list<string> $currentRoleSlugs
-	 * @return AdminPasswordSummaryContract
+	 * @return AdminSummaryContract
 	 */
-	private function buildPasswordSummary(
-		array $passwords,
-		string $selectedUuid,
+	private function buildMandateRulesSummary(
+		?array $password,
 		?array $scope,
 		array $currentRoleSlugs,
 		bool $isReadOnly,
 		bool $canManageAnyScope,
 		bool $isSuperAdmin
 	) :array {
-		$password = $this->selectedPassword( $passwords, $selectedUuid );
 		if ( $password === null ) {
 			return [
 				'is_visible'   => false,
-				'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
-				'title_id'     => 'mandate-password-summary-title',
-				'container_id' => 'mandate-password-summary',
-				'sections'     => [],
+				'title'        => __( 'Mandate Rules', 'mandate-app-security' ),
+				'title_id'     => 'mandate-rules-summary-title',
+				'container_id' => 'mandate-rules-summary',
+				'details'      => [],
 				'warnings'     => [],
 			];
 		}
 
 		$expiresOn = $scope === null ? null : $scope[ 'expires_on' ];
 		$adminLocked = $scope !== null && $scope[ 'admin_locked' ];
-		$scopeDetails = [
+		$details = [
 			$this->textDetail(
 				__( 'Restricted Scope', 'mandate-app-security' ),
 				$this->formatRestrictedScope( $scope, $expiresOn )
@@ -323,32 +353,15 @@ class AdminPageViewDataBuilder {
 		];
 		$adminLockDetail = $this->adminLockDetail( $adminLocked, $canManageAnyScope, $isSuperAdmin );
 		if ( $adminLockDetail !== null ) {
-			$scopeDetails[] = $adminLockDetail;
+			$details[] = $adminLockDetail;
 		}
 
-		$sections = [
-			[
-				'show_divider_before' => false,
-				'details'             => [
-					$this->textDetail( __( 'Name', 'mandate-app-security' ), $password[ 'name' ] ),
-					$this->textDetail( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] ),
-					$this->textDetail( __( 'App ID', 'mandate-app-security' ), $password[ 'app_id' ] ),
-					$this->textDetail( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) ),
-					$this->textDetail( __( 'Last Used', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'last_used' ] ) ),
-				],
-			],
-			[
-				'show_divider_before' => true,
-				'details'             => $scopeDetails,
-			],
-		];
-
 		if ( $scope !== null ) {
-			$sections[ 1 ][ 'details' ][] = $this->textDetail(
+			$details[] = $this->textDetail(
 				__( 'Scope Last Saved', 'mandate-app-security' ),
 				$this->formatTimestamp( $scope[ 'updated_at' ] )
 			);
-			$sections[ 1 ][ 'details' ][] = $this->textDetail(
+			$details[] = $this->textDetail(
 				__( 'Roles When Saved', 'mandate-app-security' ),
 				$scope[ 'roles_at_update' ] === null
 					? __( 'Not recorded', 'mandate-app-security' )
@@ -363,16 +376,16 @@ class AdminPageViewDataBuilder {
 
 		return [
 			'is_visible'   => true,
-			'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
-			'title_id'     => 'mandate-password-summary-title',
-			'container_id' => 'mandate-password-summary',
-			'sections'     => $sections,
+			'title'        => __( 'Mandate Rules', 'mandate-app-security' ),
+			'title_id'     => 'mandate-rules-summary-title',
+			'container_id' => 'mandate-rules-summary',
+			'details'      => $details,
 			'warnings'     => $warnings,
 		];
 	}
 
 	/**
-	 * @return AdminPasswordWarningContract
+	 * @return AdminSummaryWarningContract
 	 */
 	private function roleSnapshotWarning() :array {
 		return [
@@ -383,18 +396,18 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @return AdminPasswordDetailAdminLockContract|AdminPasswordDetailTextContract|null
+	 * @return AdminSummaryDetailAdminLockContract|AdminSummaryDetailTextContract|null
 	 */
 	private function adminLockDetail( bool $checked, bool $canManageAnyScope, bool $disabled ) :?array {
 		if ( !$canManageAnyScope ) {
 			return $checked
-				? $this->textDetail( __( 'Admin Locked', 'mandate-app-security' ), __( 'Locked', 'mandate-app-security' ) )
+				? $this->textDetail( __( 'Lock This Scope', 'mandate-app-security' ), __( 'Locked', 'mandate-app-security' ) )
 				: null;
 		}
 
 		return [
 			'kind'      => 'admin_lock',
-			'label'     => __( 'Admin Locked', 'mandate-app-security' ),
+			'label'     => __( 'Lock This Scope', 'mandate-app-security' ),
 			'help_text' => __( 'Prevent the application password owner from editing or resetting this scope.', 'mandate-app-security' ),
 			'input'     => [
 				'id'       => 'mandate-admin-locked',
@@ -408,7 +421,7 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @return array{kind:'text',label:string,value:string}
+	 * @return AdminSummaryDetailTextContract
 	 */
 	private function textDetail( string $label, string $value ) :array {
 		return [
@@ -419,7 +432,7 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @return AdminPasswordDetailExpirationContract
+	 * @return AdminSummaryDetailExpirationContract
 	 */
 	private function expirationDetail( ?string $expiresOn, bool $disabled ) :array {
 		$expired = $this->expirationDatePolicy->isExpired( $expiresOn );

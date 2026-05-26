@@ -7,7 +7,7 @@ if ( !defined( 'ABSPATH' ) ) {
 }
 
 /**
- * @phpstan-type ApplicationPasswordRecord array{uuid:string,name:string,app_id:string,created:int,last_used:int}
+ * @phpstan-type ApplicationPasswordRecord array{uuid:string,name:string,created:int,last_used:int}
  */
 class ApplicationPasswordRepository {
 
@@ -76,7 +76,6 @@ class ApplicationPasswordRepository {
 		return [
 			'uuid'      => $uuid,
 			'name'      => $name === '' ? $uuid : $name,
-			'app_id'    => $this->stringField( $password, 'app_id' ),
 			'created'   => $this->timestampField( $password, 'created' ),
 			'last_used' => $this->timestampField( $password, 'last_used' ),
 		];

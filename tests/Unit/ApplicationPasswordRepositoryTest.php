@@ -37,18 +37,20 @@ final class ApplicationPasswordRepositoryTest extends Wpm_Test_Case {
 			],
 		];
 
+		$records = ( new ApplicationPasswordRepository() )->forUser( 5 );
+
 		$this->assertSame(
 			[
 				[
 					'uuid'      => self::UUID,
 					'name'      => self::UUID,
-					'app_id'    => '123',
 					'created'   => 0,
 					'last_used' => 20,
 				],
 			],
-			( new ApplicationPasswordRepository() )->forUser( 5 )
+			$records
 		);
+		$this->assertArrayNotHasKey( 'app_id', $records[ 0 ] );
 	}
 
 	public function testFindAndOwnershipNormalizeUuidBeforeLookup() :void {

@@ -1295,7 +1295,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$html = $this->renderAdminPage( $this->scopeRepository() );
 
 		$described = $this->capabilityCodeAttributes( $html, 'upload_files' );
-		$this->assertSame( '', $described[ 'data-wpm-tooltip' ] );
+		$this->assertArrayHasKey( 'data-wpm-tooltip', $described );
 		$this->assertArrayHasKey( 'data-wpm-tooltip-text', $described );
 		$this->assertNotSame( '', $described[ 'data-wpm-tooltip-text' ] );
 		$this->assertSame( '0', $described[ 'tabindex' ] );
@@ -1336,10 +1336,17 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 'wpm_editor', $selectionForm[ 'role_summary' ][ 'rows' ][ 0 ][ 'slug' ] );
 		$this->assertSame( self::UUID, $selectionForm[ 'password_options' ][ 0 ][ 'uuid' ] );
 		$this->assertTrue( $selectionForm[ 'password_options' ][ 0 ][ 'selected' ] );
-		$this->assertFalse( $selectionForm[ 'password_summary' ][ 'sections' ][ 0 ][ 'show_divider_before' ] );
-		$this->assertTrue( $selectionForm[ 'password_summary' ][ 'sections' ][ 1 ][ 'show_divider_before' ] );
-		$adminLockDetail = $selectionForm[ 'password_summary' ][ 'sections' ][ 1 ][ 'details' ][ 2 ];
+		$this->assertArrayNotHasKey( 'password_summary', $selectionForm );
+		$this->assertSame( 'mandate-password-info', $selectionForm[ 'password_info' ][ 'container_id' ] );
+		$this->assertSame( [ 'UUID', 'Created', 'Last Used' ], array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ) );
+		$this->assertFalse( in_array( 'Name', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
+		$this->assertFalse( in_array( 'App ID', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
+		$this->assertFalse( in_array( 'Restricted Scope', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
+		$this->assertSame( 'mandate-rules-summary', $selectionForm[ 'mandate_rules' ][ 'container_id' ] );
+		$this->assertSame( [ 'Restricted Scope', 'Expiration Date', 'Lock This Scope' ], array_slice( array_column( $selectionForm[ 'mandate_rules' ][ 'details' ], 'label' ), 0, 3 ) );
+		$adminLockDetail = $selectionForm[ 'mandate_rules' ][ 'details' ][ 2 ];
 		$this->assertSame( 'admin_lock', $adminLockDetail[ 'kind' ] );
+		$this->assertSame( 'Lock This Scope', $adminLockDetail[ 'label' ] );
 		$this->assertSame( 'admin_locked', $adminLockDetail[ 'input' ][ 'name' ] );
 		$this->assertSame( 'mandate-scope-form', $adminLockDetail[ 'input' ][ 'form' ] );
 		$this->assertFalse( $adminLockDetail[ 'input' ][ 'checked' ] );
@@ -1437,6 +1444,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="save_scope" and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="clear_scope" and @disabled="disabled"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//input[@name="admin_locked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-rules-summary"]//dt[normalize-space(.) = "Lock This Scope"]/following-sibling::dd[1][not(.//input)]' ) );
 	}
 
 	public function testAdminPageRenderShowsAdminLockControlForAdminsOnly() :void {
@@ -1446,7 +1454,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$adminXpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
 		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-password-summary"]//input[@data-wpm-admin-lock-input and @name="admin_locked" and @value="1" and @form="mandate-scope-form" and @checked="checked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-rules-summary"]//input[@data-wpm-admin-lock-input and @name="admin_locked" and @value="1" and @form="mandate-scope-form" and @checked="checked"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//*[@id="mandate-scope-form"]//input[@name="admin_locked"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//input[@name="admin_locked" and @disabled="disabled"]' ) );
 
@@ -1467,7 +1475,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$data = $this->adminPageViewDataBuilder( $this->scopeRepository() )->build();
 		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
-		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'password_summary' ][ 'sections' ][ 1 ][ 'details' ][ 2 ];
+		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'mandate_rules' ][ 'details' ][ 2 ];
 
 		$this->assertTrue( $scopeForm[ 'super_admin_notice' ][ 'is_visible' ] );
 		$this->assertTrue( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
@@ -1487,8 +1495,8 @@ final class MandateTest extends Wpm_Test_Case {
 		$repository->save( self::UUID, 5, [], [], [], 1, '2026-05-24', false );
 
 		$data = $this->adminPageViewDataBuilder( $repository )->build();
-		$summary = $data[ 'vars' ][ 'selection_form' ][ 'password_summary' ];
-		$scopeDetails = $summary[ 'sections' ][ 1 ][ 'details' ];
+		$summary = $data[ 'vars' ][ 'selection_form' ][ 'mandate_rules' ];
+		$scopeDetails = $summary[ 'details' ];
 
 		$this->assertCount( 1, $summary[ 'warnings' ] );
 		$this->assertSame( 'changed', $summary[ 'warnings' ][ 0 ][ 'role_snapshot_status' ] );

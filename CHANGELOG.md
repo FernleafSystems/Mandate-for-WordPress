@@ -7,6 +7,10 @@
 - Users can scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator locks that scope.
 - Administrator locks make selected scopes read-only for the password owner.
 
+### Changed
+
+- Admin selection summaries now split password details from Mandate rules.
+
 ## 0.3.1 - 2026-05-26
 
 Mandate keeps existing GitHub-updater installs on built release packages, adds a direct Settings link from the WordPress Plugins page, and improves static site metadata.

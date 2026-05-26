@@ -14,11 +14,11 @@ class AdminTemplateRenderer {
 		'partials/capability-panel.php' => true,
 		'partials/capability-section.php' => true,
 		'partials/notice.php' => true,
-		'partials/password-detail.php' => true,
-		'partials/password-summary.php' => true,
 		'partials/role-summary.php' => true,
 		'partials/scope-form.php' => true,
 		'partials/selection-form.php' => true,
+		'partials/summary-detail.php' => true,
+		'partials/summary.php' => true,
 	];
 
 	private const RESERVED_DATA_KEYS = [

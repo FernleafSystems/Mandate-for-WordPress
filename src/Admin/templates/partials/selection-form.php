@@ -50,13 +50,18 @@ if ( !defined( 'ABSPATH' ) ) {
 				}
 				?>
 			</div>
+			<?php
+			$mandatePasswordInfoHtml = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'password_info' ] ] );
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
+			echo $mandatePasswordInfoHtml;
+			?>
 		</div>
 
 		<div class="mandate-selection-column">
 			<?php
-			$mandatePasswordSummaryHtml = $this->render( 'partials/password-summary.php', [ 'summary' => $selectionForm[ 'password_summary' ] ] );
+			$mandateRulesHtml = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'mandate_rules' ] ] );
 			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandatePasswordSummaryHtml;
+			echo $mandateRulesHtml;
 			?>
 		</div>
 	</div>

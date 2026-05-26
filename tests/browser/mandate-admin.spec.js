@@ -192,11 +192,33 @@ test( 'admin can manage grouped application password scopes with progressive enh
 		Array.from( grid.querySelectorAll( '.mandate-field-title' ) )
 			.map( ( title ) => Math.round( title.getBoundingClientRect().top ) )
 	) );
-	expect( selectionTitleTops ).toHaveLength( 3 );
+	expect( selectionTitleTops ).toHaveLength( 2 );
 	expect( Math.abs( selectionTitleTops[ 0 ] - selectionTitleTops[ 1 ] ) ).toBeLessThanOrEqual( 2 );
-	expect( Math.abs( selectionTitleTops[ 1 ] - selectionTitleTops[ 2 ] ) ).toBeLessThanOrEqual( 2 );
+	const passwordInfoPlacement = await page.locator( '#mandate-password' ).evaluate( ( passwordSelect ) => {
+		const passwordInfo = document.querySelector( '#mandate-password-info' );
+		const rulesSummary = document.querySelector( '#mandate-rules-summary' );
+		const passwordRect = passwordSelect.getBoundingClientRect();
+		const infoRect = passwordInfo.getBoundingClientRect();
+		const rulesRect = rulesSummary.getBoundingClientRect();
+
+		return {
+			infoLeft: Math.round( infoRect.left ),
+			infoTop: Math.round( infoRect.top ),
+			passwordBottom: Math.round( passwordRect.bottom ),
+			passwordLeft: Math.round( passwordRect.left ),
+			rulesLeft: Math.round( rulesRect.left ),
+			rulesTop: Math.round( rulesRect.top ),
+		};
+	} );
+	expect( passwordInfoPlacement.infoTop ).toBeGreaterThan( passwordInfoPlacement.passwordBottom );
+	expect( Math.abs( passwordInfoPlacement.infoLeft - passwordInfoPlacement.passwordLeft ) ).toBeLessThanOrEqual( 2 );
+	expect( passwordInfoPlacement.rulesLeft ).toBeGreaterThan( passwordInfoPlacement.infoLeft );
+	expect( passwordInfoPlacement.rulesTop ).toBeLessThan( passwordInfoPlacement.infoTop );
 	const summaryCardStyles = await page.locator( '#mandate-role-summary' ).evaluate( ( roleSummary ) => {
-		const passwordSummary = document.querySelector( '#mandate-password-summary' );
+		const summaryCards = [
+			document.querySelector( '#mandate-password-info' ),
+			document.querySelector( '#mandate-rules-summary' ),
+		];
 		const properties = [
 			'backgroundColor',
 			'borderTopColor',
@@ -210,10 +232,10 @@ test( 'admin can manage grouped application password scopes with progressive enh
 			'paddingLeft',
 		];
 
-		return properties.map( ( property ) => [
+		return summaryCards.flatMap( ( summaryCard ) => properties.map( ( property ) => [
 			getComputedStyle( roleSummary )[ property ],
-			getComputedStyle( passwordSummary )[ property ],
-		] );
+			getComputedStyle( summaryCard )[ property ],
+		] ) );
 	} );
 	summaryCardStyles.forEach( ( [ roleValue, passwordValue ] ) => {
 		expect( roleValue ).toBe( passwordValue );
@@ -353,7 +375,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
 	await selectCapabilitySource( page, 'wordpress' );
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).check();
-	await expect( page.locator( '#mandate-password-summary [data-wpm-expiration-input]' ) ).toHaveCount( 1 );
+	await expect( page.locator( '#mandate-rules-summary [data-wpm-expiration-input]' ) ).toHaveCount( 1 );
 	await expect( page.locator( '#mandate-scope-form [data-wpm-expiration-input]' ) ).toHaveCount( 0 );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
@@ -521,7 +543,7 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
 	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
-	const adminLockInput = page.locator( '#mandate-password-summary [data-wpm-admin-lock-input]' );
+	const adminLockInput = page.locator( '#mandate-rules-summary [data-wpm-admin-lock-input]' );
 	await expect( adminLockInput ).toHaveCount( 1 );
 	await expect( page.locator( '#mandate-scope-form [data-wpm-admin-lock-input]' ) ).toHaveCount( 0 );
 	await adminLockInput.check();

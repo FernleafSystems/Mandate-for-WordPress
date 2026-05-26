@@ -5,7 +5,7 @@ if ( !defined( 'ABSPATH' ) ) {
 }
 
 ?>
-<div class="mandate-password-summary-detail">
+<div class="mandate-summary-detail">
 	<?php
 	if ( $detail[ 'kind' ] === 'admin_lock' ) {
 		?>
