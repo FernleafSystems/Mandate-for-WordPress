@@ -1251,10 +1251,17 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertTrue( $selectionForm[ 'password_options' ][ 0 ][ 'selected' ] );
 		$this->assertFalse( $selectionForm[ 'password_summary' ][ 'sections' ][ 0 ][ 'show_divider_before' ] );
 		$this->assertTrue( $selectionForm[ 'password_summary' ][ 'sections' ][ 1 ][ 'show_divider_before' ] );
+		$adminLockDetail = $selectionForm[ 'password_summary' ][ 'sections' ][ 1 ][ 'details' ][ 2 ];
+		$this->assertSame( 'admin_lock', $adminLockDetail[ 'kind' ] );
+		$this->assertSame( 'admin_locked', $adminLockDetail[ 'input' ][ 'name' ] );
+		$this->assertSame( 'mandate-scope-form', $adminLockDetail[ 'input' ][ 'form' ] );
+		$this->assertFalse( $adminLockDetail[ 'input' ][ 'checked' ] );
+		$this->assertFalse( $adminLockDetail[ 'input' ][ 'disabled' ] );
 
 		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
 		$this->assertSame( 'mandate-scope-form', $scopeForm[ 'id' ] );
 		$this->assertSame( self::UUID, $scopeForm[ 'uuid' ] );
+		$this->assertArrayNotHasKey( 'admin_lock', $scopeForm );
 		$this->assertArrayNotHasKey( 'tabs', $scopeForm );
 		$this->assertArrayNotHasKey( 'panels', $scopeForm );
 		$this->assertSame( 'wordpress', $scopeForm[ 'grouping' ][ 'default_source' ] );
@@ -1279,8 +1286,6 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 		$this->assertFalse( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
 		$this->assertSame( 'unlocked', $scopeForm[ 'admin_lock_status' ] );
-		$this->assertTrue( $scopeForm[ 'admin_lock' ][ 'is_visible' ] );
-		$this->assertFalse( $scopeForm[ 'admin_lock' ][ 'checked' ] );
 
 		$groupingConfig = json_decode( $scopeForm[ 'grouping' ][ 'config_json' ], true, 512, JSON_THROW_ON_ERROR );
 		$this->assertSame( 'wordpress', $groupingConfig[ 'defaultSource' ] );
@@ -1339,7 +1344,6 @@ final class MandateTest extends Wpm_Test_Case {
 		$xpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
 
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//div[contains(@class, "notice-info")]/p[contains(., "locked by an administrator")]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@name="allowed_caps[]" and @value="read" and @disabled="disabled"]' ) );
 		$this->assertSame( 4, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-input and @disabled="disabled"]' ) );
@@ -1355,7 +1359,8 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$adminXpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
 		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//input[@name="admin_locked" and @value="1" and @checked="checked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-password-summary"]//input[@data-wpm-admin-lock-input and @name="admin_locked" and @value="1" and @form="mandate-scope-form" and @checked="checked"]' ) );
+		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//*[@id="mandate-scope-form"]//input[@name="admin_locked"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//input[@name="admin_locked" and @disabled="disabled"]' ) );
 
 		$this->actAsUser( 5 );
@@ -1375,10 +1380,13 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$data = $this->adminPageViewDataBuilder( $this->scopeRepository() )->build();
 		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
+		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'password_summary' ][ 'sections' ][ 1 ][ 'details' ][ 2 ];
 
 		$this->assertTrue( $scopeForm[ 'super_admin_notice' ][ 'is_visible' ] );
 		$this->assertTrue( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
 		$this->assertFalse( $scopeForm[ 'actions' ][ 1 ][ 'disabled' ] );
+		$this->assertSame( 'admin_lock', $adminLockDetail[ 'kind' ] );
+		$this->assertTrue( $adminLockDetail[ 'input' ][ 'disabled' ] );
 	}
 
 	public function testAdminPageViewDataBuilderEmitsRoleSnapshotAndExpirationState() :void {

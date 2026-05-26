@@ -57,19 +57,6 @@ echo $mandateLockNoticeHtml;
 		?>
 	</div>
 
-	<?php
-	if ( $scopeForm[ 'admin_lock' ][ 'is_visible' ] ) {
-		?>
-		<p class="mandate-admin-lock">
-			<label>
-				<input type="checkbox" name="<?php echo esc_attr( $scopeForm[ 'admin_lock' ][ 'name' ] ); ?>" value="<?php echo esc_attr( $scopeForm[ 'admin_lock' ][ 'value' ] ); ?>"<?php if ( $scopeForm[ 'admin_lock' ][ 'checked' ] ) { ?> checked="checked"<?php } ?><?php if ( $scopeForm[ 'admin_lock' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?> />
-				<?php echo esc_html( $scopeForm[ 'admin_lock' ][ 'label' ] ); ?>
-			</label>
-		</p>
-		<?php
-	}
-	?>
-
 	<p class="submit mandate-actions">
 		<?php
 		foreach ( $scopeForm[ 'actions' ] as $mandateAction ) {

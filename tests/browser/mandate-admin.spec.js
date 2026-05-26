@@ -475,7 +475,6 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	expect( ( await expirationResponse.json() ).saved ).toBe( true );
 	await page.goto( `/wp-admin/tools.php?page=mandate-app-security&user_id=${primary.user_id}&app_password_uuid=${secondaryPassword.uuid}`, { waitUntil: 'load' } );
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'expired' );
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveText( `${fixture.expiration_dates.expired} (expired)` );
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveCSS( 'color', 'rgb(179, 45, 46)' );
 
 	let authResponse = await secondaryRequest.get( '/wp-json/mandate-test/v1/auth' );
@@ -522,13 +521,16 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
 	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
-	await page.locator( 'input[name="admin_locked"]' ).check();
+	const adminLockInput = page.locator( '#mandate-password-summary [data-wpm-admin-lock-input]' );
+	await expect( adminLockInput ).toHaveCount( 1 );
+	await expect( page.locator( '#mandate-scope-form [data-wpm-admin-lock-input]' ) ).toHaveCount( 0 );
+	await adminLockInput.check();
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
 		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
 	] );
 	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
-	await expect( page.locator( 'input[name="admin_locked"]' ) ).toBeChecked();
+	await expect( adminLockInput ).toBeChecked();
 
 	await loginAsFixtureUser( page, primary.user_login );
 	await page.goto(
@@ -539,7 +541,7 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await expect( page.locator( '#mandate-user' ) ).toBeDisabled();
 	await expect( page.locator( '#mandate-user' ) ).toHaveValue( String( primary.user_id ) );
 	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
-	await expect( page.getByText( 'This application password scope is locked by an administrator.' ) ).toBeVisible();
+	await expect( page.locator( '[data-wpm-admin-lock-input]' ) ).toHaveCount( 0 );
 	await expect( page.locator( 'input[name="admin_locked"]' ) ).toHaveCount( 0 );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeDisabled();

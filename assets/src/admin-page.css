@@ -105,6 +105,20 @@
 	width: 100%;
 }
 
+.mandate-admin-lock-control {
+	align-items: center;
+	display: inline-flex;
+	min-height: 1.75rem;
+}
+
+.mandate-admin-lock-control input[type="checkbox"] {
+	margin: 0;
+}
+
+.mandate-admin-lock-help {
+	margin: .25rem 0 0;
+}
+
 .mandate-grouping-controls {
 	align-items: center;
 	border: 0;
@@ -325,16 +339,6 @@
 .mandate-actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: .5rem;
-}
-
-.mandate-admin-lock {
-	margin: 1rem 0 0;
-}
-
-.mandate-admin-lock label {
-	align-items: center;
-	display: inline-flex;
 	gap: .5rem;
 }
 

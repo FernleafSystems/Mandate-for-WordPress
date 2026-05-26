@@ -31,7 +31,9 @@ if ( !defined( 'ABSPATH' ) ) {
  * @phpstan-import-type AdminSelectionFormContract from AdminPageRenderContracts
  * @phpstan-import-type AdminPasswordSummaryContract from AdminPageRenderContracts
  * @phpstan-import-type AdminPasswordWarningContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminPasswordDetailTextContract from AdminPageRenderContracts
  * @phpstan-import-type AdminPasswordDetailExpirationContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminPasswordDetailAdminLockContract from AdminPageRenderContracts
  * @phpstan-import-type AdminScopeFormContract from AdminPageRenderContracts
  */
 class AdminPageViewDataBuilder {
@@ -132,7 +134,9 @@ class AdminPageViewDataBuilder {
 					$selectedUuid,
 					$scope,
 					$currentRoleSlugs,
-					$isReadOnly
+					$isReadOnly,
+					$canManageAnyScope,
+					$isSuperAdmin
 				),
 				'scope_form'     => $this->buildScopeForm(
 					$selectedUserId,
@@ -140,7 +144,6 @@ class AdminPageViewDataBuilder {
 					$isSuperAdmin,
 					$scope !== null && $scope[ 'admin_locked' ],
 					$isReadOnly,
-					$canManageAnyScope,
 					$capabilityGroups,
 					$selectedCaps,
 					$selectedMetaCaps
@@ -228,7 +231,9 @@ class AdminPageViewDataBuilder {
 		string $selectedUuid,
 		?array $scope,
 		array $currentRoleSlugs,
-		bool $isReadOnly
+		bool $isReadOnly,
+		bool $canManageAnyScope,
+		bool $isSuperAdmin
 	) :array {
 		return [
 			'selected_user_id' => $selectedUserId,
@@ -236,7 +241,15 @@ class AdminPageViewDataBuilder {
 			'page_slug'        => Plugin::MENU_SLUG,
 			'role_summary'     => $this->buildRoleSummary( $currentRoleSlugs ),
 			'password_options' => $this->buildPasswordOptions( $passwords, $selectedUuid ),
-			'password_summary' => $this->buildPasswordSummary( $passwords, $selectedUuid, $scope, $currentRoleSlugs, $isReadOnly ),
+			'password_summary' => $this->buildPasswordSummary(
+				$passwords,
+				$selectedUuid,
+				$scope,
+				$currentRoleSlugs,
+				$isReadOnly,
+				$canManageAnyScope,
+				$isSuperAdmin
+			),
 		];
 	}
 
@@ -283,7 +296,9 @@ class AdminPageViewDataBuilder {
 		string $selectedUuid,
 		?array $scope,
 		array $currentRoleSlugs,
-		bool $isReadOnly
+		bool $isReadOnly,
+		bool $canManageAnyScope,
+		bool $isSuperAdmin
 	) :array {
 		$password = $this->selectedPassword( $passwords, $selectedUuid );
 		if ( $password === null ) {
@@ -298,6 +313,19 @@ class AdminPageViewDataBuilder {
 		}
 
 		$expiresOn = $scope === null ? null : $scope[ 'expires_on' ];
+		$adminLocked = $scope !== null && $scope[ 'admin_locked' ];
+		$scopeDetails = [
+			$this->textDetail(
+				__( 'Restricted Scope', 'mandate-app-security' ),
+				$this->formatRestrictedScope( $scope, $expiresOn )
+			),
+			$this->expirationDetail( $expiresOn, $isReadOnly ),
+		];
+		$adminLockDetail = $this->adminLockDetail( $adminLocked, $canManageAnyScope, $isSuperAdmin );
+		if ( $adminLockDetail !== null ) {
+			$scopeDetails[] = $adminLockDetail;
+		}
+
 		$sections = [
 			[
 				'show_divider_before' => false,
@@ -311,22 +339,9 @@ class AdminPageViewDataBuilder {
 			],
 			[
 				'show_divider_before' => true,
-				'details'             => [
-					$this->textDetail(
-						__( 'Restricted Scope', 'mandate-app-security' ),
-						$this->formatRestrictedScope( $scope, $expiresOn )
-					),
-					$this->expirationDetail( $expiresOn, $isReadOnly ),
-				],
+				'details'             => $scopeDetails,
 			],
 		];
-
-		if ( $scope !== null && $scope[ 'admin_locked' ] ) {
-			$sections[ 1 ][ 'details' ][] = $this->textDetail(
-				__( 'Admin Lock', 'mandate-app-security' ),
-				__( 'Locked', 'mandate-app-security' )
-			);
-		}
 
 		if ( $scope !== null ) {
 			$sections[ 1 ][ 'details' ][] = $this->textDetail(
@@ -364,6 +379,31 @@ class AdminPageViewDataBuilder {
 			'classes'              => 'notice notice-warning inline',
 			'text'                 => __( 'The selected user roles have changed since this Mandate App Security record was saved. Review the saved restrictions before relying on this Application Password.', 'mandate-app-security' ),
 			'role_snapshot_status' => 'changed',
+		];
+	}
+
+	/**
+	 * @return AdminPasswordDetailAdminLockContract|AdminPasswordDetailTextContract|null
+	 */
+	private function adminLockDetail( bool $checked, bool $canManageAnyScope, bool $disabled ) :?array {
+		if ( !$canManageAnyScope ) {
+			return $checked
+				? $this->textDetail( __( 'Admin Locked', 'mandate-app-security' ), __( 'Locked', 'mandate-app-security' ) )
+				: null;
+		}
+
+		return [
+			'kind'      => 'admin_lock',
+			'label'     => __( 'Admin Locked', 'mandate-app-security' ),
+			'help_text' => __( 'Prevent the application password owner from editing or resetting this scope.', 'mandate-app-security' ),
+			'input'     => [
+				'id'       => 'mandate-admin-locked',
+				'name'     => 'admin_locked',
+				'value'    => '1',
+				'form'     => self::SCOPE_FORM_ID,
+				'checked'  => $checked,
+				'disabled' => $disabled,
+			],
 		];
 	}
 
@@ -455,7 +495,6 @@ class AdminPageViewDataBuilder {
 		bool $isSuperAdmin,
 		bool $adminLocked,
 		bool $isReadOnly,
-		bool $canManageAnyScope,
 		array $capabilityGroups,
 		array $selectedCaps,
 		array $selectedMetaCaps
@@ -472,7 +511,6 @@ class AdminPageViewDataBuilder {
 			'lock_notice'         => $adminLocked
 				? $this->notice( 'notice notice-info', __( 'This application password scope is locked by an administrator.', 'mandate-app-security' ) )
 				: $this->hiddenNotice(),
-			'admin_lock'          => $this->adminLockControl( $canManageAnyScope, $adminLocked, $isSuperAdmin ),
 			'grouping'            => $this->capabilityGrouping( $capabilityGroups ),
 			'source_tabs'         => $this->capabilitySourceTabs( $capabilityGroups[ 'sources' ] ),
 			'source_panels'       => $this->capabilitySourcePanels(
@@ -610,20 +648,6 @@ class AdminPageViewDataBuilder {
 		}
 
 		return $config;
-	}
-
-	/**
-	 * @return array{is_visible:bool,name:string,value:string,label:string,checked:bool,disabled:bool}
-	 */
-	private function adminLockControl( bool $isVisible, bool $checked, bool $disabled ) :array {
-		return [
-			'is_visible' => $isVisible,
-			'name'       => 'admin_locked',
-			'value'      => '1',
-			'label'      => __( 'Lock this scope so the application password owner cannot edit it.', 'mandate-app-security' ),
-			'checked'    => $checked,
-			'disabled'   => $disabled,
-		];
 	}
 
 	/**
