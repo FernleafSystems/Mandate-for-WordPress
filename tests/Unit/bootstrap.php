@@ -127,13 +127,13 @@ if ( !function_exists( 'esc_attr__' ) ) {
 
 if ( !function_exists( 'esc_html' ) ) {
 	function esc_html( mixed $text ) :string {
-		return htmlspecialchars( (string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+		return htmlspecialchars( (string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false );
 	}
 }
 
 if ( !function_exists( 'esc_attr' ) ) {
 	function esc_attr( mixed $text ) :string {
-		return htmlspecialchars( (string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+		return htmlspecialchars( (string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false );
 	}
 }
 

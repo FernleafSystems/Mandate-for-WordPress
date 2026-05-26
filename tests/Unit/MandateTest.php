@@ -158,6 +158,41 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
 	}
 
+	public function testPluginOptionsRepositoryUsesWordPressOrgPrefixedOptionName() :void {
+		$this->assertSame( 'mandate_app_security_options', PluginOptionsRepository::OPTION_NAME );
+	}
+
+	public function testPluginOptionsRepositoryIgnoresOldAptowebOptionWithoutMigration() :void {
+		$oldOptionName = 'aptoweb_mandate_application_password_scoper_options';
+		$oldDocument = [
+			'metadata' => [
+				'schema_version' => PluginOptionsRepository::CURRENT_SCHEMA_VERSION,
+				'plugin_version' => Plugin::VERSION,
+				'created_at'     => 100,
+				'updated_at'     => 200,
+			],
+			'scopes'   => [
+				self::UUID => [
+					'user_id'           => 5,
+					'allowed_caps'      => [ 'read' => true ],
+					'allowed_meta_caps' => [],
+					'updated_at'        => 200,
+					'updated_by'        => 1,
+				],
+			],
+		];
+		$GLOBALS[ 'wpm_test_options' ][ $oldOptionName ] = $oldDocument;
+
+		$this->assertSame( [], $this->scopeRepository()->all() );
+		$this->assertSame( $oldDocument, $GLOBALS[ 'wpm_test_options' ][ $oldOptionName ] );
+		$this->assertArrayNotHasKey( PluginOptionsRepository::OPTION_NAME, $GLOBALS[ 'wpm_test_options' ] );
+
+		$this->scopeRepository()->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+
+		$this->assertSame( $oldDocument, $GLOBALS[ 'wpm_test_options' ][ $oldOptionName ] );
+		$this->assertArrayHasKey( PluginOptionsRepository::OPTION_NAME, $GLOBALS[ 'wpm_test_options' ] );
+	}
+
 	public function testPluginOptionsRepositoryPreservesCreatedAtAndRefreshesUpdatedAt() :void {
 		$GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] = [
 			'metadata' => [
@@ -1632,6 +1667,44 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//script|//img' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//@*[starts-with(name(), "on")]' ) );
+	}
+
+	public function testAdminRenderPreservesLateEscapedMachineOwnedDataContracts() :void {
+		$this->seedAdminFixture();
+
+		$xpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $this->scopeRepository() ) ) );
+		$groups = $this->firstElement( $xpath, '//*[@data-wpm-capability-groups]' );
+		$config = json_decode(
+			$groups->getAttribute( 'data-wpm-capability-grouping-config' ),
+			true,
+			512,
+			JSON_THROW_ON_ERROR
+		);
+
+		$this->assertSame( 'wordpress', $config[ 'defaultSource' ] );
+		$this->assertSame( 'area', $config[ 'defaultMode' ] );
+		$this->assertIsArray( $config[ 'sources' ] );
+		$this->assertNotSame( [], $config[ 'sources' ] );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-selection-form]' ) );
+		$this->assertGreaterThan( 0, $this->nodeCount( $xpath, '//*[@data-wpm-capability-item]' ) );
+		$this->assertGreaterThan( 0, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @data-wpm-select-state]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-summary and @aria-controls]' ) );
+	}
+
+	public function testAdminTemplateAllowedHtmlStripsDisallowedMarkupAndPreservesAllowedControls() :void {
+		$html = wp_kses(
+			'<form method="post" action="https://example.test" data-wpm-selection-form onclick="evil()">'
+			.'<input type="hidden" name="mandate_action" value="save_scope" data-wpm-admin-lock-input />'
+			.'<script>alert(1)</script><span data-wpm-select-panel data-wpm-select-state="checked">ok</span>'
+			.'</form>',
+			( new AdminTemplateRenderer() )->allowedAdminHtml()
+		);
+		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
+
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//form[@method="post" and @data-wpm-selection-form]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @name="mandate_action" and @data-wpm-admin-lock-input]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//span[@data-wpm-select-panel and @data-wpm-select-state="checked"]' ) );
+		$this->assertSame( 0, $this->nodeCount( $xpath, '//script|//@onclick' ) );
 	}
 
 	public function testAdminPostClearsOnlyOwnedScope() :void {

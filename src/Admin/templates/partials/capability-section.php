@@ -14,8 +14,7 @@ if ( !defined( 'ABSPATH' ) ) {
 		<?php
 		foreach ( $section[ 'items' ] as $mandateItem ) {
 			$mandateItemHtml = $this->render( 'partials/capability-item.php', [ 'item' => $mandateItem ] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandateItemHtml;
+			echo wp_kses( $mandateItemHtml, $this->allowedAdminHtml() );
 		}
 		?>
 	</div>

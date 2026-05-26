@@ -14,8 +14,7 @@ if ( !$summary[ 'is_visible' ] ) {
 		<?php
 		foreach ( $summary[ 'details' ] as $mandateDetail ) {
 			$mandateDetailHtml = $this->render( 'partials/summary-detail.php', [ 'detail' => $mandateDetail ] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandateDetailHtml;
+			echo wp_kses( $mandateDetailHtml, $this->allowedAdminHtml() );
 		}
 		?>
 	</dl>

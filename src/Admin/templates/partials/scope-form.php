@@ -8,16 +8,13 @@ if ( !defined( 'ABSPATH' ) ) {
 <h2><?php echo esc_html( $scopeForm[ 'heading' ] ); ?></h2>
 <?php
 $mandateSuperAdminNoticeHtml = $this->render( 'partials/notice.php', [ 'notice' => $scopeForm[ 'super_admin_notice' ] ] );
-// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-echo $mandateSuperAdminNoticeHtml;
+echo wp_kses( $mandateSuperAdminNoticeHtml, $this->allowedAdminHtml() );
 $mandateLockNoticeHtml = $this->render( 'partials/notice.php', [ 'notice' => $scopeForm[ 'lock_notice' ] ] );
-// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-echo $mandateLockNoticeHtml;
+echo wp_kses( $mandateLockNoticeHtml, $this->allowedAdminHtml() );
 ?>
 <form method="post" action="<?php echo esc_url( $hrefs[ 'scope_form_action' ] ); ?>" id="<?php echo esc_attr( $scopeForm[ 'id' ] ); ?>" class="mandate-scope-form" data-wpm-admin-lock-status="<?php echo esc_attr( $scopeForm[ 'admin_lock_status' ] ); ?>">
 	<?php
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized trusted nonce field HTML produced by the view-data builder.
-	echo $trustedHtml[ 'scope_nonce_fields' ];
+	echo wp_kses( $trustedHtml[ 'scope_nonce_fields' ], $this->allowedAdminHtml() );
 	?>
 	<input type="hidden" name="user_id" value="<?php echo esc_attr( $scopeForm[ 'user_id' ] ); ?>" />
 	<input type="hidden" name="app_password_uuid" value="<?php echo esc_attr( $scopeForm[ 'uuid' ] ); ?>" />
@@ -51,8 +48,7 @@ echo $mandateLockNoticeHtml;
 		<?php
 		foreach ( $scopeForm[ 'source_panels' ] as $mandatePanel ) {
 			$mandatePanelHtml = $this->render( 'partials/capability-panel.php', [ 'panel' => $mandatePanel ] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandatePanelHtml;
+			echo wp_kses( $mandatePanelHtml, $this->allowedAdminHtml() );
 		}
 		?>
 	</div>

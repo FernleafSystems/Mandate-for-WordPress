@@ -8,7 +8,7 @@ Stable tag: 0.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-WordPress Application Passwords carry the full access of the user behind them. Mandate App Security adds per-credential policies that limit what each one can do.
+WordPress Application Passwords carry the full access of their user. Mandate App Security adds per-credential policies to limit what each one may do.
 
 == Description ==
 

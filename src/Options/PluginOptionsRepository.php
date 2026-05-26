@@ -14,7 +14,7 @@ if ( !defined( 'ABSPATH' ) ) {
  */
 class PluginOptionsRepository {
 
-	public const OPTION_NAME = 'aptoweb_mandate_application_password_scoper_options';
+	public const OPTION_NAME = 'mandate_app_security_options';
 	public const CURRENT_SCHEMA_VERSION = 3;
 
 	/**

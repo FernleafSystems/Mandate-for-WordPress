@@ -202,8 +202,7 @@ class AdminPage {
 	public function render() :void {
 		$this->requirePageAccess();
 		$html = $this->templateRenderer->render( 'admin-page.php', $this->viewDataBuilder->build() );
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Admin templates escape scalar output and only emit sanitized trusted helper HTML.
-		echo $html;
+		echo wp_kses( $html, $this->templateRenderer->allowedAdminHtml() );
 	}
 
 	private function isSuperAdminUser( int $userId ) :bool {

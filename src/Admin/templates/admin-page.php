@@ -9,8 +9,7 @@ if ( !defined( 'ABSPATH' ) ) {
 	<h1><?php echo esc_html( $strings[ 'page_title' ] ); ?></h1>
 	<?php
 	$mandateMessageHtml = $this->render( 'partials/notice.php', [ 'notice' => $vars[ 'message' ] ] );
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-	echo $mandateMessageHtml;
+	echo wp_kses( $mandateMessageHtml, $this->allowedAdminHtml() );
 	$mandateSelectionHtml = $this->render( 'partials/selection-form.php', [
 		'hrefs'         => $hrefs,
 		'strings'       => $strings,
@@ -18,11 +17,9 @@ if ( !defined( 'ABSPATH' ) ) {
 		'selectionForm' => $vars[ 'selection_form' ],
 		'trustedHtml'   => $trustedHtml,
 	] );
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-	echo $mandateSelectionHtml;
+	echo wp_kses( $mandateSelectionHtml, $this->allowedAdminHtml() );
 	$mandatePageNoticeHtml = $this->render( 'partials/notice.php', [ 'notice' => $vars[ 'page_notice' ] ] );
-	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-	echo $mandatePageNoticeHtml;
+	echo wp_kses( $mandatePageNoticeHtml, $this->allowedAdminHtml() );
 	?>
 	<?php
 	if ( $flags[ 'show_scope_form' ] ) {
@@ -31,8 +28,7 @@ if ( !defined( 'ABSPATH' ) ) {
 			'scopeForm' => $vars[ 'scope_form' ],
 			'trustedHtml' => $trustedHtml,
 		] );
-		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-		echo $mandateScopeHtml;
+		echo wp_kses( $mandateScopeHtml, $this->allowedAdminHtml() );
 	}
 	?>
 </div>

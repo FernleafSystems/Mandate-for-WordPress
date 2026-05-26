@@ -12,8 +12,7 @@ if ( !defined( 'ABSPATH' ) ) {
 			<div class="mandate-field">
 				<label class="mandate-field-title" for="mandate-user"><?php echo esc_html( $strings[ 'user_label' ] ); ?></label>
 				<?php
-				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized trusted user dropdown HTML produced by the view-data builder.
-				echo $trustedHtml[ 'user_dropdown' ];
+				echo wp_kses( $trustedHtml[ 'user_dropdown' ], $this->allowedAdminHtml() );
 				?>
 			</div>
 			<?php
@@ -21,8 +20,7 @@ if ( !defined( 'ABSPATH' ) ) {
 				'roleSummary' => $selectionForm[ 'role_summary' ],
 				'strings'     => $strings,
 			] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandateRoleSummaryHtml;
+			echo wp_kses( $mandateRoleSummaryHtml, $this->allowedAdminHtml() );
 			?>
 		</div>
 
@@ -52,16 +50,14 @@ if ( !defined( 'ABSPATH' ) ) {
 			</div>
 			<?php
 			$mandatePasswordInfoHtml = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'password_info' ] ] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandatePasswordInfoHtml;
+			echo wp_kses( $mandatePasswordInfoHtml, $this->allowedAdminHtml() );
 			?>
 		</div>
 
 		<div class="mandate-selection-column">
 			<?php
 			$mandateRulesHtml = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'mandate_rules' ] ] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandateRulesHtml;
+			echo wp_kses( $mandateRulesHtml, $this->allowedAdminHtml() );
 			?>
 		</div>
 	</div>
