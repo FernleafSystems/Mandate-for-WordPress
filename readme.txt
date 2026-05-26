@@ -4,7 +4,7 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,11 @@ Mandate App Security is available at https://wpmandate.com.
 The public development repository, release packages, and build documentation are at https://github.com/FernleafSystems/Mandate-for-WordPress.
 
 == Changelog ==
+
+= 0.3.1 =
+* Adds a Plugins page Settings link that opens the Mandate admin tool.
+* Adds favicon and sitemap metadata for the static product site.
+* Keeps legacy GitHub updater installs on built release ZIPs by publishing and verifying the legacy package asset.
 
 = 0.3.0 =
 * Capability descriptions and tooltips explain what each WordPress capability does.

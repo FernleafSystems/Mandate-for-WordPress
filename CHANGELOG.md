@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1 - 2026-05-26
+
+Mandate keeps existing GitHub-updater installs on built release packages, adds a direct Settings link from the WordPress Plugins page, and improves static site metadata.
+
+### Added
+
+- Plugins page Settings link for opening the Mandate admin tool.
+- Static product site favicon and one-URL sitemap for the wpmandate.com homepage.
+
+### Compatibility
+
+- Legacy `mandate-github` release asset is published and verified alongside the renamed GitHub package so existing updater installs keep receiving built ZIPs.
+
 ## 0.3.0 - 2026-05-26
 
 Application Password scope editing is easier to understand, package output is verified more thoroughly, and the public plugin identity is aligned for distribution.
