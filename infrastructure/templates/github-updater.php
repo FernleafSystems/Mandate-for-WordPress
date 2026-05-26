@@ -14,5 +14,12 @@ if ( !defined( 'ABSPATH' ) ) {
 		PluginIdentity::SLUG
 	);
 
-	$mandate_update_checker->getVcsApi()->enableReleaseAssets( '/'.PluginIdentity::GITHUB_ASSET_PREFIX.'-[^\/?&#]+\.zip($|[?&#])/i' );
+	$mandate_release_asset_prefixes = \array_map(
+		static fn( string $assetPrefix ) :string => \preg_quote( $assetPrefix, '/' ),
+		PluginIdentity::GITHUB_ASSET_PREFIXES
+	);
+
+	$mandate_update_checker->getVcsApi()->enableReleaseAssets(
+		'/(?:'.\implode( '|', $mandate_release_asset_prefixes ).')-[^\/?&#]+\.zip($|[?&#])/i'
+	);
 } );
