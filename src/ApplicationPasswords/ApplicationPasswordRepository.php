@@ -2,6 +2,10 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * @phpstan-type ApplicationPasswordRecord array{uuid:string,name:string,app_id:string,created:int,last_used:int}
  */

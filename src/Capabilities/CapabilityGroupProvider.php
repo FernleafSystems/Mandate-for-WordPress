@@ -2,6 +2,10 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class CapabilityGroupProvider {
 
 	private const WORDPRESS_PRIMITIVE_CAPABILITIES = [

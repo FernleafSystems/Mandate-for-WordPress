@@ -10,9 +10,12 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class AdminPage {
 
-	private const REQUIRED_CAPABILITY = 'manage_options';
 	private const ASSET_HANDLE = 'mandate-admin-page';
 
 	private ScopeRepository $scopeRepository;
@@ -35,6 +38,8 @@ class AdminPage {
 
 	private AdminTemplateRenderer $templateRenderer;
 
+	private AdminScopeAccessPolicy $accessPolicy;
+
 	private string $pageHookSuffix = '';
 
 	public function __construct(
@@ -47,7 +52,8 @@ class AdminPage {
 		AdminUserRoleProvider $roleProvider,
 		AdminScopeFormSecurity $formSecurity,
 		AdminPageViewDataBuilder $viewDataBuilder,
-		AdminTemplateRenderer $templateRenderer
+		AdminTemplateRenderer $templateRenderer,
+		?AdminScopeAccessPolicy $accessPolicy = null
 	) {
 		$this->scopeRepository = $scopeRepository;
 		$this->passwordRepository = $passwordRepository;
@@ -59,6 +65,7 @@ class AdminPage {
 		$this->formSecurity = $formSecurity;
 		$this->viewDataBuilder = $viewDataBuilder;
 		$this->templateRenderer = $templateRenderer;
+		$this->accessPolicy = $accessPolicy ?? new AdminScopeAccessPolicy();
 	}
 
 	public function registerHooks() :void {
@@ -84,7 +91,7 @@ class AdminPage {
 		$this->pageHookSuffix = (string)add_management_page(
 			__( 'Mandate App Security', 'mandate-app-security' ),
 			__( 'Mandate App Security', 'mandate-app-security' ),
-			self::REQUIRED_CAPABILITY,
+			$this->accessPolicy->pageCapability(),
 			Plugin::MENU_SLUG,
 			[ $this, 'render' ]
 		);
@@ -131,7 +138,7 @@ class AdminPage {
 			return;
 		}
 
-		$this->requireManageCapability();
+		$this->requirePageAccess();
 
 		$userId = absint( $this->postScalar( 'user_id' ) );
 		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->postScalar( 'app_password_uuid' ) );
@@ -147,19 +154,29 @@ class AdminPage {
 			$this->formSecurity->nonceName( $action )
 		);
 
+		$scope = $uuid === '' ? null : $this->scopeRepository->findForUser( $userId, $uuid );
 		if ( $userId > 0 && $uuid !== '' && $this->passwordRepository->userOwnsPassword( $userId, $uuid ) ) {
-			if ( $action === AdminScopeFormSecurity::ACTION_CLEAR ) {
+			if ( !$this->accessPolicy->canManageUserScope( $userId ) ) {
+				$message = 'invalid';
+			}
+			elseif ( !$this->accessPolicy->canMutateScope( $userId, $scope ) ) {
+				$message = 'locked';
+			}
+			elseif ( $action === AdminScopeFormSecurity::ACTION_CLEAR ) {
 				$message = $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
 			}
 			elseif ( $action === AdminScopeFormSecurity::ACTION_SAVE ) {
-				$message = $this->handleSaveScopePost( $userId, $uuid );
+				$message = $this->handleSaveScopePost( $userId, $uuid, $scope );
 			}
 		}
 
 		$this->redirectAfterPost( $userId, $uuid, $message );
 	}
 
-	private function handleSaveScopePost( int $userId, string $uuid ) :string {
+	/**
+	 * @param array{admin_locked:bool}|null $scope
+	 */
+	private function handleSaveScopePost( int $userId, string $uuid, ?array $scope ) :string {
 		if ( $this->isSuperAdminUser( $userId ) ) {
 			return 'super_admin_unsupported';
 		}
@@ -176,7 +193,10 @@ class AdminPage {
 		$allowedCaps = array_intersect_key( CapabilityName::normalizeMap( $submittedCaps ), $candidates );
 		$allowedMetaCaps = $this->metaRegistry->intersectSubmitted( $submittedMetaCaps );
 		$capabilitiesRestricted = !( $allowedCaps === $candidates && $allowedMetaCaps === $this->metaRegistry->registered() );
-		if ( !$capabilitiesRestricted && $expiresOn === null ) {
+		$adminLocked = $this->accessPolicy->canManageAnyScope()
+			? $this->postedCheckbox( 'admin_locked' )
+			: ( $scope !== null && $scope[ 'admin_locked' ] );
+		if ( !$capabilitiesRestricted && $expiresOn === null && !$adminLocked ) {
 			return $this->scopeRepository->deleteForUser( $userId, $uuid ) ? 'reset' : 'invalid';
 		}
 
@@ -188,7 +208,8 @@ class AdminPage {
 			$this->roleProvider->roleSlugsForUser( $userId ),
 			get_current_user_id(),
 			$expiresOn,
-			$capabilitiesRestricted
+			$capabilitiesRestricted,
+			$adminLocked
 		) ? 'saved' : 'invalid';
 	}
 
@@ -207,14 +228,14 @@ class AdminPage {
 		exit;
 	}
 
-	private function requireManageCapability() :void {
-		if ( !current_user_can( self::REQUIRED_CAPABILITY ) ) {
+	private function requirePageAccess() :void {
+		if ( !$this->accessPolicy->canAccessPage() ) {
 			wp_die( esc_html__( 'You do not have permission to manage application password scopes.', 'mandate-app-security' ) );
 		}
 	}
 
 	public function render() :void {
-		$this->requireManageCapability();
+		$this->requirePageAccess();
 		$html = $this->templateRenderer->render( 'admin-page.php', $this->viewDataBuilder->build() );
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Admin templates escape scalar output and only emit sanitized trusted helper HTML.
 		echo $html;
@@ -247,6 +268,10 @@ class AdminPage {
 		}
 
 		return $this->expirationDatePolicy->normalize( $submitted ) ?? false;
+	}
+
+	private function postedCheckbox( string $key ) :bool {
+		return $this->postScalar( $key ) !== '';
 	}
 
 	/**

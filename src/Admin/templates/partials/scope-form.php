@@ -10,8 +10,11 @@ if ( !defined( 'ABSPATH' ) ) {
 $mandateSuperAdminNoticeHtml = $this->render( 'partials/notice.php', [ 'notice' => $scopeForm[ 'super_admin_notice' ] ] );
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
 echo $mandateSuperAdminNoticeHtml;
+$mandateLockNoticeHtml = $this->render( 'partials/notice.php', [ 'notice' => $scopeForm[ 'lock_notice' ] ] );
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
+echo $mandateLockNoticeHtml;
 ?>
-<form method="post" action="<?php echo esc_url( $hrefs[ 'scope_form_action' ] ); ?>" id="<?php echo esc_attr( $scopeForm[ 'id' ] ); ?>" class="mandate-scope-form">
+<form method="post" action="<?php echo esc_url( $hrefs[ 'scope_form_action' ] ); ?>" id="<?php echo esc_attr( $scopeForm[ 'id' ] ); ?>" class="mandate-scope-form" data-wpm-admin-lock-status="<?php echo esc_attr( $scopeForm[ 'admin_lock_status' ] ); ?>">
 	<?php
 	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized trusted nonce field HTML produced by the view-data builder.
 	echo $trustedHtml[ 'scope_nonce_fields' ];
@@ -34,6 +37,19 @@ echo $mandateSuperAdminNoticeHtml;
 		$mandatePanelHtml = $this->render( 'partials/capability-panel.php', [ 'panel' => $mandatePanel ] );
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
 		echo $mandatePanelHtml;
+	}
+	?>
+
+	<?php
+	if ( $scopeForm[ 'admin_lock' ][ 'is_visible' ] ) {
+		?>
+		<p class="mandate-admin-lock">
+			<label>
+				<input type="checkbox" name="<?php echo esc_attr( $scopeForm[ 'admin_lock' ][ 'name' ] ); ?>" value="<?php echo esc_attr( $scopeForm[ 'admin_lock' ][ 'value' ] ); ?>"<?php if ( $scopeForm[ 'admin_lock' ][ 'checked' ] ) { ?> checked="checked"<?php } ?><?php if ( $scopeForm[ 'admin_lock' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?> />
+				<?php echo esc_html( $scopeForm[ 'admin_lock' ][ 'label' ] ); ?>
+			</label>
+		</p>
+		<?php
 	}
 	?>
 

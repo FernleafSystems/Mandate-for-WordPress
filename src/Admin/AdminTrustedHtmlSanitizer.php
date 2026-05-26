@@ -2,6 +2,10 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class AdminTrustedHtmlSanitizer {
 
 	public function dropdown( string $html ) :string {
@@ -9,11 +13,13 @@ class AdminTrustedHtmlSanitizer {
 			$html,
 			[
 				'select' => [
-					'class' => true,
-					'id'    => true,
-					'name'  => true,
+					'class'    => true,
+					'disabled' => true,
+					'id'       => true,
+					'name'     => true,
 				],
 				'option' => [
+					'disabled' => true,
 					'selected' => true,
 					'value'    => true,
 				],

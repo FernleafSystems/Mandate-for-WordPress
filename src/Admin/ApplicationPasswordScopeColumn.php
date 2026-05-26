@@ -5,13 +5,22 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class ApplicationPasswordScopeColumn {
 
 	public const COLUMN_KEY = 'mandate_scope';
 
-	private const REQUIRED_CAPABILITY = 'manage_options';
 	private const JS_TEMPLATE_UUID = '{{ data.uuid }}';
 	private const JS_URL_PLACEHOLDER = 'MANDATE_APPLICATION_PASSWORD_UUID';
+
+	private AdminScopeAccessPolicy $accessPolicy;
+
+	public function __construct( ?AdminScopeAccessPolicy $accessPolicy = null ) {
+		$this->accessPolicy = $accessPolicy ?? new AdminScopeAccessPolicy();
+	}
 
 	public function registerHooks() :void {
 		add_filter( 'manage_application-passwords-user_columns', [ $this, 'addColumn' ] );
@@ -24,7 +33,7 @@ class ApplicationPasswordScopeColumn {
 	 * @return array<string,string>
 	 */
 	public function addColumn( array $columns ) :array {
-		if ( !$this->canManageScopes() ) {
+		if ( !$this->canUseScopeShortcut() ) {
 			return $columns;
 		}
 
@@ -50,7 +59,7 @@ class ApplicationPasswordScopeColumn {
 	 * @param array<string,mixed> $item
 	 */
 	public function renderColumn( string $columnName, array $item ) :void {
-		if ( $columnName !== self::COLUMN_KEY || !$this->canManageScopes() ) {
+		if ( $columnName !== self::COLUMN_KEY || !$this->canUseScopeShortcut() ) {
 			return;
 		}
 
@@ -58,7 +67,7 @@ class ApplicationPasswordScopeColumn {
 	}
 
 	public function renderColumnJsTemplate( string $columnName ) :void {
-		if ( $columnName !== self::COLUMN_KEY || !$this->canManageScopes() ) {
+		if ( $columnName !== self::COLUMN_KEY || !$this->canUseScopeShortcut() ) {
 			return;
 		}
 
@@ -88,13 +97,13 @@ class ApplicationPasswordScopeColumn {
 
 		printf(
 			'<a class="button" href="%1$s">%2$s</a>',
-			$href,
+			esc_attr( $href ),
 			esc_html__( 'Restrict Scope', 'mandate-app-security' )
 		);
 	}
 
-	private function canManageScopes() :bool {
-		return current_user_can( self::REQUIRED_CAPABILITY );
+	private function canUseScopeShortcut() :bool {
+		return $this->accessPolicy->canUseScopeShortcutForProfileUser( $this->profileUserId() );
 	}
 
 	private function profileUserId() :int {

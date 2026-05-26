@@ -4,6 +4,10 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\Options;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * @phpstan-type PluginOptionsMetadata array{schema_version:int,plugin_version:string,created_at:int,updated_at:int}
  * @phpstan-type PluginOptionsDocument array{metadata:PluginOptionsMetadata,scopes:array<string,mixed>}
@@ -11,7 +15,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 class PluginOptionsRepository {
 
 	public const OPTION_NAME = 'aptoweb_mandate_application_password_scoper_options';
-	public const CURRENT_SCHEMA_VERSION = 2;
+	public const CURRENT_SCHEMA_VERSION = 3;
 
 	/**
 	 * @return PluginOptionsDocument
@@ -69,7 +73,7 @@ class PluginOptionsRepository {
 	private function normalizeDocument( array $raw ) :?array {
 		$schemaVersion = $this->schemaVersion( $raw );
 		return match ( $schemaVersion ) {
-			1, self::CURRENT_SCHEMA_VERSION => $this->normalizeVersionedDocument( $raw ),
+			1, 2, self::CURRENT_SCHEMA_VERSION => $this->normalizeVersionedDocument( $raw ),
 			default => null,
 		};
 	}

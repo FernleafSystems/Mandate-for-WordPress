@@ -238,6 +238,16 @@
 	gap: .5rem;
 }
 
+.mandate-admin-lock {
+	margin: 1rem 0 0;
+}
+
+.mandate-admin-lock label {
+	align-items: center;
+	display: inline-flex;
+	gap: .5rem;
+}
+
 .mandate-selection-status {
 	align-items: center;
 	color: #50575e;

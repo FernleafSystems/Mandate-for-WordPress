@@ -2,6 +2,10 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Expiration;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class ExpirationDatePolicy {
 
 	public function normalize( mixed $date ) :?string {

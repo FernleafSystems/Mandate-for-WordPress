@@ -2,6 +2,10 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class CurrentApplicationPasswordContext {
 
 	private ?int $userId = null;

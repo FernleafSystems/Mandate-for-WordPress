@@ -6,6 +6,10 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
 $rootDir = dirname( __DIR__ );
+if ( !defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', $rootDir.'/' );
+}
+
 $autoload = $rootDir.'/vendor/autoload.php';
 if ( !is_file( $autoload ) ) {
 	fwrite( STDERR, 'Missing vendor/autoload.php. Run composer install before installing WordPress tests.'.PHP_EOL );

@@ -2,6 +2,10 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 final class PluginIdentity {
 
 	public const NAME = 'Mandate App Security';

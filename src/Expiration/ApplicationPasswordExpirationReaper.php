@@ -4,6 +4,10 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\Expiration;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class ApplicationPasswordExpirationReaper {
 
 	public const HOOK = 'mandate_revoke_expired_application_passwords';

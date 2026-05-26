@@ -6,7 +6,7 @@ if ( !defined( 'ABSPATH' ) ) {
 
 ?>
 <label>
-	<input type="checkbox" name="<?php echo esc_attr( $item[ 'field_name' ] ); ?>[]" value="<?php echo esc_attr( $item[ 'name' ] ); ?>"<?php if ( $item[ 'checked' ] ) { ?> checked="checked"<?php } ?> />
+	<input type="checkbox" name="<?php echo esc_attr( $item[ 'field_name' ] ); ?>[]" value="<?php echo esc_attr( $item[ 'name' ] ); ?>"<?php if ( $item[ 'checked' ] ) { ?> checked="checked"<?php } ?><?php if ( $item[ 'disabled' ] ) { ?> disabled="disabled"<?php } ?> />
 	<?php
 	if ( $item[ 'has_tooltip' ] ) {
 		?>

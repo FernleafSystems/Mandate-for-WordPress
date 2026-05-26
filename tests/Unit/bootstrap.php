@@ -72,7 +72,7 @@ function wpm_test_reset_state() :void {
 	$GLOBALS[ 'wpm_test_roles' ] = new Wpm_Test_Roles( [] );
 	$GLOBALS[ 'wpm_test_users' ] = [];
 	$GLOBALS[ 'wpm_test_current_user_id' ] = 1;
-	$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'manage_options' => true ];
+	$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'manage_options' => true, 'read' => true ];
 	$GLOBALS[ 'wpm_test_rest_uuid' ] = null;
 	$GLOBALS[ 'wpm_test_now' ] = strtotime( '2026-05-23 12:00:00 UTC' );
 	$GLOBALS[ 'wpm_test_is_multisite' ] = false;

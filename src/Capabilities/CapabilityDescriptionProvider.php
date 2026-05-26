@@ -2,6 +2,10 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class CapabilityDescriptionProvider {
 
 	/**

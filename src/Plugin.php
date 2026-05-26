@@ -4,6 +4,7 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeAccessPolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
@@ -20,6 +21,10 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpir
 use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
+
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 class Plugin {
 
@@ -44,6 +49,7 @@ class Plugin {
 		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
 		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
 		$templateRenderer = new AdminTemplateRenderer();
+		$accessPolicy = new AdminScopeAccessPolicy();
 		$viewDataBuilder = new AdminPageViewDataBuilder(
 			$scopeRepository,
 			$passwordRepository,
@@ -54,7 +60,8 @@ class Plugin {
 			$expirationDatePolicy,
 			$roleProvider,
 			$formSecurity,
-			$trustedHtmlSanitizer
+			$trustedHtmlSanitizer,
+			$accessPolicy
 		);
 
 		$adminPage = new AdminPage(
@@ -67,7 +74,8 @@ class Plugin {
 			$roleProvider,
 			$formSecurity,
 			$viewDataBuilder,
-			$templateRenderer
+			$templateRenderer,
+			$accessPolicy
 		);
 		$enforcer = new CapabilityScopeEnforcer(
 			$scopeRepository,
@@ -77,7 +85,7 @@ class Plugin {
 			$expirationDatePolicy
 		);
 		$expirationReaper = new ApplicationPasswordExpirationReaper( $scopeRepository, $expirationDatePolicy );
-		$scopeColumn = new ApplicationPasswordScopeColumn();
+		$scopeColumn = new ApplicationPasswordScopeColumn( $accessPolicy );
 
 		$adminPage->registerHooks();
 		$scopeColumn->registerHooks();

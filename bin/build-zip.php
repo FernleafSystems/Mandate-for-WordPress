@@ -10,6 +10,10 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
 $projectRoot = dirname( __DIR__ );
+if ( !\defined( 'ABSPATH' ) ) {
+	\define( 'ABSPATH', $projectRoot.'/' );
+}
+
 $autoload = $projectRoot.'/vendor/autoload.php';
 if ( !\is_file( $autoload ) ) {
 	\fwrite( \STDERR, 'Missing vendor/autoload.php. Run composer install before building the zip.'.PHP_EOL );

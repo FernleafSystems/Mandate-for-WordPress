@@ -92,6 +92,54 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( null, $record[ 'roles_at_update' ] );
 	}
 
+	public function testScopeNormalizationDefaultsLegacyRecordsToUnlocked() :void {
+		foreach ( [ 1, 2 ] as $schemaVersion ) {
+			wpm_test_reset_state();
+			$stored = [
+				'metadata' => [
+					'schema_version' => $schemaVersion,
+					'plugin_version' => '0.3.1',
+					'created_at'     => 100,
+					'updated_at'     => 200,
+				],
+				'scopes'   => [
+					self::UUID => [
+						'user_id'                 => 5,
+						'capabilities_restricted' => true,
+						'allowed_caps'            => [ 'read' => true ],
+						'allowed_meta_caps'       => [],
+						'expires_on'              => null,
+						'roles_at_update'         => [ 'wpm_editor' ],
+						'updated_at'              => 200,
+						'updated_by'              => 1,
+					],
+				],
+			];
+			$GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] = $stored;
+
+			$record = $this->scopeRepository()->find( self::UUID );
+
+			$this->assertNotNull( $record );
+			$this->assertFalse( $record[ 'admin_locked' ] );
+			$this->assertSame( $stored, $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ] );
+		}
+	}
+
+	public function testScopeRepositoryPersistsAdminLockedAndLockOnlyRecords() :void {
+		$repository = $this->scopeRepository();
+
+		$this->assertTrue( $repository->save( self::UUID, 5, [], [], [ 'wpm_editor' ], 1, null, false, true ) );
+		$record = $repository->findForUser( 5, self::UUID );
+
+		$this->assertNotNull( $record );
+		$this->assertFalse( $record[ 'capabilities_restricted' ] );
+		$this->assertSame( [], $record[ 'allowed_caps' ] );
+		$this->assertTrue( $record[ 'admin_locked' ] );
+		$stored = $this->storedScopes();
+		$this->assertTrue( $stored[ self::UUID ][ 'admin_locked' ] );
+		$this->assertSame( PluginOptionsRepository::CURRENT_SCHEMA_VERSION, $GLOBALS[ 'wpm_test_options' ][ PluginOptionsRepository::OPTION_NAME ][ 'metadata' ][ 'schema_version' ] );
+	}
+
 	public function testPluginOptionsRepositoryStoresVersionedDocumentContract() :void {
 		$repository = $this->scopeRepository();
 
@@ -503,6 +551,14 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 1, $callbacks[ 0 ][ 'accepted_args' ] );
 	}
 
+	public function testAdminPageRegistersMenuForLoggedInUsers() :void {
+		$adminPage = $this->adminPage();
+
+		$adminPage->registerMenu();
+
+		$this->assertSame( 'read', $GLOBALS[ 'wpm_test_management_pages' ][ Plugin::MENU_SLUG ][ 'capability' ] );
+	}
+
 	public function testApplicationPasswordScopeColumnRegistersTableHooks() :void {
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
@@ -553,6 +609,27 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 
 		$this->assertSame( '', $html );
+	}
+
+	public function testApplicationPasswordScopeColumnAllowsOwnersOnOwnProfileOnly() :void {
+		$GLOBALS[ 'wpm_test_current_user_id' ] = 5;
+		$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'read' => true ];
+		$GLOBALS[ 'user_id' ] = 5;
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$columns = $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] );
+		$this->assertSame( [ ApplicationPasswordScopeColumn::COLUMN_KEY, 'revoke' ], array_keys( $columns ) );
+		$html = $this->captureOutput(
+			fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] )
+		);
+		$this->assertSame( self::UUID, $this->queryParamFromHref( $this->actionLinkHref( $html ), 'app_password_uuid' ) );
+
+		$GLOBALS[ 'user_id' ] = 9;
+		$this->assertSame( [ 'revoke' => 'Revoke' ], $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] ) );
+		$this->assertSame(
+			'',
+			$this->captureOutput( fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] ) )
+		);
 	}
 
 	public function testApplicationPasswordScopeColumnRendersSanitizedDeepLink() :void {
@@ -728,8 +805,9 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [], $this->scopeRepository()->all() );
 	}
 
-	public function testAdminPostRequiresManageOptionsBeforeMutation() :void {
+	public function testAdminPostRequiresLoggedInPageAccessBeforeMutation() :void {
 		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_current_user_id' ] = 0;
 		$GLOBALS[ 'wpm_test_current_user_caps' ] = [];
 		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true );
 
@@ -737,6 +815,64 @@ final class MandateTest extends Wpm_Test_Case {
 			fn() => $this->adminPage()->handlePost()
 		);
 		$this->assertSame( [], $this->scopeRepository()->all() );
+	}
+
+	public function testAdminPostRequiresReadPageAccessBeforeMutation() :void {
+		$this->seedAdminFixture();
+		$GLOBALS[ 'wpm_test_current_user_id' ] = 5;
+		$GLOBALS[ 'wpm_test_current_user_caps' ] = [];
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true );
+
+		$this->assertThrowsRuntimeException(
+			fn() => $this->adminPage()->handlePost()
+		);
+		$this->assertSame( [], $this->scopeRepository()->all() );
+	}
+
+	public function testNonAdminPostSavesOwnUnlockedScopeOnly() :void {
+		$this->seedAdminFixture();
+		$this->actAsUser( 5 );
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true, true );
+
+		$repository = $this->scopeRepository();
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$record = $repository->findForUser( 5, self::UUID );
+
+		$this->assertSame( 'saved', $this->redirectMessage( $location ) );
+		$this->assertNotNull( $record );
+		$this->assertSame( [ 'read' => true ], $record[ 'allowed_caps' ] );
+		$this->assertFalse( $record[ 'admin_locked' ] );
+		$this->assertSame( 5, $record[ 'updated_by' ] );
+	}
+
+	public function testNonAdminPostRejectsForgedOtherUserScopeWithoutMutation() :void {
+		$this->seedAdminFixture();
+		$this->actAsUser( 5 );
+		$this->submitScopePost( 'save_scope', 9, self::OTHER_UUID, [ 'read' ], [], true );
+
+		$repository = $this->scopeRepository();
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$this->assertSame( 'invalid', $this->redirectMessage( $location ) );
+		$this->assertSame( [], $repository->all() );
+	}
+
+	public function testNonAdminPostRejectsOwnAdminLockedScopeWithoutMutation() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1, null, true, true );
+		$before = $repository->findForUser( 5, self::UUID );
+		$this->actAsUser( 5 );
+
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read', 'upload_files' ], [], true );
+		$saveLocation = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$this->assertSame( 'locked', $this->redirectMessage( $saveLocation ) );
+		$this->assertSame( $before, $repository->findForUser( 5, self::UUID ) );
+
+		$this->submitScopePost( 'clear_scope', 5, self::UUID, [], [], true );
+		$clearLocation = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$this->assertSame( 'locked', $this->redirectMessage( $clearLocation ) );
+		$this->assertSame( $before, $repository->findForUser( 5, self::UUID ) );
 	}
 
 	public function testAdminPostRequiresActionScopedNonceBeforeMutation() :void {
@@ -786,6 +922,25 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
 	}
 
+	public function testAdminPostCanSaveAndResetAnotherUsersScope() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$this->submitScopePost( 'save_scope', 9, self::OTHER_UUID, [ 'read' ], [], true );
+
+		$saveLocation = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$record = $repository->findForUser( 9, self::OTHER_UUID );
+
+		$this->assertSame( 'saved', $this->redirectMessage( $saveLocation ) );
+		$this->assertNotNull( $record );
+		$this->assertSame( [ 'read' => true ], $record[ 'allowed_caps' ] );
+
+		$this->submitScopePost( 'clear_scope', 9, self::OTHER_UUID, [], [], true );
+		$resetLocation = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$this->assertSame( 'reset', $this->redirectMessage( $resetLocation ) );
+		$this->assertNull( $repository->findForUser( 9, self::OTHER_UUID ) );
+	}
+
 	public function testAdminPostAllSelectedScopeDeletesStoredScope() :void {
 		$this->seedAdminFixture();
 		$repository = $this->scopeRepository();
@@ -806,6 +961,57 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertArrayNotHasKey( self::UUID, $storedScopes );
 		$this->assertArrayHasKey( self::OTHER_UUID, $storedScopes );
 		$this->assertSame( 'reset', $this->redirectMessage( $location ) );
+	}
+
+	public function testAdminPostCanPersistAndRemoveLockOnlyScope() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$this->submitScopePost(
+			'save_scope',
+			5,
+			self::UUID,
+			[ 'read', 'edit_posts', 'upload_files' ],
+			array_keys( ( new MetaCapabilityRegistry() )->registered() ),
+			true,
+			true
+		);
+
+		$saveLocation = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$record = $repository->findForUser( 5, self::UUID );
+
+		$this->assertSame( 'saved', $this->redirectMessage( $saveLocation ) );
+		$this->assertNotNull( $record );
+		$this->assertFalse( $record[ 'capabilities_restricted' ] );
+		$this->assertTrue( $record[ 'admin_locked' ] );
+
+		$this->submitScopePost(
+			'save_scope',
+			5,
+			self::UUID,
+			[ 'read', 'edit_posts', 'upload_files' ],
+			array_keys( ( new MetaCapabilityRegistry() )->registered() ),
+			true
+		);
+
+		$unlockLocation = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+
+		$this->assertSame( 'reset', $this->redirectMessage( $unlockLocation ) );
+		$this->assertNull( $repository->findForUser( 5, self::UUID ) );
+	}
+
+	public function testAdminPostCanUnlockRestrictedScopeWithoutChangingRestrictions() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1, null, true, true );
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true, false );
+
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$record = $repository->findForUser( 5, self::UUID );
+
+		$this->assertSame( 'saved', $this->redirectMessage( $location ) );
+		$this->assertNotNull( $record );
+		$this->assertSame( [ 'read' => true ], $record[ 'allowed_caps' ] );
+		$this->assertFalse( $record[ 'admin_locked' ] );
 	}
 
 	public function testAdminPostRefusesMultisiteSuperAdminScopeWithoutMutation() :void {
@@ -919,12 +1125,69 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 'wordpress', $scopeForm[ 'tabs' ][ 0 ][ 'key' ] );
 		$this->assertSame( 'other', $scopeForm[ 'tabs' ][ 1 ][ 'key' ] );
 		$this->assertFalse( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
+		$this->assertSame( 'unlocked', $scopeForm[ 'admin_lock_status' ] );
+		$this->assertTrue( $scopeForm[ 'admin_lock' ][ 'is_visible' ] );
+		$this->assertFalse( $scopeForm[ 'admin_lock' ][ 'checked' ] );
 
 		$uploadFiles = $this->capabilityItemFromViewData( $data, 'upload_files' );
 		$this->assertSame( 'allowed_caps', $uploadFiles[ 'field_name' ] );
 		$this->assertTrue( $uploadFiles[ 'checked' ] );
+		$this->assertFalse( $uploadFiles[ 'disabled' ] );
 		$this->assertTrue( $uploadFiles[ 'has_tooltip' ] );
 		$this->assertIsString( $uploadFiles[ 'tooltip_text' ] );
+	}
+
+	public function testAdminPageViewDataBuilderRestrictsNonAdminSelectionToCurrentUser() :void {
+		$this->seedAdminFixture();
+		$this->actAsUser( 5 );
+		$_GET = [
+			'page'              => Plugin::MENU_SLUG,
+			'user_id'           => '9',
+			'app_password_uuid' => self::OTHER_UUID,
+		];
+
+		$data = $this->adminPageViewDataBuilder( $this->scopeRepository() )->build();
+		$document = $this->documentFromHtml( $data[ 'trustedHtml' ][ 'user_dropdown' ] );
+		$xpath = new DOMXPath( $document );
+
+		$this->assertSame( 5, $data[ 'vars' ][ 'selection_form' ][ 'selected_user_id' ] );
+		$this->assertSame( self::UUID, $data[ 'vars' ][ 'selection_form' ][ 'selected_uuid' ] );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//select[@id="mandate-user" and @name="user_id" and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//option[@value="5" and @selected="selected"]' ) );
+		$this->assertSame( 0, $this->nodeCount( $xpath, '//option[@value="9"]' ) );
+	}
+
+	public function testAdminPageRenderShowsLockedOwnerScopeAsReadOnly() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [ 'wpm_editor' ], 1, null, true, true );
+		$this->actAsUser( 5 );
+
+		$xpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
+
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//div[contains(@class, "notice-info")]/p[contains(., "locked by an administrator")]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@name="allowed_caps[]" and @value="read" and @disabled="disabled"]' ) );
+		$this->assertSame( 4, $this->nodeCount( $xpath, '//*[@data-wpm-select-group and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-input and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="save_scope" and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="clear_scope" and @disabled="disabled"]' ) );
+		$this->assertSame( 0, $this->nodeCount( $xpath, '//input[@name="admin_locked"]' ) );
+	}
+
+	public function testAdminPageRenderShowsAdminLockControlForAdminsOnly() :void {
+		$this->seedAdminFixture();
+		$repository = $this->scopeRepository();
+		$repository->save( self::UUID, 5, [], [], [ 'wpm_editor' ], 1, null, false, true );
+
+		$adminXpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
+		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//input[@name="admin_locked" and @value="1" and @checked="checked"]' ) );
+		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//input[@name="admin_locked" and @disabled="disabled"]' ) );
+
+		$this->actAsUser( 5 );
+		$userXpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
+		$this->assertSame( 0, $this->nodeCount( $userXpath, '//input[@name="admin_locked"]' ) );
 	}
 
 	public function testAdminPageViewDataBuilderEmitsSuperAdminUnsupportedState() :void {
@@ -1137,7 +1400,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 	public function testDeletedApplicationPasswordPrunesScopeRecord() :void {
 		$repository = $this->scopeRepository();
-		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
+		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1, null, true, true );
 		$this->assertArrayHasKey( self::UUID, $repository->all() );
 
 		$repository->deleteForApplicationPassword( 5, [ 'uuid' => self::UUID ] );
@@ -1269,6 +1532,10 @@ final class MandateTest extends Wpm_Test_Case {
 			'ID'    => 5,
 			'roles' => [ 'wpm_editor' ],
 		];
+		$GLOBALS[ 'wpm_test_users' ][ 9 ] = (object)[
+			'ID'    => 9,
+			'roles' => [ 'wpm_editor' ],
+		];
 		WP_Application_Passwords::$passwordsByUser = [
 			5 => [
 				[
@@ -1279,7 +1546,21 @@ final class MandateTest extends Wpm_Test_Case {
 					'last_used' => 0,
 				],
 			],
+			9 => [
+				[
+					'uuid'      => self::OTHER_UUID,
+					'name'      => 'Other',
+					'app_id'    => '',
+					'created'   => 0,
+					'last_used' => 0,
+				],
+			],
 		];
+	}
+
+	private function actAsUser( int $userId ) :void {
+		$GLOBALS[ 'wpm_test_current_user_id' ] = $userId;
+		$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'read' => true ];
 	}
 
 	/**
@@ -1292,7 +1573,8 @@ final class MandateTest extends Wpm_Test_Case {
 		string $uuid,
 		array $allowedCaps,
 		array $allowedMetaCaps,
-		bool $withNonce
+		bool $withNonce,
+		?bool $adminLocked = null
 	) :void {
 		$_SERVER[ 'REQUEST_METHOD' ] = 'POST';
 		$_POST = [
@@ -1302,6 +1584,9 @@ final class MandateTest extends Wpm_Test_Case {
 			'allowed_caps'      => $allowedCaps,
 			'allowed_meta_caps' => $allowedMetaCaps,
 		];
+		if ( $adminLocked !== null ) {
+			$_POST[ 'admin_locked' ] = $adminLocked ? '1' : '';
+		}
 		if ( $withNonce ) {
 			$formSecurity = new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() );
 			$nonceName = $formSecurity->nonceName( $action );
@@ -1337,6 +1622,14 @@ final class MandateTest extends Wpm_Test_Case {
 	private function actionLinkHref( string $html ) :string {
 		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
 		return $this->firstElement( $xpath, '//a' )->getAttribute( 'href' );
+	}
+
+	private function queryParamFromHref( string $href, string $key ) :string {
+		$query = parse_url( $href, PHP_URL_QUERY );
+		$this->assertIsString( $query );
+		parse_str( $query, $params );
+		$value = $params[ $key ] ?? '';
+		return is_scalar( $value ) ? (string)$value : '';
 	}
 
 	private function captureOutput( callable $callback ) :string {

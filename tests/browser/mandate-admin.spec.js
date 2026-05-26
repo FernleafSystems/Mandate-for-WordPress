@@ -1,15 +1,24 @@
 const { test, expect, request } = require( '@playwright/test' );
 
 async function loginAsAdmin( page ) {
+	await loginAs( page, process.env.WPM_BROWSER_ADMIN_USER || 'admin', process.env.WPM_BROWSER_ADMIN_PASSWORD || 'password' );
+}
+
+async function loginAs( page, username, password ) {
 	await page.goto( '/wp-admin/', { waitUntil: 'load' } );
 	if ( await page.locator( '#loginform' ).count() ) {
-		await page.locator( '#user_login' ).fill( process.env.WPM_BROWSER_ADMIN_USER || 'admin' );
-		await page.locator( '#user_pass' ).fill( process.env.WPM_BROWSER_ADMIN_PASSWORD || 'password' );
+		await page.locator( '#user_login' ).fill( username );
+		await page.locator( '#user_pass' ).fill( password );
 		await Promise.all( [
 			page.waitForNavigation( { waitUntil: 'domcontentloaded' } ),
 			page.locator( '#wp-submit' ).click(),
 		] );
 	}
+}
+
+async function loginAsFixtureUser( page, username ) {
+	await page.context().clearCookies();
+	await loginAs( page, username, 'password' );
 }
 
 function basicAuthHeader( username, password ) {
@@ -362,4 +371,75 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	authResponse = await secondaryRequest.get( '/wp-json/mandate-test/v1/auth' );
 	expect( authResponse.ok() ).toBeFalsy();
 	await secondaryRequest.dispose();
+} );
+
+test( 'admin can lock a scope and the owner cannot edit it from UI or forged POST', async ( { page } ) => {
+	await page.setViewportSize( { width: 1280, height: 900 } );
+	await loginAsAdmin( page );
+
+	const fixtureResponse = await page.request.get( '/wp-json/mandate-test/v1/fixture' );
+	expect( fixtureResponse.ok() ).toBeTruthy();
+	const fixture = await fixtureResponse.json();
+	const primary = fixture.primary;
+	const otherUser = fixture.secondary_user;
+	const primaryPassword = primary.passwords.primary;
+
+	await page.goto( '/wp-admin/tools.php?page=mandate-app-security', { waitUntil: 'load' } );
+	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
+	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
+	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
+	await page.locator( 'input[name="admin_locked"]' ).check();
+	await Promise.all( [
+		page.waitForNavigation( { waitUntil: 'load' } ),
+		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
+	] );
+	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
+	await expect( page.locator( 'input[name="admin_locked"]' ) ).toBeChecked();
+
+	await loginAsFixtureUser( page, primary.user_login );
+	await page.goto(
+		`/wp-admin/tools.php?page=mandate-app-security&user_id=${otherUser.user_id}&app_password_uuid=${primaryPassword.uuid}`,
+		{ waitUntil: 'load' }
+	);
+
+	await expect( page.locator( '#mandate-user' ) ).toBeDisabled();
+	await expect( page.locator( '#mandate-user' ) ).toHaveValue( String( primary.user_id ) );
+	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
+	await expect( page.getByText( 'This application password scope is locked by an administrator.' ) ).toBeVisible();
+	await expect( page.locator( 'input[name="admin_locked"]' ) ).toHaveCount( 0 );
+	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
+	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeDisabled();
+	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeDisabled();
+	await expect( page.locator( '[data-wpm-panel="wordpress"] [data-wpm-select-state="unchecked"]' ) ).toBeDisabled();
+	await expect( page.locator( 'button[name="mandate_action"][value="save_scope"]' ) ).toBeDisabled();
+	await expect( page.locator( 'button[name="mandate_action"][value="clear_scope"]' ) ).toBeDisabled();
+
+	const forged = await page.locator( '#mandate-scope-form' ).evaluate( async ( form ) => {
+		const params = new URLSearchParams();
+		new FormData( form ).forEach( ( value, key ) => params.append( key, value ) );
+		params.set( 'mandate_action', 'save_scope' );
+		params.append( 'allowed_caps[]', 'read' );
+		params.append( 'allowed_caps[]', 'edit_posts' );
+		params.append( 'allowed_caps[]', 'upload_files' );
+
+		const response = await fetch( form.action, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: params.toString(),
+			redirect: 'follow',
+		} );
+
+		return {
+			status: response.status,
+			url: response.url,
+		};
+	} );
+	expect( forged.status ).toBe( 200 );
+	expect( new URL( forged.url ).searchParams.get( 'mandate_message' ) ).toBe( 'locked' );
+
+	await page.reload( { waitUntil: 'load' } );
+	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
+	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
 } );

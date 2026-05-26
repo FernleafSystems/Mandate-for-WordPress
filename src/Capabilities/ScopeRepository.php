@@ -6,8 +6,12 @@ use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPas
 use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
- * @phpstan-type CapabilityScopeRecord array{user_id:int,capabilities_restricted:bool,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,expires_on:string|null,roles_at_update:list<string>|null,updated_at:int,updated_by:int}
+ * @phpstan-type CapabilityScopeRecord array{user_id:int,capabilities_restricted:bool,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,expires_on:string|null,roles_at_update:list<string>|null,updated_at:int,updated_by:int,admin_locked:bool}
  */
 class ScopeRepository {
 
@@ -78,7 +82,8 @@ class ScopeRepository {
 		array $rolesAtUpdate,
 		int $updatedBy,
 		?string $expiresOn = null,
-		bool $capabilitiesRestricted = true
+		bool $capabilitiesRestricted = true,
+		bool $adminLocked = false
 	) :bool {
 		$uuid = ApplicationPasswordRepository::normalizeUuid( $uuid );
 		if ( $uuid === '' || $userId < 1 ) {
@@ -100,6 +105,7 @@ class ScopeRepository {
 			'roles_at_update'         => $this->normalizeRoleSlugs( $rolesAtUpdate ),
 			'updated_at'              => time(),
 			'updated_by'              => max( 0, $updatedBy ),
+			'admin_locked'            => $adminLocked,
 		];
 
 		return $this->optionsRepository->replaceScopes( $all );
@@ -160,6 +166,9 @@ class ScopeRepository {
 		$expiresOn = array_key_exists( 'expires_on', $record )
 			? $this->expirationDatePolicy->normalize( $record[ 'expires_on' ] )
 			: null;
+		$adminLocked = isset( $record[ 'admin_locked' ] ) && is_bool( $record[ 'admin_locked' ] )
+			? $record[ 'admin_locked' ]
+			: false;
 
 		return [
 			'user_id'                 => $userId,
@@ -170,6 +179,7 @@ class ScopeRepository {
 			'roles_at_update'         => $rolesAtUpdate,
 			'updated_at'              => isset( $record[ 'updated_at' ] ) ? max( 0, (int)$record[ 'updated_at' ] ) : 0,
 			'updated_by'              => isset( $record[ 'updated_by' ] ) ? max( 0, (int)$record[ 'updated_by' ] ) : 0,
+			'admin_locked'            => $adminLocked,
 		];
 	}
 

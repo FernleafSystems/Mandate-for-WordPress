@@ -3,6 +3,10 @@
 
 use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 
+if ( !\defined( 'ABSPATH' ) ) {
+	\define( 'ABSPATH', \dirname( __DIR__ ).'/' );
+}
+
 require_once dirname( __DIR__ ).'/src/PluginIdentity.php';
 
 const MANDATE_PACKAGE_ROOT = PluginIdentity::PACKAGE_ROOT;

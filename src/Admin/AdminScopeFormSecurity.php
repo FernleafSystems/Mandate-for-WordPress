@@ -4,6 +4,10 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 
+if ( !defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class AdminScopeFormSecurity {
 
 	public const ACTION_SAVE = 'save_scope';

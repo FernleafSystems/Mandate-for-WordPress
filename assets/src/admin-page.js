@@ -83,7 +83,7 @@ function enhanceTabs( root ) {
 function enhanceBulkControls( root ) {
 	root.addEventListener( 'click', ( event ) => {
 		const button = event.target.closest( '[data-wpm-select-group]' );
-		if ( !button ) {
+		if ( !button || button.disabled ) {
 			return;
 		}
 

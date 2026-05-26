@@ -11,8 +11,8 @@ if ( !defined( 'ABSPATH' ) ) {
 		<?php
 		if ( $detail[ 'kind' ] === 'expiration' ) {
 			?>
-			<button type="button" class="<?php echo esc_attr( $detail[ 'classes' ] ); ?>" data-wpm-expiration-summary data-wpm-expiration-state="<?php echo esc_attr( $detail[ 'state' ] ); ?>" aria-controls="<?php echo esc_attr( $detail[ 'input' ][ 'id' ] ); ?>" hidden><?php echo esc_html( $detail[ 'value' ] ); ?></button>
-			<input type="date" id="<?php echo esc_attr( $detail[ 'input' ][ 'id' ] ); ?>" class="mandate-expiration-input" name="<?php echo esc_attr( $detail[ 'input' ][ 'name' ] ); ?>" value="<?php echo esc_attr( $detail[ 'input' ][ 'value' ] ); ?>" data-wpm-expiration-input form="<?php echo esc_attr( $detail[ 'input' ][ 'form' ] ); ?>" aria-label="<?php echo esc_attr( $detail[ 'input' ][ 'aria_label' ] ); ?>" />
+			<button type="button" class="<?php echo esc_attr( $detail[ 'classes' ] ); ?>" data-wpm-expiration-summary data-wpm-expiration-state="<?php echo esc_attr( $detail[ 'state' ] ); ?>" aria-controls="<?php echo esc_attr( $detail[ 'input' ][ 'id' ] ); ?>"<?php if ( $detail[ 'disabled' ] ) { ?> disabled="disabled"<?php } ?> hidden><?php echo esc_html( $detail[ 'value' ] ); ?></button>
+			<input type="date" id="<?php echo esc_attr( $detail[ 'input' ][ 'id' ] ); ?>" class="mandate-expiration-input" name="<?php echo esc_attr( $detail[ 'input' ][ 'name' ] ); ?>" value="<?php echo esc_attr( $detail[ 'input' ][ 'value' ] ); ?>" data-wpm-expiration-input form="<?php echo esc_attr( $detail[ 'input' ][ 'form' ] ); ?>" aria-label="<?php echo esc_attr( $detail[ 'input' ][ 'aria_label' ] ); ?>"<?php if ( $detail[ 'input' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?> />
 			<?php
 		}
 		else {
