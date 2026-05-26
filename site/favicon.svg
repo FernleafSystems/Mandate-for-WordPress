@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Mandate">
+	<rect x="6" y="6" width="52" height="52" rx="8" fill="#ffffff" stroke="#159bd3" stroke-width="5"/>
+	<path fill="#159bd3" d="M15 47V17h8.5L32 33.2 40.5 17H49v30h-7.6V29.7L34.8 42h-5.6l-6.6-12.3V47H15z"/>
+</svg>
