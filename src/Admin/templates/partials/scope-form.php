@@ -35,9 +35,21 @@ echo $mandateLockNoticeHtml;
 		}
 		?>
 	</fieldset>
-	<div class="mandate-capability-groups" data-wpm-capability-groups data-wpm-capability-mode="<?php echo esc_attr( $scopeForm[ 'grouping' ][ 'default_mode' ] ); ?>" data-wpm-capability-grouping-config="<?php echo esc_attr( $scopeForm[ 'grouping' ][ 'config_json' ] ); ?>">
+	<div class="mandate-capability-source-tabs" role="tablist" data-wpm-capability-source-tabs>
 		<?php
-		foreach ( $scopeForm[ 'panels' ] as $mandatePanel ) {
+		foreach ( $scopeForm[ 'source_tabs' ] as $mandateSourceTab ) {
+			?>
+			<button type="button" id="<?php echo esc_attr( $mandateSourceTab[ 'id' ] ); ?>" class="mandate-capability-source-tab<?php if ( $mandateSourceTab[ 'selected' ] ) { ?> is-active<?php } ?>" role="tab" aria-selected="<?php echo esc_attr( $mandateSourceTab[ 'selected' ] ? 'true' : 'false' ); ?>" aria-controls="<?php echo esc_attr( $mandateSourceTab[ 'panel_id' ] ); ?>" data-wpm-capability-source-tab data-wpm-capability-source="<?php echo esc_attr( $mandateSourceTab[ 'key' ] ); ?>">
+				<span><?php echo esc_html( $mandateSourceTab[ 'label' ] ); ?></span>
+				<span class="mandate-capability-source-count"><?php echo esc_html( (string)$mandateSourceTab[ 'count' ] ); ?></span>
+			</button>
+			<?php
+		}
+		?>
+	</div>
+	<div class="mandate-capability-groups" data-wpm-capability-groups data-wpm-capability-source="<?php echo esc_attr( $scopeForm[ 'grouping' ][ 'default_source' ] ); ?>" data-wpm-capability-mode="<?php echo esc_attr( $scopeForm[ 'grouping' ][ 'default_mode' ] ); ?>" data-wpm-capability-grouping-config="<?php echo esc_attr( $scopeForm[ 'grouping' ][ 'config_json' ] ); ?>">
+		<?php
+		foreach ( $scopeForm[ 'source_panels' ] as $mandatePanel ) {
 			$mandatePanelHtml = $this->render( 'partials/capability-panel.php', [ 'panel' => $mandatePanel ] );
 			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
 			echo $mandatePanelHtml;

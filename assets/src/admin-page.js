@@ -94,28 +94,20 @@ function capabilityItemAttribute( item, mode ) {
 	return mode === 'action' ? item.dataset.wpmCapabilityAction : item.dataset.wpmCapabilityArea;
 }
 
-function capabilityItemSubAttribute( item, mode ) {
-	return mode === 'action' ? item.dataset.wpmCapabilityArea : item.dataset.wpmCapabilityAction;
-}
-
-function createBulkButton( action ) {
-	const button = document.createElement( 'button' );
-	button.type = 'button';
-	button.className = 'button';
-	button.dataset.wpmSelectPanel = '';
-	button.dataset.wpmSelectState = action.state;
-	button.textContent = action.label;
-	button.disabled = Boolean( action.disabled );
-	return button;
-}
-
-function createCapabilitySection( mode, group, subgroup, items ) {
+function createCapabilitySection( mode, source, sectionConfig, items ) {
 	const section = document.createElement( 'fieldset' );
-	section.id = `mandate-${mode}-${group.key}-${subgroup.key}-capabilities`;
+	section.id = `mandate-${source.key}-${mode}-${sectionConfig.key}-capabilities`;
 	section.className = 'mandate-capability-section';
 
 	const legend = document.createElement( 'legend' );
-	legend.textContent = subgroup.label;
+	const label = document.createElement( 'span' );
+	label.textContent = sectionConfig.label;
+	legend.appendChild( label );
+
+	const count = document.createElement( 'span' );
+	count.className = 'mandate-capability-section-count';
+	count.textContent = sectionConfig.count;
+	legend.appendChild( count );
 	section.appendChild( legend );
 
 	const list = document.createElement( 'div' );
@@ -126,65 +118,71 @@ function createCapabilitySection( mode, group, subgroup, items ) {
 	return section;
 }
 
-function createCapabilityPanel( mode, group, config, allItems ) {
-	const sections = [];
-	group.subgroups.forEach( ( subgroup ) => {
+function createEmptyMessage( text ) {
+	const message = document.createElement( 'p' );
+	message.className = 'description';
+	message.textContent = text;
+	return message;
+}
+
+function sourcePanelFor( container, source ) {
+	return container.querySelector( `[data-wpm-capability-source-panel][data-wpm-capability-source="${ source.key }"]` );
+}
+
+function renderCapabilitySourcePanel( panel, source, mode, allItems ) {
+	const scroll = panel.querySelector( '.mandate-capability-scroll' );
+	const modeConfig = source.modes[ mode ];
+	if ( !scroll || !modeConfig ) {
+		return;
+	}
+
+	const fragment = document.createDocumentFragment();
+	modeConfig.sections.forEach( ( sectionConfig ) => {
 		const items = allItems.filter( ( item ) => (
-			capabilityItemAttribute( item, mode ) === group.key
-			&& capabilityItemSubAttribute( item, mode ) === subgroup.key
+			item.dataset.wpmCapabilitySource === source.key
+			&& capabilityItemAttribute( item, mode ) === sectionConfig.key
 		) );
 		if ( items.length ) {
-			sections.push( createCapabilitySection( mode, group, subgroup, items ) );
+			fragment.appendChild( createCapabilitySection( mode, source, sectionConfig, items ) );
 		}
 	} );
 
-	if ( !sections.length ) {
-		return null;
+	if ( !fragment.childNodes.length ) {
+		fragment.appendChild( createEmptyMessage( source.emptyText ) );
 	}
 
-	const panel = document.createElement( 'section' );
-	panel.id = `mandate-capability-${mode}-${group.key}`;
-	panel.className = 'mandate-capability-panel';
-	panel.dataset.wpmCapabilityPanel = group.key;
-
-	const heading = document.createElement( 'div' );
-	heading.className = 'mandate-panel-heading';
-	const title = document.createElement( 'h3' );
-	title.textContent = group.label;
-	heading.appendChild( title );
-
-	const actions = document.createElement( 'p' );
-	actions.appendChild( createBulkButton( config.bulkActions.selectAll ) );
-	actions.appendChild( document.createTextNode( ' ' ) );
-	actions.appendChild( createBulkButton( config.bulkActions.deselectAll ) );
-	heading.appendChild( actions );
-	panel.appendChild( heading );
-
-	const scroll = document.createElement( 'div' );
-	scroll.className = 'mandate-capability-scroll';
-	sections.forEach( ( section ) => scroll.appendChild( section ) );
-	panel.appendChild( scroll );
-
-	return panel;
+	scroll.replaceChildren( fragment );
 }
 
 function renderCapabilityGroups( container, config, mode ) {
-	const modeConfig = config.modes[ mode ];
-	if ( !modeConfig ) {
+	if ( !config.sources || !config.sources.length ) {
 		return;
 	}
 
 	const allItems = Array.from( container.querySelectorAll( '[data-wpm-capability-item]' ) );
-	const fragment = document.createDocumentFragment();
-	modeConfig.groups.forEach( ( group ) => {
-		const panel = createCapabilityPanel( mode, group, config, allItems );
+	config.sources.forEach( ( source ) => {
+		const panel = sourcePanelFor( container, source );
 		if ( panel ) {
-			fragment.appendChild( panel );
+			renderCapabilitySourcePanel( panel, source, mode, allItems );
 		}
 	} );
 
-	container.replaceChildren( fragment );
 	container.dataset.wpmCapabilityMode = mode;
+}
+
+function setActiveCapabilitySource( form, container, sourceKey ) {
+	container.dataset.wpmCapabilitySource = sourceKey;
+
+	form.querySelectorAll( '[data-wpm-capability-source-tab]' ).forEach( ( tab ) => {
+		const active = tab.dataset.wpmCapabilitySource === sourceKey;
+		tab.classList.toggle( 'is-active', active );
+		tab.setAttribute( 'aria-selected', active ? 'true' : 'false' );
+		tab.setAttribute( 'tabindex', active ? '0' : '-1' );
+	} );
+
+	container.querySelectorAll( '[data-wpm-capability-source-panel]' ).forEach( ( panel ) => {
+		panel.hidden = panel.dataset.wpmCapabilitySource !== sourceKey;
+	} );
 }
 
 function enhanceCapabilityGrouping( root ) {
@@ -196,9 +194,13 @@ function enhanceCapabilityGrouping( root ) {
 	const container = form.querySelector( '[data-wpm-capability-groups]' );
 	const config = container ? parseGroupingConfig( container ) : null;
 	const controls = Array.from( form.querySelectorAll( '[data-wpm-capability-grouping-mode]' ) );
-	if ( !container || !config || !controls.length ) {
+	const sourceTabs = Array.from( form.querySelectorAll( '[data-wpm-capability-source-tab]' ) );
+	if ( !container || !config || !controls.length || !sourceTabs.length ) {
 		return;
 	}
+
+	renderCapabilityGroups( container, config, container.dataset.wpmCapabilityMode || config.defaultMode );
+	setActiveCapabilitySource( form, container, container.dataset.wpmCapabilitySource || config.defaultSource );
 
 	controls.forEach( ( control ) => {
 		control.addEventListener( 'change', () => {
@@ -206,6 +208,13 @@ function enhanceCapabilityGrouping( root ) {
 				hideTooltip();
 				renderCapabilityGroups( container, config, control.value );
 			}
+		} );
+	} );
+
+	sourceTabs.forEach( ( tab ) => {
+		tab.addEventListener( 'click', () => {
+			hideTooltip();
+			setActiveCapabilitySource( form, container, tab.dataset.wpmCapabilitySource );
 		} );
 	} );
 }

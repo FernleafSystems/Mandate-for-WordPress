@@ -23,11 +23,12 @@ if ( !defined( 'ABSPATH' ) ) {
  * @phpstan-type AdminScopeActionContract array{name:string,value:string,label:string,classes:string,disabled:bool}
  * @phpstan-type AdminScopeAdminLockContract array{is_visible:bool,name:string,value:string,label:string,checked:bool,disabled:bool}
  * @phpstan-type AdminCapabilityGroupingModeContract array{key:'area'|'action',label:string,checked:bool}
- * @phpstan-type AdminCapabilityGroupingContract array{label:string,default_mode:'area',config_json:string,modes:list<AdminCapabilityGroupingModeContract>}
- * @phpstan-type AdminCapabilityItemContract array{name:string,type:'primitive'|'meta',field_name:'allowed_caps'|'allowed_meta_caps',checked:bool,disabled:bool,area:'posts'|'pages'|'media'|'taxonomy'|'comments'|'users'|'plugins'|'themes'|'general'|'network'|'privacy'|'updates'|'legacy'|'third_party',action:'read'|'create'|'edit'|'delete',has_tooltip:bool,tooltip_text:string}
- * @phpstan-type AdminCapabilitySectionContract array{id:string,label:string,empty_text:string,is_empty:bool,items:list<AdminCapabilityItemContract>}
- * @phpstan-type AdminCapabilityPanelContract array{key:string,id:string,label:string,sections:list<AdminCapabilitySectionContract>,bulk_actions:array{select_all:array{label:string,state:string,disabled:bool},deselect_all:array{label:string,state:string,disabled:bool}}}
- * @phpstan-type AdminScopeFormContract array{id:string,user_id:int,uuid:string,heading:string,admin_lock_status:'locked'|'unlocked',super_admin_notice:AdminNoticeContract,lock_notice:AdminNoticeContract,admin_lock:AdminScopeAdminLockContract,grouping:AdminCapabilityGroupingContract,panels:list<AdminCapabilityPanelContract>,actions:list<AdminScopeActionContract>}
+ * @phpstan-type AdminCapabilityGroupingContract array{label:string,default_source:'wordpress',default_mode:'area',config_json:string,modes:list<AdminCapabilityGroupingModeContract>}
+ * @phpstan-type AdminCapabilityItemContract array{name:string,type:'primitive'|'meta',field_name:'allowed_caps'|'allowed_meta_caps',checked:bool,disabled:bool,source:'wordpress'|'third_party',area:'posts'|'pages'|'media'|'taxonomy'|'comments'|'users'|'plugins'|'themes'|'general'|'network'|'privacy'|'updates'|'legacy'|'third_party',action:'read'|'create'|'edit'|'delete',has_tooltip:bool,tooltip_text:string}
+ * @phpstan-type AdminCapabilitySectionContract array{id:string,label:string,count:int,items:list<AdminCapabilityItemContract>}
+ * @phpstan-type AdminCapabilitySourceTabContract array{key:'wordpress'|'third_party',id:string,panel_id:string,label:string,count:int,selected:bool}
+ * @phpstan-type AdminCapabilityPanelContract array{key:'wordpress'|'third_party',id:string,tab_id:string,label:string,count:int,empty_text:string,is_empty:bool,sections:list<AdminCapabilitySectionContract>,bulk_actions:array{select_all:array{label:string,state:string,disabled:bool},deselect_all:array{label:string,state:string,disabled:bool}}}
+ * @phpstan-type AdminScopeFormContract array{id:string,user_id:int,uuid:string,heading:string,admin_lock_status:'locked'|'unlocked',super_admin_notice:AdminNoticeContract,lock_notice:AdminNoticeContract,admin_lock:AdminScopeAdminLockContract,grouping:AdminCapabilityGroupingContract,source_tabs:list<AdminCapabilitySourceTabContract>,source_panels:list<AdminCapabilityPanelContract>,actions:list<AdminScopeActionContract>}
  * @phpstan-type AdminPageRenderData array{
  *   hrefs:array{selection_form_action:string,scope_form_action:string},
  *   strings:AdminPageStringsContract,

@@ -7,18 +7,22 @@ if ( !defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * @phpstan-type CapabilitySource 'wordpress'|'third_party'
  * @phpstan-type CapabilityArea 'posts'|'pages'|'media'|'taxonomy'|'comments'|'users'|'plugins'|'themes'|'general'|'network'|'privacy'|'updates'|'legacy'|'third_party'
  * @phpstan-type CapabilityAction 'read'|'create'|'edit'|'delete'
  * @phpstan-type CapabilityDefinition array{area:CapabilityArea,action:CapabilityAction}
- * @phpstan-type CapabilityGroupItem array{name:string,type:'primitive'|'meta',area:CapabilityArea,action:CapabilityAction,known:bool}
- * @phpstan-type CapabilityGroupSubgroup array{key:string,items:list<CapabilityGroupItem>}
- * @phpstan-type CapabilityGroupPanel array{key:string,subgroups:list<CapabilityGroupSubgroup>}
- * @phpstan-type CapabilityGroupingResult array{items:list<CapabilityGroupItem>,area:list<CapabilityGroupPanel>,action:list<CapabilityGroupPanel>}
+ * @phpstan-type CapabilityGroupItem array{name:string,type:'primitive'|'meta',source:CapabilitySource,area:CapabilityArea,action:CapabilityAction,known:bool}
+ * @phpstan-type CapabilityGroupSection array{key:string,items:list<CapabilityGroupItem>}
+ * @phpstan-type CapabilitySourceGroup array{key:CapabilitySource,items:list<CapabilityGroupItem>,area:list<CapabilityGroupSection>,action:list<CapabilityGroupSection>}
+ * @phpstan-type CapabilityGroupingResult array{items:list<CapabilityGroupItem>,sources:list<CapabilitySourceGroup>}
  */
 class CapabilityGroupProvider {
 
 	public const MODE_AREA = 'area';
 	public const MODE_ACTION = 'action';
+
+	public const SOURCE_WORDPRESS = 'wordpress';
+	public const SOURCE_THIRD_PARTY = 'third_party';
 
 	public const AREA_POSTS = 'posts';
 	public const AREA_PAGES = 'pages';
@@ -62,6 +66,11 @@ class CapabilityGroupProvider {
 		self::ACTION_CREATE,
 		self::ACTION_EDIT,
 		self::ACTION_DELETE,
+	];
+
+	private const SOURCE_ORDER = [
+		self::SOURCE_WORDPRESS,
+		self::SOURCE_THIRD_PARTY,
 	];
 
 	/**
@@ -179,10 +188,16 @@ class CapabilityGroupProvider {
 		$this->sortItems( $items );
 
 		return [
-			'items'  => $items,
-			'area'   => $this->groupItems( $items, self::MODE_AREA, self::MODE_ACTION ),
-			'action' => $this->groupItems( $items, self::MODE_ACTION, self::MODE_AREA ),
+			'items'   => $items,
+			'sources' => $this->groupItemsBySource( $items ),
 		];
+	}
+
+	/**
+	 * @return list<string>
+	 */
+	public function sourceKeys() :array {
+		return self::SOURCE_ORDER;
 	}
 
 	/**
@@ -215,12 +230,14 @@ class CapabilityGroupProvider {
 		$items = [];
 		foreach ( array_keys( CapabilityName::normalizeMap( $capabilities ) ) as $capability ) {
 			$definition = $this->definitionFor( $capability );
+			$known = isset( self::DEFINITIONS[ $capability ] );
 			$items[] = [
 				'name'   => $capability,
 				'type'   => $type,
+				'source' => $known ? self::SOURCE_WORDPRESS : self::SOURCE_THIRD_PARTY,
 				'area'   => $definition[ 'area' ],
 				'action' => $definition[ 'action' ],
-				'known'  => isset( self::DEFINITIONS[ $capability ] ),
+				'known'  => $known,
 			];
 		}
 
@@ -262,58 +279,69 @@ class CapabilityGroupProvider {
 
 	/**
 	 * @param list<CapabilityGroupItem> $items
-	 * @return list<CapabilityGroupPanel>
+	 * @return list<CapabilitySourceGroup>
 	 */
-	private function groupItems( array $items, string $topLevel, string $subLevel ) :array {
-		$topKeys = $topLevel === self::MODE_AREA ? self::AREA_ORDER : self::ACTION_ORDER;
-		$subKeys = $subLevel === self::MODE_AREA ? self::AREA_ORDER : self::ACTION_ORDER;
+	private function groupItemsBySource( array $items ) :array {
 		$grouped = [];
-
 		foreach ( $items as $item ) {
-			$topKey = $item[ $topLevel ];
-			$subKey = $item[ $subLevel ];
-			$grouped[ $topKey ][ $subKey ][] = $item;
+			$grouped[ $item[ 'source' ] ][] = $item;
 		}
 
-		$panels = [];
-		foreach ( $topKeys as $topKey ) {
-			if ( !isset( $grouped[ $topKey ] ) ) {
-				continue;
-			}
-
-			$subgroups = [];
-			foreach ( $subKeys as $subKey ) {
-				if ( isset( $grouped[ $topKey ][ $subKey ] ) ) {
-					$subgroups[] = [
-						'key'   => $subKey,
-						'items' => $grouped[ $topKey ][ $subKey ],
-					];
-				}
-			}
-
-			$panels[] = [
-				'key'       => $topKey,
-				'subgroups' => $subgroups,
+		$sources = [];
+		foreach ( self::SOURCE_ORDER as $source ) {
+			$sourceItems = $grouped[ $source ] ?? [];
+			$sources[] = [
+				'key'    => $source,
+				'items'  => $sourceItems,
+				'area'   => $this->groupSourceItems( $sourceItems, self::MODE_AREA ),
+				'action' => $this->groupSourceItems( $sourceItems, self::MODE_ACTION ),
 			];
 		}
 
-		return $panels;
+		return $sources;
+	}
+
+	/**
+	 * @param list<CapabilityGroupItem> $items
+	 * @return list<CapabilityGroupSection>
+	 */
+	private function groupSourceItems( array $items, string $mode ) :array {
+		$keys = $mode === self::MODE_AREA ? self::AREA_ORDER : self::ACTION_ORDER;
+		$grouped = [];
+		foreach ( $items as $item ) {
+			$grouped[ $item[ $mode ] ][] = $item;
+		}
+
+		$sections = [];
+		foreach ( $keys as $key ) {
+			if ( isset( $grouped[ $key ] ) ) {
+				$sections[] = [
+					'key'   => $key,
+					'items' => $grouped[ $key ],
+				];
+			}
+		}
+
+		return $sections;
 	}
 
 	/**
 	 * @param list<CapabilityGroupItem> $items
 	 */
 	private function sortItems( array &$items ) :void {
+		$sourcePositions = array_flip( self::SOURCE_ORDER );
 		$areaPositions = array_flip( self::AREA_ORDER );
 		$actionPositions = array_flip( self::ACTION_ORDER );
 		usort(
 			$items,
 			static fn( array $a, array $b ) :int => [
+				$sourcePositions[ $a[ 'source' ] ],
 				$areaPositions[ $a[ 'area' ] ],
 				$actionPositions[ $a[ 'action' ] ],
 				$a[ 'type' ] === 'primitive' ? 0 : 1,
 				$a[ 'name' ],
 			] <=> [
+				$sourcePositions[ $b[ 'source' ] ],
 				$areaPositions[ $b[ 'area' ] ],
 				$actionPositions[ $b[ 'action' ] ],
 				$b[ 'type' ] === 'primitive' ? 0 : 1,

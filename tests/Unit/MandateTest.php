@@ -404,20 +404,21 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 
 		$this->assertSame(
-			[ 'posts', 'media', 'general', 'third_party' ],
-			array_column( $groups[ 'area' ], 'key' )
+			[ 'wordpress', 'third_party' ],
+			array_column( $groups[ 'sources' ], 'key' )
 		);
-		$this->assertSame(
-			[ 'read', 'create', 'edit' ],
-			array_column( $groups[ 'action' ], 'key' )
-		);
+		$sources = array_column( $groups[ 'sources' ], null, 'key' );
+		$this->assertSame( [ 'posts', 'media', 'general' ], array_column( $sources[ 'wordpress' ][ 'area' ], 'key' ) );
+		$this->assertSame( [ 'read', 'create', 'edit' ], array_column( $sources[ 'wordpress' ][ 'action' ], 'key' ) );
+		$this->assertSame( [ 'third_party' ], array_column( $sources[ 'third_party' ][ 'area' ], 'key' ) );
+		$this->assertSame( [ 'edit' ], array_column( $sources[ 'third_party' ][ 'action' ], 'key' ) );
 
 		$items = $this->capabilityItemsByName( $groups[ 'items' ] );
-		$this->assertSame( [ 'area' => 'general', 'action' => 'read', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'read' ] ) );
-		$this->assertSame( [ 'area' => 'posts', 'action' => 'edit', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'edit_posts' ] ) );
-		$this->assertSame( [ 'area' => 'media', 'action' => 'create', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'upload_files' ] ) );
-		$this->assertSame( [ 'area' => 'posts', 'action' => 'read', 'type' => 'meta', 'known' => true ], $this->capabilityItemSummary( $items[ 'read_post' ] ) );
-		$this->assertSame( [ 'area' => 'third_party', 'action' => 'edit', 'type' => 'primitive', 'known' => false ], $this->capabilityItemSummary( $items[ 'wpm_manage_widget' ] ) );
+		$this->assertSame( [ 'source' => 'wordpress', 'area' => 'general', 'action' => 'read', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'read' ] ) );
+		$this->assertSame( [ 'source' => 'wordpress', 'area' => 'posts', 'action' => 'edit', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'edit_posts' ] ) );
+		$this->assertSame( [ 'source' => 'wordpress', 'area' => 'media', 'action' => 'create', 'type' => 'primitive', 'known' => true ], $this->capabilityItemSummary( $items[ 'upload_files' ] ) );
+		$this->assertSame( [ 'source' => 'wordpress', 'area' => 'posts', 'action' => 'read', 'type' => 'meta', 'known' => true ], $this->capabilityItemSummary( $items[ 'read_post' ] ) );
+		$this->assertSame( [ 'source' => 'third_party', 'area' => 'third_party', 'action' => 'edit', 'type' => 'primitive', 'known' => false ], $this->capabilityItemSummary( $items[ 'wpm_manage_widget' ] ) );
 	}
 
 	public function testCapabilityGroupsInferThirdPartyActionsDeterministically() :void {
@@ -437,6 +438,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 'delete', $items[ 'delete_widget' ][ 'action' ] );
 		$this->assertSame( 'edit', $items[ 'manage_widget' ][ 'action' ] );
 		foreach ( $items as $item ) {
+			$this->assertSame( 'third_party', $item[ 'source' ] );
 			$this->assertSame( 'third_party', $item[ 'area' ] );
 			$this->assertFalse( $item[ 'known' ] );
 		}
@@ -453,8 +455,10 @@ final class MandateTest extends Wpm_Test_Case {
 		foreach ( array_keys( $defaultMetaCaps ) as $capability ) {
 			$this->assertArrayHasKey( $capability, $items );
 			$this->assertSame( 'meta', $items[ $capability ][ 'type' ] );
+			$this->assertSame( 'wordpress', $items[ $capability ][ 'source' ] );
 			$this->assertTrue( $items[ $capability ][ 'known' ] );
 		}
+		$this->assertSame( 'third_party', $items[ 'wpm_manage_meta' ][ 'source' ] );
 		$this->assertSame( 'third_party', $items[ 'wpm_manage_meta' ][ 'area' ] );
 		$this->assertSame( 'edit', $items[ 'wpm_manage_meta' ][ 'action' ] );
 	}
@@ -1003,6 +1007,7 @@ final class MandateTest extends Wpm_Test_Case {
 			true
 		);
 		$_POST[ 'capability_grouping_mode' ] = 'action';
+		$_POST[ 'capability_source' ] = 'third_party';
 
 		$repository = $this->scopeRepository();
 		$this->handlePostExpectRedirect( $this->adminPage( $repository ) );
@@ -1019,6 +1024,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertNull( $record[ 'expires_on' ] );
 		$this->assertSame( [ 'wpm_editor' ], $record[ 'roles_at_update' ] );
 		$this->assertArrayNotHasKey( 'grouping', $stored );
+		$this->assertArrayNotHasKey( 'source', $stored );
 		$this->assertArrayNotHasKey( 'area', $stored );
 		$this->assertArrayNotHasKey( 'action', $stored );
 		$this->assertSame( false, $GLOBALS[ 'wpm_test_autoload' ][ PluginOptionsRepository::OPTION_NAME ] );
@@ -1225,22 +1231,33 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 'mandate-scope-form', $scopeForm[ 'id' ] );
 		$this->assertSame( self::UUID, $scopeForm[ 'uuid' ] );
 		$this->assertArrayNotHasKey( 'tabs', $scopeForm );
+		$this->assertArrayNotHasKey( 'panels', $scopeForm );
+		$this->assertSame( 'wordpress', $scopeForm[ 'grouping' ][ 'default_source' ] );
 		$this->assertSame( 'area', $scopeForm[ 'grouping' ][ 'default_mode' ] );
 		$this->assertSame( [ 'area', 'action' ], array_column( $scopeForm[ 'grouping' ][ 'modes' ], 'key' ) );
-		$this->assertSame( [ 'posts', 'pages', 'media', 'taxonomy', 'users', 'general' ], array_column( $scopeForm[ 'panels' ], 'key' ) );
+		$this->assertSame( [ 'wordpress', 'third_party' ], array_column( $scopeForm[ 'source_tabs' ], 'key' ) );
+		$this->assertSame( [ 'wordpress', 'third_party' ], array_column( $scopeForm[ 'source_panels' ], 'key' ) );
+		$this->assertSame( 14, $scopeForm[ 'source_tabs' ][ 0 ][ 'count' ] );
+		$this->assertSame( 0, $scopeForm[ 'source_tabs' ][ 1 ][ 'count' ] );
 		$this->assertFalse( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
 		$this->assertSame( 'unlocked', $scopeForm[ 'admin_lock_status' ] );
 		$this->assertTrue( $scopeForm[ 'admin_lock' ][ 'is_visible' ] );
 		$this->assertFalse( $scopeForm[ 'admin_lock' ][ 'checked' ] );
 
 		$groupingConfig = json_decode( $scopeForm[ 'grouping' ][ 'config_json' ], true, 512, JSON_THROW_ON_ERROR );
+		$this->assertSame( 'wordpress', $groupingConfig[ 'defaultSource' ] );
 		$this->assertSame( 'area', $groupingConfig[ 'defaultMode' ] );
-		$this->assertSame( [ 'posts', 'pages', 'media', 'taxonomy', 'users', 'general' ], array_column( $groupingConfig[ 'modes' ][ 'area' ][ 'groups' ], 'key' ) );
-		$this->assertSame( [ 'read', 'create', 'edit', 'delete' ], array_column( $groupingConfig[ 'modes' ][ 'action' ][ 'groups' ], 'key' ) );
+		$this->assertSame( [ 'wordpress', 'third_party' ], array_column( $groupingConfig[ 'sources' ], 'key' ) );
+		$configSources = array_column( $groupingConfig[ 'sources' ], null, 'key' );
+		$this->assertArrayNotHasKey( 'label', $configSources[ 'wordpress' ] );
+		$this->assertSame( [ 'posts', 'pages', 'media', 'taxonomy', 'users', 'general' ], array_column( $configSources[ 'wordpress' ][ 'modes' ][ 'area' ][ 'sections' ], 'key' ) );
+		$this->assertSame( [ 'read', 'create', 'edit', 'delete' ], array_column( $configSources[ 'wordpress' ][ 'modes' ][ 'action' ][ 'sections' ], 'key' ) );
+		$this->assertSame( [], $configSources[ 'third_party' ][ 'modes' ][ 'area' ][ 'sections' ] );
 
 		$uploadFiles = $this->capabilityItemFromViewData( $data, 'upload_files' );
 		$this->assertSame( 'allowed_caps', $uploadFiles[ 'field_name' ] );
 		$this->assertSame( 'primitive', $uploadFiles[ 'type' ] );
+		$this->assertSame( 'wordpress', $uploadFiles[ 'source' ] );
 		$this->assertSame( 'media', $uploadFiles[ 'area' ] );
 		$this->assertSame( 'create', $uploadFiles[ 'action' ] );
 		$this->assertTrue( $uploadFiles[ 'checked' ] );
@@ -1280,7 +1297,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//div[contains(@class, "notice-info")]/p[contains(., "locked by an administrator")]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@name="allowed_caps[]" and @value="read" and @disabled="disabled"]' ) );
-		$this->assertSame( 12, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @disabled="disabled"]' ) );
+		$this->assertSame( 4, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-input and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="save_scope" and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="clear_scope" and @disabled="disabled"]' ) );
@@ -1745,8 +1762,8 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	/**
-	 * @param list<array{name:string,type:string,area:string,action:string,known:bool}> $items
-	 * @return array<string,array{name:string,type:string,area:string,action:string,known:bool}>
+	 * @param list<array{name:string,type:string,source:string,area:string,action:string,known:bool}> $items
+	 * @return array<string,array{name:string,type:string,source:string,area:string,action:string,known:bool}>
 	 */
 	private function capabilityItemsByName( array $items ) :array {
 		$indexed = [];
@@ -1758,11 +1775,12 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	/**
-	 * @param array{name:string,type:string,area:string,action:string,known:bool} $item
-	 * @return array{area:string,action:string,type:string,known:bool}
+	 * @param array{name:string,type:string,source:string,area:string,action:string,known:bool} $item
+	 * @return array{source:string,area:string,action:string,type:string,known:bool}
 	 */
 	private function capabilityItemSummary( array $item ) :array {
 		return [
+			'source' => $item[ 'source' ],
 			'area'   => $item[ 'area' ],
 			'action' => $item[ 'action' ],
 			'type'   => $item[ 'type' ],
@@ -1914,7 +1932,7 @@ final class MandateTest extends Wpm_Test_Case {
 	 * @return array<string,mixed>
 	 */
 	private function capabilityItemFromViewData( array $data, string $capability ) :array {
-		foreach ( $data[ 'vars' ][ 'scope_form' ][ 'panels' ] as $panel ) {
+		foreach ( $data[ 'vars' ][ 'scope_form' ][ 'source_panels' ] as $panel ) {
 			foreach ( $panel[ 'sections' ] as $section ) {
 				foreach ( $section[ 'items' ] as $item ) {
 					if ( $item[ 'name' ] === $capability ) {
