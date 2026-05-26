@@ -11,10 +11,6 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * @phpstan-import-type ApplicationPasswordRecord from ApplicationPasswordRepository
  * @phpstan-import-type CapabilityScopeRecord from ScopeRepository

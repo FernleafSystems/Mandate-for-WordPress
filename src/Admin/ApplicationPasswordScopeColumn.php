@@ -5,10 +5,6 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 class ApplicationPasswordScopeColumn {
 
 	public const COLUMN_KEY = 'mandate_scope';

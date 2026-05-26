@@ -21,10 +21,6 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 class Plugin {
 
 	public const VERSION = '0.3.1';

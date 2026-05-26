@@ -2,10 +2,6 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 class CapabilityName {
 
 	public static function normalize( string $capability ) :string {

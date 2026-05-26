@@ -4,10 +4,6 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityName;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 class MetaCapabilityRegistry {
 
 	private const DEFAULT_META_CAPABILITIES = [

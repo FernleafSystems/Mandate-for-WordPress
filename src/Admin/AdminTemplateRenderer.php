@@ -2,10 +2,6 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 class AdminTemplateRenderer {
 
 	private const ALLOWED_TEMPLATES = [

@@ -6,10 +6,6 @@ use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPas
 use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * @phpstan-type CapabilityScopeRecord array{user_id:int,capabilities_restricted:bool,allowed_caps:array<string,true>,allowed_meta_caps:array<string,true>,expires_on:string|null,roles_at_update:list<string>|null,updated_at:int,updated_by:int}
  */

@@ -4,10 +4,6 @@ namespace FernleafSystems\Wordpress\Plugin\Mandate\Options;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * @phpstan-type PluginOptionsMetadata array{schema_version:int,plugin_version:string,created_at:int,updated_at:int}
  * @phpstan-type PluginOptionsDocument array{metadata:PluginOptionsMetadata,scopes:array<string,mixed>}

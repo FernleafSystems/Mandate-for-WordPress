@@ -10,10 +10,6 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 class AdminPage {
 
 	private const REQUIRED_CAPABILITY = 'manage_options';

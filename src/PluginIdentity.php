@@ -2,10 +2,6 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate;
 
-if ( !defined( 'ABSPATH' ) && PHP_SAPI !== 'cli' ) {
-	exit;
-}
-
 final class PluginIdentity {
 
 	public const NAME = 'Mandate App Security';

@@ -2,10 +2,6 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
 
-if ( !defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
  * @phpstan-type AdminNoticeContract array{is_visible:bool,classes:string,text:string}
  * @phpstan-type AdminPageStringsContract array{page_title:string,user_label:string,application_password_label:string,role_slug_label:string,no_application_passwords_available:string,loading_selection:string,apply_selection:string}
