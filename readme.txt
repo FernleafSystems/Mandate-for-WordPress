@@ -4,21 +4,21 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Scoping AI access for WordPress by controlling what each Application Password is allowed to do.
+WordPress Application Passwords carry the full access of the user behind them. Mandate App Security adds per-credential policies that limit what each one can do.
 
 == Description ==
 
-Mandate App Security helps administrators control WordPress API access for external tools, REST API clients, automations, Model Context Protocol (MCP) servers, and AI agents that authenticate with Application Passwords instead of a user's normal login password.
+WordPress Application Passwords prove identity. They do not limit what an authenticated request can do. If the user behind a password is an admin, every tool that authenticates as that user has admin-level access — with no native way to narrow it.
 
-The tradeoff is that an Application Password normally inherits the user's broad WordPress access. If the user can edit posts, upload files, manage options, or perform other privileged actions, an API client using that Application Password can usually attempt those actions too.
+Today, REST clients, automation platforms, AI agents, management tools, and MCP connectors all authenticate with Application Passwords. Any of them, if misconfigured or compromised, can do anything that user can do.
 
-Mandate App Security adds a small least-privilege guardrail inside WordPress itself: per-password access control for Application Passwords.
+Mandate App Security adds the missing layer: a capability policy per Application Password. You define what each credential is allowed to do. Mandate App Security enforces it on every request. Normal wp-admin sessions and user roles are unaffected.
 
-Instead of treating every Application Password for a user as equally trusted, Mandate App Security lets an administrator control each password's authorisation by saving a capability allowlist.
+Instead of treating every Application Password as equally trusted, Mandate App Security lets an administrator save a capability allowlist per password.
 
 An administrator can choose:
 
@@ -31,24 +31,11 @@ When a request is authenticated with that Application Password, Mandate App Secu
 
 Mandate App Security never grants new permissions. It only narrows an Application Password to capabilities the selected user already receives from assigned roles. If the selected Application Password is past its saved expiration date, Mandate App Security removes all capabilities for that request. Normal browser and wp-admin sessions for the same user are not changed.
 
-This is especially useful when WordPress is connected to lower-level API tooling, automation systems, MCP layers, or AI/agent workflows. Even if a tool calls the WordPress REST API or other WordPress API endpoints directly, WordPress capability checks still run, so the password itself becomes more constrained.
+= Example scopes =
 
-= Current scope =
+A reporting dashboard that only needs to read posts and media should never be able to edit settings or manage users. A content automation tool that publishes posts has no reason to access WooCommerce orders. An AI writing assistant does not need plugin management access.
 
-This release focuses on the core safety mechanism:
-
-* Tools admin page for selecting a user and Application Password
-* user role summary and selected password summary
-* role-derived capability allowlist
-* grouped WordPress and Everything Else capability lists
-* per-Application-Password scope storage
-* optional per-Application-Password expiration dates
-* primitive capability enforcement
-* registered meta-capability enforcement
-* automatic revocation of expired Application Passwords
-* cleanup when an Application Password is deleted
-
-It does not provide Application Password management screens, edit roles, define per-object permissions, provide route-specific REST allowlists, or scope multisite super-admin passwords. The only automatic Application Password deletion it performs is revocation of passwords that are past a saved Mandate App Security expiration date.
+With Mandate App Security, each of those tools gets a dedicated Application Password scoped to exactly what it needs. Nothing more.
 
 == Installation ==
 
@@ -57,6 +44,14 @@ It does not provide Application Password management screens, edit roles, define 
 3. Open Tools > Mandate App Security to select an application password and save its allowed capabilities.
 
 == Frequently Asked Questions ==
+
+= Does this create or manage Application Passwords? =
+
+No. Mandate App Security scopes existing Application Passwords. You create and manage Application Passwords from the WordPress user profile screen.
+
+= What integrations does this work with? =
+
+Any tool that authenticates using a WordPress Application Password: REST API clients, automation platforms, AI agents, management tools, and MCP connectors. If it uses an Application Password to authenticate, Mandate App Security can scope its access.
 
 = Does this change the user's normal role capabilities? =
 
@@ -86,19 +81,20 @@ No. Scopes for multisite super admins are not supported.
 
 Mandate App Security is available at https://wpmandate.com.
 
-The public development repository is available at https://github.com/FernleafSystems/Mandate-for-WordPress.
-
-The distributed plugin includes built admin assets in `assets/dist`. To rebuild those assets from source, install the development dependencies with `composer install` and `npm ci`, run `npm run build`, and then run `composer build-zip` to create the release package.
+The public development repository, release packages, and build documentation are at https://github.com/FernleafSystems/Mandate-for-WordPress.
 
 == Changelog ==
 
+= 0.3.0 =
+* Capability descriptions and tooltips explain what each WordPress capability does.
+* Cleaner admin layout: user, password, and scope summary shown as aligned columns.
+* Expiration date editing moved into the password summary.
+* Capability tabs relabelled: WordPress Capabilities and Third-Party Capabilities.
+
 = 0.2.0 =
-* Added optional per-Application-Password expiration dates and daily revocation of expired passwords.
-* Added saved-role snapshots, scope audit details, and role-change warnings.
-* Added capability descriptions and admin tooltips for common WordPress capabilities.
-* Moved scope storage into a versioned Mandate App Security options document.
-* Improved the admin layout, selected password summary, and capability tab labels.
-* Added PHPUnit unit tests, WordPress integration tests, package verification, and GitHub release package support.
+* Optional expiration dates per Application Password. Expired passwords are automatically revoked daily.
+* Scope audit details: last saved date and the roles the scope was based on.
+* Warning when current roles differ from roles at the time the scope was saved.
 
 = 0.1.0 =
-* Initial release.
+* Initial release: capability scoping per Application Password, role-derived allowlists, and enforcement on every API request.
