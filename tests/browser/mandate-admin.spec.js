@@ -84,6 +84,10 @@ function primitiveCapInput( page, source, capability ) {
 	return page.locator( `[data-wpm-capability-source-panel][data-wpm-capability-source="${source}"] input[name="allowed_caps[]"][value="${capability}"]` );
 }
 
+function capabilitySection( page, source, mode, section ) {
+	return page.locator( `#mandate-${source}-${mode}-${section}-capabilities` );
+}
+
 function primitiveCapTooltipTarget( page, source, capability ) {
 	return page.locator( `[data-wpm-capability-source-panel][data-wpm-capability-source="${source}"] [data-wpm-tooltip]` ).filter( { hasText: capability } );
 }
@@ -103,6 +107,34 @@ async function selectGroupingMode( page, mode ) {
 
 async function selectCapabilitySource( page, source ) {
 	await page.locator( `[data-wpm-capability-source-tab][data-wpm-capability-source="${source}"]` ).click();
+}
+
+async function locatorRect( locator ) {
+	return locator.evaluate( ( element ) => {
+		const rect = element.getBoundingClientRect();
+		return {
+			left: Math.round( rect.left ),
+			top: Math.round( rect.top ),
+			right: Math.round( rect.right ),
+			bottom: Math.round( rect.bottom ),
+			width: Math.round( rect.width ),
+		};
+	} );
+}
+
+async function firstRowCapabilityColumns( section ) {
+	return section.locator( '.mandate-capability-list label' ).evaluateAll( ( labels ) => {
+		const positions = labels.map( ( label ) => {
+			const rect = label.getBoundingClientRect();
+			return {
+				left: Math.round( rect.left ),
+				top: Math.round( rect.top ),
+			};
+		} );
+		const firstTop = positions[ 0 ].top;
+		return positions.filter( ( position ) => Math.abs( position.top - firstTop ) <= 2 )
+			.map( ( position ) => position.left );
+	} );
 }
 
 test( 'admin can manage grouped application password scopes with progressive enhancement', async ( { page, baseURL } ) => {
@@ -209,8 +241,106 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await expect( page.locator( '[data-wpm-capability-source-panel][data-wpm-capability-source="third_party"]' ) ).toBeHidden();
 	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
+
+	const wordpressPanel = page.locator( '[data-wpm-capability-panel="wordpress"]' );
+	await expect( wordpressPanel.locator( '.mandate-capability-toolbar' ) ).toBeVisible();
+	await expect( wordpressPanel.locator( '.mandate-capability-toolbar h3' ) ).toHaveCount( 0 );
+	await expect( wordpressPanel.locator( '[data-wpm-capability-section-index]' ) ).toBeVisible();
+	const scrollRegion = wordpressPanel.locator( '.mandate-capability-scroll' );
+	const actionRow = wordpressPanel.locator( '.mandate-panel-actions' );
+	const indexLinkStyle = await wordpressPanel.locator( '[data-wpm-capability-section-index] a' ).first().evaluate( ( link ) => {
+		const style = getComputedStyle( link );
+		return {
+			backgroundColor: style.backgroundColor,
+			borderTopWidth: style.borderTopWidth,
+			borderRightWidth: style.borderRightWidth,
+			borderBottomWidth: style.borderBottomWidth,
+			borderLeftWidth: style.borderLeftWidth,
+		};
+	} );
+	expect( indexLinkStyle ).toEqual( {
+		backgroundColor: 'rgba(0, 0, 0, 0)',
+		borderTopWidth: '0px',
+		borderRightWidth: '0px',
+		borderBottomWidth: '0px',
+		borderLeftWidth: '0px',
+	} );
+	const postsSection = capabilitySection( page, 'wordpress', 'area', 'posts' );
+	const pagesSection = capabilitySection( page, 'wordpress', 'area', 'pages' );
+	const postsRect = await locatorRect( postsSection );
+	const pagesRect = await locatorRect( pagesSection );
+	expect( Math.abs( postsRect.left - pagesRect.left ) ).toBeLessThanOrEqual( 2 );
+	expect( pagesRect.top ).toBeGreaterThanOrEqual( postsRect.bottom );
+	const sectionHeadingSpan = await postsSection.evaluate( ( section ) => {
+		const legendElement = section.querySelector( 'legend' );
+		const legend = legendElement.getBoundingClientRect();
+		const title = legendElement.querySelector( 'span:first-child' ).getBoundingClientRect();
+		const count = legendElement.querySelector( '.mandate-capability-section-count' ).getBoundingClientRect();
+		const scroll = section.closest( '.mandate-capability-scroll' ).getBoundingClientRect();
+		const sectionStyle = getComputedStyle( section );
+		const legendStyle = getComputedStyle( legendElement );
+		const countStyle = getComputedStyle( legendElement.querySelector( '.mandate-capability-section-count' ) );
+		return {
+			leftOffset: Math.round( Math.abs( legend.left - scroll.left ) ),
+			widthOffset: Math.round( Math.abs( legend.width - scroll.width ) ),
+			titleCountGap: Math.round( count.left - title.right ),
+			sectionBorderBottomWidth: sectionStyle.borderBottomWidth,
+			legendBackgroundColor: legendStyle.backgroundColor,
+			legendBorderTopWidth: legendStyle.borderTopWidth,
+			legendBorderRightWidth: legendStyle.borderRightWidth,
+			legendBorderLeftWidth: legendStyle.borderLeftWidth,
+			countBackgroundColor: countStyle.backgroundColor,
+			countBorderTopWidth: countStyle.borderTopWidth,
+		};
+	} );
+	expect( sectionHeadingSpan.leftOffset ).toBeLessThanOrEqual( 2 );
+	expect( sectionHeadingSpan.widthOffset ).toBeLessThanOrEqual( 2 );
+	expect( sectionHeadingSpan.titleCountGap ).toBeGreaterThanOrEqual( 0 );
+	expect( sectionHeadingSpan.titleCountGap ).toBeLessThanOrEqual( 12 );
+	expect( sectionHeadingSpan.sectionBorderBottomWidth ).toBe( '0px' );
+	expect( sectionHeadingSpan.legendBackgroundColor ).toBe( 'rgba(0, 0, 0, 0)' );
+	expect( sectionHeadingSpan.legendBorderTopWidth ).toBe( '0px' );
+	expect( sectionHeadingSpan.legendBorderRightWidth ).toBe( '0px' );
+	expect( sectionHeadingSpan.legendBorderLeftWidth ).toBe( '0px' );
+	expect( sectionHeadingSpan.countBackgroundColor ).toBe( 'rgba(0, 0, 0, 0)' );
+	expect( sectionHeadingSpan.countBorderTopWidth ).toBe( '0px' );
+	expect( await firstRowCapabilityColumns( postsSection ) ).toHaveLength( 3 );
+	await page.setViewportSize( { width: 760, height: 900 } );
+	expect( await firstRowCapabilityColumns( postsSection ) ).toHaveLength( 1 );
+	await page.setViewportSize( { width: 1280, height: 900 } );
+	const scrollRect = await locatorRect( scrollRegion );
+	const actionRect = await locatorRect( actionRow );
+	expect( actionRect.top ).toBeGreaterThanOrEqual( scrollRect.bottom );
+	expect( Math.abs( actionRect.right - scrollRect.right ) ).toBeLessThanOrEqual( 2 );
+	await scrollRegion.evaluate( ( scroll ) => {
+		scroll.scrollTop = scroll.scrollHeight;
+		const originalScrollTo = scroll.scrollTo.bind( scroll );
+		scroll.scrollTo = ( options ) => {
+			scroll.dataset.wpmLastScrollBehavior = typeof options === 'object' ? options.behavior : '';
+			originalScrollTo( options );
+		};
+	} );
+	await expect( wordpressPanel.locator( '[data-wpm-capability-section-index]' ) ).toBeVisible();
+	await wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-area-posts-capabilities"]' ).click();
+	await expect( scrollRegion ).toHaveAttribute( 'data-wpm-last-scroll-behavior', 'smooth' );
+	await expect.poll( async () => postsSection.evaluate( ( section ) => {
+		const scroll = section.closest( '.mandate-capability-scroll' ).getBoundingClientRect();
+		const rect = section.getBoundingClientRect();
+		return Math.round( Math.abs( rect.top - scroll.top ) );
+	} ) ).toBeLessThanOrEqual( 20 );
+	await page.emulateMedia( { reducedMotion: 'reduce' } );
+	await scrollRegion.evaluate( ( scroll ) => {
+		scroll.scrollTop = scroll.scrollHeight;
+		scroll.dataset.wpmLastScrollBehavior = '';
+	} );
+	await wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-area-posts-capabilities"]' ).click();
+	await expect( scrollRegion ).toHaveAttribute( 'data-wpm-last-scroll-behavior', 'auto' );
+	await page.emulateMedia( { reducedMotion: 'no-preference' } );
+
 	await selectGroupingMode( page, 'action' );
 	await expect( page.locator( '[data-wpm-capability-groups]' ) ).toHaveAttribute( 'data-wpm-capability-mode', 'action' );
+	await expect( wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-action-read-capabilities"]' ) ).toBeVisible();
+	await expect( wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-area-posts-capabilities"]' ) ).toHaveCount( 0 );
 	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();

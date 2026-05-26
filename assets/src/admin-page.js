@@ -90,13 +90,9 @@ function parseGroupingConfig( container ) {
 	}
 }
 
-function capabilityItemAttribute( item, mode ) {
-	return mode === 'action' ? item.dataset.wpmCapabilityAction : item.dataset.wpmCapabilityArea;
-}
-
-function createCapabilitySection( mode, source, sectionConfig, items ) {
+function createCapabilitySection( sectionConfig, items ) {
 	const section = document.createElement( 'fieldset' );
-	section.id = `mandate-${source.key}-${mode}-${sectionConfig.key}-capabilities`;
+	section.id = sectionConfig.id;
 	section.className = 'mandate-capability-section';
 
 	const legend = document.createElement( 'legend' );
@@ -118,6 +114,24 @@ function createCapabilitySection( mode, source, sectionConfig, items ) {
 	return section;
 }
 
+function createCapabilityIndexLink( sectionConfig ) {
+	const link = document.createElement( 'a' );
+	link.href = `#${ sectionConfig.id }`;
+	link.dataset.wpmCapabilityIndexLink = '';
+	link.dataset.wpmCapabilitySectionTarget = sectionConfig.id;
+
+	const label = document.createElement( 'span' );
+	label.textContent = sectionConfig.label;
+	link.appendChild( label );
+
+	const count = document.createElement( 'span' );
+	count.className = 'mandate-capability-section-count';
+	count.textContent = sectionConfig.count;
+	link.appendChild( count );
+
+	return link;
+}
+
 function createEmptyMessage( text ) {
 	const message = document.createElement( 'p' );
 	message.className = 'description';
@@ -129,21 +143,61 @@ function sourcePanelFor( container, source ) {
 	return container.querySelector( `[data-wpm-capability-source-panel][data-wpm-capability-source="${ source.key }"]` );
 }
 
-function renderCapabilitySourcePanel( panel, source, mode, allItems ) {
+function capabilityItemMap( container ) {
+	const items = new Map();
+	container.querySelectorAll( '[data-wpm-capability-item]' ).forEach( ( item ) => {
+		items.set( item.dataset.wpmCapabilityKey, item );
+	} );
+	return items;
+}
+
+function sectionItems( sectionConfig, items ) {
+	return sectionConfig.itemKeys.map( ( itemKey ) => items.get( itemKey ) );
+}
+
+function scrollCapabilitySectionIntoView( target ) {
+	const scroll = target.closest( '.mandate-capability-scroll' );
+	if ( !scroll ) {
+		return;
+	}
+
+	const scrollRect = scroll.getBoundingClientRect();
+	const targetRect = target.getBoundingClientRect();
+	const prefersReducedMotion = window.matchMedia
+		&& window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+	scroll.scrollTo( {
+		top: scroll.scrollTop + targetRect.top - scrollRect.top,
+		behavior: prefersReducedMotion ? 'auto' : 'smooth',
+	} );
+}
+
+function renderCapabilityIndex( panel, modeConfig ) {
+	const index = panel.querySelector( '[data-wpm-capability-section-index]' );
+	if ( !index ) {
+		return;
+	}
+
+	const fragment = document.createDocumentFragment();
+	modeConfig.sections.forEach( ( sectionConfig ) => {
+		fragment.appendChild( createCapabilityIndexLink( sectionConfig ) );
+	} );
+	index.replaceChildren( fragment );
+}
+
+function renderCapabilitySourcePanel( panel, source, mode, items ) {
 	const scroll = panel.querySelector( '.mandate-capability-scroll' );
 	const modeConfig = source.modes[ mode ];
 	if ( !scroll || !modeConfig ) {
 		return;
 	}
 
+	renderCapabilityIndex( panel, modeConfig );
+
 	const fragment = document.createDocumentFragment();
 	modeConfig.sections.forEach( ( sectionConfig ) => {
-		const items = allItems.filter( ( item ) => (
-			item.dataset.wpmCapabilitySource === source.key
-			&& capabilityItemAttribute( item, mode ) === sectionConfig.key
-		) );
-		if ( items.length ) {
-			fragment.appendChild( createCapabilitySection( mode, source, sectionConfig, items ) );
+		const currentItems = sectionItems( sectionConfig, items );
+		if ( currentItems.length ) {
+			fragment.appendChild( createCapabilitySection( sectionConfig, currentItems ) );
 		}
 	} );
 
@@ -159,11 +213,11 @@ function renderCapabilityGroups( container, config, mode ) {
 		return;
 	}
 
-	const allItems = Array.from( container.querySelectorAll( '[data-wpm-capability-item]' ) );
+	const items = capabilityItemMap( container );
 	config.sources.forEach( ( source ) => {
 		const panel = sourcePanelFor( container, source );
 		if ( panel ) {
-			renderCapabilitySourcePanel( panel, source, mode, allItems );
+			renderCapabilitySourcePanel( panel, source, mode, items );
 		}
 	} );
 
@@ -216,6 +270,23 @@ function enhanceCapabilityGrouping( root ) {
 			hideTooltip();
 			setActiveCapabilitySource( form, container, tab.dataset.wpmCapabilitySource );
 		} );
+	} );
+
+	container.addEventListener( 'click', ( event ) => {
+		const link = event.target instanceof Element
+			? event.target.closest( '[data-wpm-capability-index-link]' )
+			: null;
+		if ( !link || !container.contains( link ) ) {
+			return;
+		}
+
+		const targetId = link.dataset.wpmCapabilitySectionTarget;
+		const target = targetId ? document.getElementById( targetId ) : null;
+		if ( target ) {
+			event.preventDefault();
+			hideTooltip();
+			scrollCapabilitySectionIntoView( target );
+		}
 	} );
 }
 

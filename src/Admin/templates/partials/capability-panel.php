@@ -6,15 +6,19 @@ if ( !defined( 'ABSPATH' ) ) {
 
 ?>
 <section id="<?php echo esc_attr( $panel[ 'id' ] ); ?>" class="mandate-capability-panel" role="tabpanel" aria-labelledby="<?php echo esc_attr( $panel[ 'tab_id' ] ); ?>" data-wpm-capability-panel="<?php echo esc_attr( $panel[ 'key' ] ); ?>" data-wpm-capability-source-panel data-wpm-capability-source="<?php echo esc_attr( $panel[ 'key' ] ); ?>">
-	<div class="mandate-panel-heading">
-		<h3>
-			<?php echo esc_html( $panel[ 'label' ] ); ?>
-			<span class="mandate-capability-source-count"><?php echo esc_html( (string)$panel[ 'count' ] ); ?></span>
-		</h3>
-		<p>
-			<button type="button" class="button" data-wpm-select-panel data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'select_all' ][ 'state' ] ); ?>"<?php if ( $panel[ 'bulk_actions' ][ 'select_all' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?>><?php echo esc_html( $panel[ 'bulk_actions' ][ 'select_all' ][ 'label' ] ); ?></button>
-			<button type="button" class="button" data-wpm-select-panel data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'state' ] ); ?>"<?php if ( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?>><?php echo esc_html( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'label' ] ); ?></button>
-		</p>
+	<div class="mandate-capability-toolbar">
+		<nav class="mandate-capability-section-index" aria-label="<?php echo esc_attr__( 'Capability groups', 'mandate-app-security' ); ?>" data-wpm-capability-section-index>
+			<?php
+			foreach ( $panel[ 'section_index' ] as $mandateIndexItem ) {
+				?>
+				<a href="#<?php echo esc_attr( $mandateIndexItem[ 'target_id' ] ); ?>" data-wpm-capability-index-link data-wpm-capability-section-target="<?php echo esc_attr( $mandateIndexItem[ 'target_id' ] ); ?>">
+					<span><?php echo esc_html( $mandateIndexItem[ 'label' ] ); ?></span>
+					<span class="mandate-capability-section-count"><?php echo esc_html( (string)$mandateIndexItem[ 'count' ] ); ?></span>
+				</a>
+				<?php
+			}
+			?>
+		</nav>
 	</div>
 	<div class="mandate-capability-scroll">
 		<?php
@@ -32,4 +36,8 @@ if ( !defined( 'ABSPATH' ) ) {
 		}
 		?>
 	</div>
+	<p class="mandate-panel-actions">
+		<button type="button" class="button" data-wpm-select-panel data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'select_all' ][ 'state' ] ); ?>"<?php if ( $panel[ 'bulk_actions' ][ 'select_all' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?>><?php echo esc_html( $panel[ 'bulk_actions' ][ 'select_all' ][ 'label' ] ); ?></button>
+		<button type="button" class="button" data-wpm-select-panel data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'state' ] ); ?>"<?php if ( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?>><?php echo esc_html( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'label' ] ); ?></button>
+	</p>
 </section>

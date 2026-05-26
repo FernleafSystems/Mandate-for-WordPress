@@ -306,23 +306,65 @@ class CapabilityGroupProvider {
 	 * @return list<CapabilityGroupSection>
 	 */
 	private function groupSourceItems( array $items, string $mode ) :array {
-		$keys = $mode === self::MODE_AREA ? self::AREA_ORDER : self::ACTION_ORDER;
 		$grouped = [];
 		foreach ( $items as $item ) {
 			$grouped[ $item[ $mode ] ][] = $item;
 		}
 
 		$sections = [];
-		foreach ( $keys as $key ) {
-			if ( isset( $grouped[ $key ] ) ) {
-				$sections[] = [
-					'key'   => $key,
-					'items' => $grouped[ $key ],
-				];
-			}
+		foreach ( $this->orderedSectionKeys( $grouped, $mode ) as $key ) {
+			$sectionItems = $grouped[ $key ];
+			$this->sortSectionItems( $sectionItems );
+			$sections[] = [
+				'key'   => $key,
+				'items' => $sectionItems,
+			];
 		}
 
 		return $sections;
+	}
+
+	/**
+	 * @param array<string,list<CapabilityGroupItem>> $grouped
+	 * @return list<string>
+	 */
+	private function orderedSectionKeys( array $grouped, string $mode ) :array {
+		$keys = array_keys( $grouped );
+
+		if ( $mode === self::MODE_ACTION ) {
+			$actionPositions = array_flip( self::ACTION_ORDER );
+			usort(
+				$keys,
+				static fn( string $a, string $b ) :int => $actionPositions[ $a ] <=> $actionPositions[ $b ]
+			);
+
+			return $keys;
+		}
+
+		$areaPositions = array_flip( self::AREA_ORDER );
+		usort(
+			$keys,
+			static function ( string $a, string $b ) use ( $areaPositions, $grouped ) :int {
+				if ( $a === self::AREA_LEGACY && $b !== self::AREA_LEGACY ) {
+					return 1;
+				}
+				if ( $b === self::AREA_LEGACY && $a !== self::AREA_LEGACY ) {
+					return -1;
+				}
+
+				return [
+					-count( $grouped[ $a ] ),
+					$areaPositions[ $a ],
+					$a,
+				] <=> [
+					-count( $grouped[ $b ] ),
+					$areaPositions[ $b ],
+					$b,
+				];
+			}
+		);
+
+		return $keys;
 	}
 
 	/**
@@ -330,23 +372,33 @@ class CapabilityGroupProvider {
 	 */
 	private function sortItems( array &$items ) :void {
 		$sourcePositions = array_flip( self::SOURCE_ORDER );
-		$areaPositions = array_flip( self::AREA_ORDER );
-		$actionPositions = array_flip( self::ACTION_ORDER );
 		usort(
 			$items,
-			static fn( array $a, array $b ) :int => [
-				$sourcePositions[ $a[ 'source' ] ],
-				$areaPositions[ $a[ 'area' ] ],
-				$actionPositions[ $a[ 'action' ] ],
-				$a[ 'type' ] === 'primitive' ? 0 : 1,
-				$a[ 'name' ],
-			] <=> [
-				$sourcePositions[ $b[ 'source' ] ],
-				$areaPositions[ $b[ 'area' ] ],
-				$actionPositions[ $b[ 'action' ] ],
-				$b[ 'type' ] === 'primitive' ? 0 : 1,
-				$b[ 'name' ],
-			]
+			fn( array $a, array $b ) :int => ( $sourcePositions[ $a[ 'source' ] ] <=> $sourcePositions[ $b[ 'source' ] ] )
+				?: $this->compareItemsByName( $a, $b )
 		);
+	}
+
+	/**
+	 * @param list<CapabilityGroupItem> $items
+	 */
+	private function sortSectionItems( array &$items ) :void {
+		usort(
+			$items,
+			fn( array $a, array $b ) :int => $this->compareItemsByName( $a, $b )
+		);
+	}
+
+	/**
+	 * @param CapabilityGroupItem $a
+	 * @param CapabilityGroupItem $b
+	 */
+	private function compareItemsByName( array $a, array $b ) :int {
+		return $this->compareItemNames( $a[ 'name' ], $b[ 'name' ] )
+			?: ( $a[ 'type' ] === 'primitive' ? 0 : 1 ) <=> ( $b[ 'type' ] === 'primitive' ? 0 : 1 );
+	}
+
+	private function compareItemNames( string $a, string $b ) :int {
+		return strnatcmp( $a, $b );
 	}
 }

@@ -179,33 +179,59 @@
 	display: none;
 }
 
-.mandate-panel-heading {
+.mandate-capability-toolbar {
+	align-items: flex-start;
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	padding: 0 0 .75rem;
+}
+
+.mandate-capability-section-index {
+	display: flex;
+	flex: 1 1 20rem;
+	flex-wrap: wrap;
+	gap: .35rem;
+	min-width: 0;
+}
+
+.mandate-capability-section-index:empty {
+	display: none;
+}
+
+.mandate-capability-section-index a {
+	align-items: center;
+	border-radius: 2px;
+	color: #2271b1;
+	display: inline-flex;
+	gap: .3rem;
+	line-height: 1.4;
+	padding: .15rem .2rem;
+	text-decoration: none;
+}
+
+.mandate-capability-section-index a:hover,
+.mandate-capability-section-index a:focus {
+	color: #135e96;
+	text-decoration: underline;
+	text-underline-offset: .18rem;
+}
+
+.mandate-panel-actions {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	gap: .75rem;
-	justify-content: space-between;
-	margin-bottom: .75rem;
-}
-
-.mandate-panel-heading h3 {
-	font-size: 1rem;
-	line-height: 1.4;
-	margin: 0;
-}
-
-.mandate-panel-heading p {
-	margin: 0;
+	gap: .5rem;
+	justify-content: flex-end;
+	margin: .75rem 0 0;
+	white-space: nowrap;
 }
 
 .mandate-capability-scroll {
 	border: 1px solid #dcdcde;
-	display: grid;
-	gap: 1.25rem;
-	grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
 	max-height: 32rem;
 	overflow: auto;
-	padding: .75rem 1rem;
+	padding: 0;
 }
 
 .mandate-capability-section {
@@ -217,30 +243,32 @@
 
 .mandate-capability-section legend {
 	align-items: center;
+	border-bottom: 1px solid #dcdcde;
+	box-sizing: border-box;
 	display: flex;
 	gap: .5rem;
-	justify-content: space-between;
+	justify-content: flex-start;
 	font-weight: 600;
-	margin-bottom: .5rem;
-	padding: 0;
+	margin: 0;
+	padding: .75rem 1rem .45rem;
+	width: 100%;
 }
 
 .mandate-capability-section-count {
-	background: #f0f6fc;
-	border: 1px solid #c5d9ed;
-	border-radius: 999px;
-	color: #0a4b78;
+	color: #646970;
 	font-size: .75rem;
 	font-weight: 400;
 	line-height: 1.4;
-	min-width: 1.6rem;
-	padding: 0 .45rem;
+	min-width: 0;
+	padding: 0;
 	text-align: center;
 }
 
 .mandate-capability-list {
 	display: grid;
-	gap: .4rem;
+	gap: .4rem 1rem;
+	grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
+	padding: .85rem 1rem 1rem;
 }
 
 .mandate-capability-list label {
@@ -338,10 +366,20 @@
 	}
 }
 
+@media screen and ( max-width: 1100px ) {
+	.mandate-capability-list {
+		grid-template-columns: repeat( 2, minmax( 0, 1fr ) );
+	}
+}
+
 @media screen and ( max-width: 782px ) {
 	.mandate-selection-grid,
-	.mandate-capability-scroll {
+	.mandate-capability-list {
 		grid-template-columns: 1fr;
+	}
+
+	.mandate-panel-actions {
+		white-space: normal;
 	}
 
 	.mandate-password-summary-details {

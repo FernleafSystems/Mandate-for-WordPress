@@ -558,7 +558,7 @@ class AdminPageViewDataBuilder {
 
 	/**
 	 * @param list<CapabilitySourceGroup> $sources
-	 * @return list<array{key:string,emptyText:string,modes:array{area:array{sections:list<array{key:string,label:string,count:int}>},action:array{sections:list<array{key:string,label:string,count:int}>}}}>
+	 * @return list<array{key:string,emptyText:string,modes:array{area:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>}>},action:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>}>}}}>
 	 */
 	private function capabilitySourceConfig( array $sources ) :array {
 		$config = [];
@@ -570,12 +570,14 @@ class AdminPageViewDataBuilder {
 					CapabilityGroupProvider::MODE_AREA   => [
 						'sections' => $this->capabilitySectionConfig(
 							$source[ CapabilityGroupProvider::MODE_AREA ],
+							$source[ 'key' ],
 							CapabilityGroupProvider::MODE_AREA
 						),
 					],
 					CapabilityGroupProvider::MODE_ACTION => [
 						'sections' => $this->capabilitySectionConfig(
 							$source[ CapabilityGroupProvider::MODE_ACTION ],
+							$source[ 'key' ],
 							CapabilityGroupProvider::MODE_ACTION
 						),
 					],
@@ -588,17 +590,22 @@ class AdminPageViewDataBuilder {
 
 	/**
 	 * @param list<CapabilityGroupSection> $sections
-	 * @return list<array{key:string,label:string,count:int}>
+	 * @return list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>}>
 	 */
-	private function capabilitySectionConfig( array $sections, string $mode ) :array {
+	private function capabilitySectionConfig( array $sections, string $sourceKey, string $mode ) :array {
 		$config = [];
 		foreach ( $sections as $section ) {
 			$config[] = [
-				'key'   => $section[ 'key' ],
-				'label' => $mode === CapabilityGroupProvider::MODE_AREA
+				'id'       => $this->capabilitySectionId( $sourceKey, $mode, $section[ 'key' ] ),
+				'key'      => $section[ 'key' ],
+				'label'    => $mode === CapabilityGroupProvider::MODE_AREA
 					? $this->areaLabel( $section[ 'key' ] )
 					: $this->actionLabel( $section[ 'key' ] ),
-				'count' => count( $section[ 'items' ] ),
+				'count'    => count( $section[ 'items' ] ),
+				'itemKeys' => array_map(
+					fn( array $item ) :string => $this->capabilityItemKey( $item[ 'type' ], $item[ 'name' ] ),
+					$section[ 'items' ]
+				),
 			];
 		}
 
@@ -674,10 +681,9 @@ class AdminPageViewDataBuilder {
 				'key'          => $source[ 'key' ],
 				'id'           => $this->capabilitySourcePanelId( $source[ 'key' ] ),
 				'tab_id'       => $this->capabilitySourceTabId( $source[ 'key' ] ),
-				'label'        => $this->sourceLabel( $source[ 'key' ] ),
-				'count'        => count( $source[ 'items' ] ),
 				'empty_text'   => __( 'No capabilities are available in this source.', 'mandate-app-security' ),
 				'is_empty'     => $source[ 'items' ] === [],
+				'section_index' => $this->capabilitySectionIndex( $sections ),
 				'sections'     => $sections,
 				'bulk_actions' => $this->capabilityBulkActions( $isReadOnly ),
 			];
@@ -710,6 +716,7 @@ class AdminPageViewDataBuilder {
 				? isset( $selectedCaps[ $name ] )
 				: isset( $selectedMetaCaps[ $name ] );
 			$items[] = [
+				'item_key'     => $this->capabilityItemKey( $capability[ 'type' ], $name ),
 				'name'         => $name,
 				'type'         => $capability[ 'type' ],
 				'field_name'   => $capability[ 'type' ] === 'primitive' ? 'allowed_caps' : 'allowed_meta_caps',
@@ -724,11 +731,34 @@ class AdminPageViewDataBuilder {
 		}
 
 		return [
-			'id'         => 'mandate-'.$sourceKey.'-'.$mode.'-'.$sectionKey.'-capabilities',
+			'id'         => $this->capabilitySectionId( $sourceKey, $mode, $sectionKey ),
 			'label'      => $label,
 			'count'      => count( $items ),
 			'items'      => $items,
 		];
+	}
+
+	/**
+	 * @param list<AdminCapabilitySectionContract> $sections
+	 * @return list<array{target_id:string,label:string,count:int}>
+	 */
+	private function capabilitySectionIndex( array $sections ) :array {
+		return array_map(
+			static fn( array $section ) :array => [
+				'target_id' => $section[ 'id' ],
+				'label'     => $section[ 'label' ],
+				'count'     => $section[ 'count' ],
+			],
+			$sections
+		);
+	}
+
+	private function capabilitySectionId( string $source, string $mode, string $section ) :string {
+		return 'mandate-'.$source.'-'.$mode.'-'.$section.'-capabilities';
+	}
+
+	private function capabilityItemKey( string $type, string $name ) :string {
+		return $type.':'.$name;
 	}
 
 	private function capabilitySourcePanelId( string $source ) :string {

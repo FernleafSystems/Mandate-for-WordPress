@@ -463,6 +463,31 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 'edit', $items[ 'wpm_manage_meta' ][ 'action' ] );
 	}
 
+	public function testCapabilityGroupsOrderAreaSectionsByVisibleCountAndItemsByName() :void {
+		$groups = ( new CapabilityGroupProvider() )->group(
+			[
+				'level_10'      => true,
+				'level_2'       => true,
+				'level_1'       => true,
+				'upload_files'  => true,
+				'publish_posts' => true,
+				'edit_posts'    => true,
+				'delete_posts'  => true,
+				'manage_options' => true,
+				'read'          => true,
+			],
+			[]
+		);
+
+		$sources = array_column( $groups[ 'sources' ], null, 'key' );
+		$this->assertSame( [ 'posts', 'general', 'media', 'legacy' ], array_column( $sources[ 'wordpress' ][ 'area' ], 'key' ) );
+		$this->assertSame( [ 'read', 'create', 'edit', 'delete' ], array_column( $sources[ 'wordpress' ][ 'action' ], 'key' ) );
+
+		$sections = array_column( $sources[ 'wordpress' ][ 'area' ], null, 'key' );
+		$this->assertSame( [ 'delete_posts', 'edit_posts', 'publish_posts' ], array_column( $sections[ 'posts' ][ 'items' ], 'name' ) );
+		$this->assertSame( [ 'level_1', 'level_2', 'level_10' ], array_column( $sections[ 'legacy' ][ 'items' ], 'name' ) );
+	}
+
 	public function testNormalRequestWithoutApplicationPasswordContextIsUnchanged() :void {
 		$repository = $this->scopeRepository();
 		$repository->save( self::UUID, 5, [ 'read' => true ], [], [], 1 );
@@ -1239,6 +1264,19 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [ 'wordpress', 'third_party' ], array_column( $scopeForm[ 'source_panels' ], 'key' ) );
 		$this->assertSame( 14, $scopeForm[ 'source_tabs' ][ 0 ][ 'count' ] );
 		$this->assertSame( 0, $scopeForm[ 'source_tabs' ][ 1 ][ 'count' ] );
+		$this->assertArrayNotHasKey( 'label', $scopeForm[ 'source_panels' ][ 0 ] );
+		$this->assertArrayNotHasKey( 'count', $scopeForm[ 'source_panels' ][ 0 ] );
+		$this->assertSame(
+			[
+				'mandate-wordpress-area-posts-capabilities',
+				'mandate-wordpress-area-pages-capabilities',
+				'mandate-wordpress-area-taxonomy-capabilities',
+				'mandate-wordpress-area-users-capabilities',
+				'mandate-wordpress-area-media-capabilities',
+				'mandate-wordpress-area-general-capabilities',
+			],
+			array_column( $scopeForm[ 'source_panels' ][ 0 ][ 'section_index' ], 'target_id' )
+		);
 		$this->assertFalse( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
 		$this->assertSame( 'unlocked', $scopeForm[ 'admin_lock_status' ] );
 		$this->assertTrue( $scopeForm[ 'admin_lock' ][ 'is_visible' ] );
@@ -1250,11 +1288,17 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [ 'wordpress', 'third_party' ], array_column( $groupingConfig[ 'sources' ], 'key' ) );
 		$configSources = array_column( $groupingConfig[ 'sources' ], null, 'key' );
 		$this->assertArrayNotHasKey( 'label', $configSources[ 'wordpress' ] );
-		$this->assertSame( [ 'posts', 'pages', 'media', 'taxonomy', 'users', 'general' ], array_column( $configSources[ 'wordpress' ][ 'modes' ][ 'area' ][ 'sections' ], 'key' ) );
+		$this->assertSame( [ 'posts', 'pages', 'taxonomy', 'users', 'media', 'general' ], array_column( $configSources[ 'wordpress' ][ 'modes' ][ 'area' ][ 'sections' ], 'key' ) );
 		$this->assertSame( [ 'read', 'create', 'edit', 'delete' ], array_column( $configSources[ 'wordpress' ][ 'modes' ][ 'action' ][ 'sections' ], 'key' ) );
 		$this->assertSame( [], $configSources[ 'third_party' ][ 'modes' ][ 'area' ][ 'sections' ] );
+		$configSections = array_column( $configSources[ 'wordpress' ][ 'modes' ][ 'area' ][ 'sections' ], null, 'key' );
+		$this->assertSame(
+			[ 'meta:delete_post', 'meta:edit_post', 'primitive:edit_posts', 'meta:read_post' ],
+			$configSections[ 'posts' ][ 'itemKeys' ]
+		);
 
 		$uploadFiles = $this->capabilityItemFromViewData( $data, 'upload_files' );
+		$this->assertSame( 'primitive:upload_files', $uploadFiles[ 'item_key' ] );
 		$this->assertSame( 'allowed_caps', $uploadFiles[ 'field_name' ] );
 		$this->assertSame( 'primitive', $uploadFiles[ 'type' ] );
 		$this->assertSame( 'wordpress', $uploadFiles[ 'source' ] );
