@@ -28,7 +28,7 @@ An admin can choose:
 - an optional expiration date for that password
 - whether the scope is locked so the password owner can view it but not edit it
 
-Users can also narrow their own Application Passwords. Only administrators can edit another user's Application Password scope or lock a scope against owner edits.
+Users can also narrow their own Application Passwords when WordPress allows Application Passwords for their account. Only administrators can edit another user's Application Password scope or lock a scope against owner edits.
 
 When a request is authenticated with that Application Password, Mandate App Security checks the saved allowlist and removes capabilities that are not allowed for that password.
 
@@ -46,7 +46,7 @@ It is not a replacement for careful user roles, secure integrations, or good ope
 
 ## How It Works
 
-The plugin adds a page under Tools where administrators can select any user and Application Password. Non-administrators can use the same page for their own Application Passwords unless an administrator has locked the selected scope.
+The plugin adds a page under Tools where administrators can select any user and Application Password. Non-administrators can use the same page for their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator has locked the selected scope.
 
 The capability list shown on the page is built from the user's assigned roles. Directly assigned user capabilities and capabilities from unrelated roles are not offered as scope options.
 

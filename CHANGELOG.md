@@ -4,7 +4,7 @@
 
 ### Added
 
-- Users can scope their own Application Passwords unless an administrator locks that scope.
+- Users can scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator locks that scope.
 - Administrator locks make selected scopes read-only for the password owner.
 
 ## 0.3.1 - 2026-05-26

@@ -28,7 +28,7 @@ An administrator can choose:
 * an optional expiration date for that password
 * whether the scope is locked so the password owner can view it but not edit it
 
-Users can scope their own Application Passwords. Only administrators can edit another user's scope or lock a scope against owner edits.
+Users can scope their own Application Passwords when WordPress allows Application Passwords for their account. Only administrators can edit another user's scope or lock a scope against owner edits.
 
 When a request is authenticated with that Application Password, Mandate App Security checks the saved allowlist and removes capabilities that are not allowed for that password.
 
@@ -66,7 +66,7 @@ The application password keeps its normal WordPress behavior until an administra
 
 = Can users scope their own application passwords? =
 
-Yes. Users can scope their own Application Passwords unless an administrator has locked that scope. Administrators can edit any user's scope.
+Yes. Users can scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator has locked that scope. Administrators can edit any user's scope.
 
 = How do expiration dates work? =
 
@@ -93,7 +93,7 @@ The public development repository, release packages, and build documentation are
 == Changelog ==
 
 = 0.3.1 =
-* Allows users to scope their own Application Passwords unless an administrator locks the scope.
+* Allows users to scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator locks the scope.
 * Adds administrator locks that make selected scopes read-only for password owners.
 * Adds a Plugins page Settings link that opens the Mandate admin tool.
 * Adds favicon and sitemap metadata for the static product site.

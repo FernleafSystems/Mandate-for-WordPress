@@ -5,6 +5,7 @@ declare( strict_types=1 );
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeAccessPolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
@@ -734,6 +735,45 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertHookRegistered( 'admin_enqueue_scripts', 'action', 10, 1 );
 	}
 
+	public function testPluginAdminMenuSkipsPageForUnavailableNonAdminOwner() :void {
+		$this->seedAdminFixture();
+		$this->actAsUser( 5 );
+		$this->setApplicationPasswordsAvailableForUser( 5, false );
+		$GLOBALS[ 'wpm_test_is_admin' ] = true;
+
+		Plugin::boot( $this->pluginFile() );
+		do_action( 'admin_menu' );
+
+		$this->assertArrayNotHasKey( Plugin::MENU_SLUG, $GLOBALS[ 'wpm_test_management_pages' ] );
+		$this->assertHookNotRegistered( 'load-tools_page_'.Plugin::MENU_SLUG, 'action' );
+	}
+
+	public function testAdminScopeAccessPolicyRespectsApplicationPasswordAvailabilityForOwners() :void {
+		$this->seedAdminFixture();
+		$this->actAsUser( 5 );
+		$policy = new AdminScopeAccessPolicy();
+
+		$this->assertTrue( $policy->canAccessPage() );
+		$this->assertTrue( $policy->canManageUserScope( 5 ) );
+		$this->assertSame( 5, $policy->selectedUserId( '9' ) );
+		$this->assertTrue( $policy->canUseScopeShortcutForProfileUser( 5 ) );
+
+		$this->setApplicationPasswordsAvailableForUser( 5, false );
+
+		$this->assertFalse( $policy->canAccessPage() );
+		$this->assertFalse( $policy->canManageUserScope( 5 ) );
+		$this->assertSame( 0, $policy->selectedUserId( '9' ) );
+		$this->assertFalse( $policy->canUseScopeShortcutForProfileUser( 5 ) );
+
+		$GLOBALS[ 'wpm_test_current_user_id' ] = 1;
+		$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'manage_options' => true ];
+
+		$this->assertTrue( $policy->canAccessPage() );
+		$this->assertTrue( $policy->canManageUserScope( 5 ) );
+		$this->assertSame( 5, $policy->selectedUserId( '5' ) );
+		$this->assertTrue( $policy->canUseScopeShortcutForProfileUser( 5 ) );
+	}
+
 	public function testApplicationPasswordScopeColumnOrdersScopeBeforeRevoke() :void {
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
@@ -751,7 +791,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [ 'name', ApplicationPasswordScopeColumn::COLUMN_KEY ], array_keys( $columns ) );
 	}
 
-	public function testApplicationPasswordScopeColumnRequiresManageOptions() :void {
+	public function testApplicationPasswordScopeColumnRequiresShortcutAccess() :void {
 		$GLOBALS[ 'wpm_test_current_user_caps' ] = [];
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
@@ -766,6 +806,7 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testApplicationPasswordScopeColumnAllowsOwnersOnOwnProfileOnly() :void {
+		$this->seedAdminFixture();
 		$GLOBALS[ 'wpm_test_current_user_id' ] = 5;
 		$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'read' => true ];
 		$GLOBALS[ 'user_id' ] = 5;
@@ -783,6 +824,24 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame(
 			'',
 			$this->captureOutput( fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] ) )
+		);
+	}
+
+	public function testApplicationPasswordScopeColumnHidesOwnerShortcutWhenApplicationPasswordsUnavailable() :void {
+		$this->seedAdminFixture();
+		$this->actAsUser( 5 );
+		$this->setApplicationPasswordsAvailableForUser( 5, false );
+		$GLOBALS[ 'user_id' ] = 5;
+		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$this->assertSame( [ 'revoke' => 'Revoke' ], $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] ) );
+		$this->assertSame(
+			'',
+			$this->captureOutput( fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] ) )
+		);
+		$this->assertSame(
+			'',
+			$this->captureOutput( fn() => $scopeColumn->renderColumnJsTemplate( ApplicationPasswordScopeColumn::COLUMN_KEY ) )
 		);
 	}
 
@@ -971,6 +1030,20 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 5, $record[ 'updated_by' ] );
 	}
 
+	public function testNonAdminPostRejectsOwnScopeWhenApplicationPasswordsUnavailableWithoutMutation() :void {
+		$this->seedAdminFixture();
+		$this->actAsUser( 5 );
+		$this->setApplicationPasswordsAvailableForUser( 5, false );
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true );
+
+		$repository = $this->scopeRepository();
+		$this->assertThrowsRuntimeException(
+			fn() => $this->adminPage( $repository )->handlePost()
+		);
+
+		$this->assertSame( [], $repository->all() );
+	}
+
 	public function testNonAdminPostRejectsForgedOtherUserScopeWithoutMutation() :void {
 		$this->seedAdminFixture();
 		$this->actAsUser( 5 );
@@ -1072,6 +1145,20 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$this->assertSame( 'reset', $this->redirectMessage( $resetLocation ) );
 		$this->assertNull( $repository->findForUser( 9, self::OTHER_UUID ) );
+	}
+
+	public function testAdminPostCanManageUserWhenOwnerApplicationPasswordsUnavailable() :void {
+		$this->seedAdminFixture();
+		$this->setApplicationPasswordsAvailableForUser( 5, false );
+		$this->submitScopePost( 'save_scope', 5, self::UUID, [ 'read' ], [], true );
+
+		$repository = $this->scopeRepository();
+		$location = $this->handlePostExpectRedirect( $this->adminPage( $repository ) );
+		$record = $repository->findForUser( 5, self::UUID );
+
+		$this->assertSame( 'saved', $this->redirectMessage( $location ) );
+		$this->assertNotNull( $record );
+		$this->assertSame( [ 'read' => true ], $record[ 'allowed_caps' ] );
 	}
 
 	public function testAdminPostAllSelectedScopeDeletesStoredScope() :void {
@@ -1755,6 +1842,10 @@ final class MandateTest extends Wpm_Test_Case {
 	private function actAsUser( int $userId ) :void {
 		$GLOBALS[ 'wpm_test_current_user_id' ] = $userId;
 		$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'read' => true ];
+	}
+
+	private function setApplicationPasswordsAvailableForUser( int $userId, bool $available ) :void {
+		$GLOBALS[ 'wpm_test_application_passwords_available_for_users' ][ $userId ] = $available;
 	}
 
 	/**

@@ -73,6 +73,7 @@ function wpm_test_reset_state() :void {
 	$GLOBALS[ 'wpm_test_users' ] = [];
 	$GLOBALS[ 'wpm_test_current_user_id' ] = 1;
 	$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'manage_options' => true, 'read' => true ];
+	$GLOBALS[ 'wpm_test_application_passwords_available_for_users' ] = [];
 	$GLOBALS[ 'wpm_test_rest_uuid' ] = null;
 	$GLOBALS[ 'wpm_test_now' ] = strtotime( '2026-05-23 12:00:00 UTC' );
 	$GLOBALS[ 'wpm_test_is_admin' ] = false;
@@ -255,6 +256,14 @@ if ( !function_exists( 'get_current_user_id' ) ) {
 if ( !function_exists( 'current_user_can' ) ) {
 	function current_user_can( string $capability, mixed ...$args ) :bool {
 		return !empty( $GLOBALS[ 'wpm_test_current_user_caps' ][ $capability ] );
+	}
+}
+
+if ( !function_exists( 'wp_is_application_passwords_available_for_user' ) ) {
+	function wp_is_application_passwords_available_for_user( mixed $user ) :bool {
+		$userId = is_object( $user ) && isset( $user->ID ) ? (int)$user->ID : (int)$user;
+
+		return (bool)( $GLOBALS[ 'wpm_test_application_passwords_available_for_users' ][ $userId ] ?? true );
 	}
 }
 

@@ -16,7 +16,10 @@ class AdminScopeAccessPolicy {
 	}
 
 	public function canAccessPage() :bool {
-		return $this->currentUserId() > 0 && current_user_can( self::PAGE_CAPABILITY );
+		$currentUserId = $this->currentUserId();
+
+		return $currentUserId > 0
+			&& ( $this->canManageAnyScope() || $this->canSelfManageOwnScope( $currentUserId ) );
 	}
 
 	public function canManageAnyScope() :bool {
@@ -24,7 +27,11 @@ class AdminScopeAccessPolicy {
 	}
 
 	public function canManageUserScope( int $userId ) :bool {
-		return $userId > 0 && ( $this->canManageAnyScope() || $userId === $this->currentUserId() );
+		if ( $userId < 1 ) {
+			return false;
+		}
+
+		return $this->canManageAnyScope() || $this->canSelfManageOwnScope( $userId );
 	}
 
 	/**
@@ -51,7 +58,7 @@ class AdminScopeAccessPolicy {
 	public function selectedUserId( string $requestedUserId ) :int {
 		$currentUserId = $this->currentUserId();
 		if ( !$this->canManageAnyScope() ) {
-			return $this->existingUserId( $currentUserId );
+			return $this->canSelfManageOwnScope( $currentUserId ) ? $currentUserId : 0;
 		}
 
 		$userId = absint( $requestedUserId );
@@ -67,7 +74,7 @@ class AdminScopeAccessPolicy {
 	}
 
 	public function canUseScopeShortcutForProfileUser( int $profileUserId ) :bool {
-		return $this->canManageAnyScope() || ( $profileUserId > 0 && $profileUserId === $this->currentUserId() );
+		return $this->canManageAnyScope() || $this->canSelfManageOwnScope( $profileUserId );
 	}
 
 	public function currentUserId() :int {
@@ -76,5 +83,18 @@ class AdminScopeAccessPolicy {
 
 	private function existingUserId( int $userId ) :int {
 		return $userId > 0 && get_userdata( $userId ) ? $userId : 0;
+	}
+
+	private function canSelfManageOwnScope( int $userId ) :bool {
+		return $userId > 0
+			&& $userId === $this->currentUserId()
+			&& current_user_can( self::PAGE_CAPABILITY )
+			&& $this->existingUserId( $userId ) > 0
+			&& $this->applicationPasswordsAvailableForUser( $userId );
+	}
+
+	private function applicationPasswordsAvailableForUser( int $userId ) :bool {
+		return function_exists( 'wp_is_application_passwords_available_for_user' )
+			&& wp_is_application_passwords_available_for_user( $userId );
 	}
 }

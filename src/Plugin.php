@@ -73,10 +73,15 @@ class Plugin {
 		add_action(
 			'admin_menu',
 			static function () use ( $services ) :void {
+				$accessPolicy = $services->adminScopeAccessPolicy();
+				if ( !$accessPolicy->canAccessPage() ) {
+					return;
+				}
+
 				$pageHook = add_management_page(
 					__( 'Mandate App Security', 'mandate-app-security' ),
 					__( 'Mandate App Security', 'mandate-app-security' ),
-					$services->adminScopeAccessPolicy()->pageCapability(),
+					$accessPolicy->pageCapability(),
 					self::MENU_SLUG,
 					static function () use ( $services ) :void {
 						$services->adminPage()->render();
