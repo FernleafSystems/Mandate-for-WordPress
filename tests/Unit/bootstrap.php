@@ -75,6 +75,7 @@ function wpm_test_reset_state() :void {
 	$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'manage_options' => true, 'read' => true ];
 	$GLOBALS[ 'wpm_test_rest_uuid' ] = null;
 	$GLOBALS[ 'wpm_test_now' ] = strtotime( '2026-05-23 12:00:00 UTC' );
+	$GLOBALS[ 'wpm_test_is_admin' ] = false;
 	$GLOBALS[ 'wpm_test_is_multisite' ] = false;
 	$GLOBALS[ 'wpm_test_super_admins' ] = [];
 	$GLOBALS[ 'wpm_test_actions' ] = [];
@@ -254,6 +255,12 @@ if ( !function_exists( 'get_current_user_id' ) ) {
 if ( !function_exists( 'current_user_can' ) ) {
 	function current_user_can( string $capability, mixed ...$args ) :bool {
 		return !empty( $GLOBALS[ 'wpm_test_current_user_caps' ][ $capability ] );
+	}
+}
+
+if ( !function_exists( 'is_admin' ) ) {
+	function is_admin() :bool {
+		return (bool)( $GLOBALS[ 'wpm_test_is_admin' ] ?? false );
 	}
 }
 

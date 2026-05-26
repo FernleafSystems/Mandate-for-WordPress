@@ -30,6 +30,10 @@ class ApplicationPasswordExpirationReaper {
 	}
 
 	public function ensureScheduled() :void {
+		self::ensureScheduledHook();
+	}
+
+	public static function ensureScheduledHook() :void {
 		if ( !function_exists( 'wp_next_scheduled' ) || !function_exists( 'wp_schedule_event' ) ) {
 			return;
 		}

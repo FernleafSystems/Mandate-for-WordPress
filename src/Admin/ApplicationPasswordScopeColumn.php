@@ -22,12 +22,6 @@ class ApplicationPasswordScopeColumn {
 		$this->accessPolicy = $accessPolicy ?? new AdminScopeAccessPolicy();
 	}
 
-	public function registerHooks() :void {
-		add_filter( 'manage_application-passwords-user_columns', [ $this, 'addColumn' ] );
-		add_action( 'manage_application-passwords-user_custom_column', [ $this, 'renderColumn' ], 10, 2 );
-		add_action( 'manage_application-passwords-user_custom_column_js_template', [ $this, 'renderColumnJsTemplate' ] );
-	}
-
 	/**
 	 * @param array<string,string> $columns
 	 * @return array<string,string>

@@ -16,6 +16,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionP
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
 use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
@@ -653,45 +654,55 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [], $this->scopeRepository()->all() );
 	}
 
-	public function testAdminPageRegistersPluginActionLinksFilter() :void {
-		$adminPage = $this->adminPage();
+	public function testPluginBootRegistersGlobalHooksOnlyOutsideAdmin() :void {
+		$GLOBALS[ 'wpm_test_is_admin' ] = false;
 
-		$adminPage->registerHooks();
+		Plugin::boot( $this->pluginFile() );
 
-		$filterName = 'plugin_action_links_'.PluginIdentity::MAIN_FILE;
-		$callbacks = $GLOBALS[ 'wpm_test_filters' ][ $filterName ][ 10 ] ?? [];
-		$this->assertCount( 1, $callbacks );
-		$this->assertSame( [ $adminPage, 'addSettingsActionLink' ], $callbacks[ 0 ][ 'callback' ] );
-		$this->assertSame( 1, $callbacks[ 0 ][ 'accepted_args' ] );
+		$this->assertHookRegistered( 'application_password_did_authenticate', 'action', 20, 2 );
+		$this->assertHookRegistered( 'user_has_cap', 'filter', PHP_INT_MAX, 4 );
+		$this->assertHookRegistered( 'map_meta_cap', 'filter', PHP_INT_MAX, 4 );
+		$this->assertHookRegistered( 'wp_delete_application_password', 'action', 10, 2 );
+		$this->assertHookRegistered( ApplicationPasswordExpirationReaper::HOOK, 'action', 10, 1 );
+		$this->assertArrayHasKey( $this->pluginFile(), $GLOBALS[ 'wpm_test_deactivation_hooks' ] );
+		$this->assertNotFalse( wp_next_scheduled( ApplicationPasswordExpirationReaper::HOOK ) );
+
+		$this->assertHookNotRegistered( 'admin_menu', 'action' );
+		$this->assertHookNotRegistered( 'admin_init', 'action' );
+		$this->assertHookNotRegistered( 'admin_enqueue_scripts', 'action' );
+		$this->assertHookNotRegistered( 'manage_application-passwords-user_custom_column', 'action' );
+		$this->assertHookNotRegistered( 'manage_application-passwords-user_custom_column_js_template', 'action' );
+		$this->assertHookNotRegistered( 'manage_application-passwords-user_columns', 'filter' );
+		$this->assertHookNotRegistered( 'plugin_action_links_'.PluginIdentity::MAIN_FILE, 'filter' );
 	}
 
-	public function testAdminPageRegistersMenuForLoggedInUsers() :void {
-		$adminPage = $this->adminPage();
+	public function testPluginBootRegistersAdminHooksOnlyInsideAdmin() :void {
+		$GLOBALS[ 'wpm_test_is_admin' ] = true;
 
-		$adminPage->registerMenu();
+		Plugin::boot( $this->pluginFile() );
 
-		$this->assertSame( 'read', $GLOBALS[ 'wpm_test_management_pages' ][ Plugin::MENU_SLUG ][ 'capability' ] );
+		$this->assertHookRegistered( 'admin_menu', 'action', 10, 1 );
+		$this->assertHookRegistered( 'manage_application-passwords-user_columns', 'filter', 10, 1 );
+		$this->assertHookRegistered( 'manage_application-passwords-user_custom_column', 'action', 10, 2 );
+		$this->assertHookRegistered( 'manage_application-passwords-user_custom_column_js_template', 'action', 10, 1 );
+		$this->assertHookRegistered( 'plugin_action_links_'.PluginIdentity::MAIN_FILE, 'filter', 10, 1 );
+		$this->assertHookNotRegistered( 'admin_init', 'action' );
 	}
 
-	public function testApplicationPasswordScopeColumnRegistersTableHooks() :void {
-		$scopeColumn = new ApplicationPasswordScopeColumn();
+	public function testPluginAdminMenuRegistersPageLoadHook() :void {
+		$GLOBALS[ 'wpm_test_is_admin' ] = true;
 
-		$scopeColumn->registerHooks();
+		Plugin::boot( $this->pluginFile() );
+		do_action( 'admin_menu' );
 
-		$columnCallbacks = $GLOBALS[ 'wpm_test_filters' ][ 'manage_application-passwords-user_columns' ][ 10 ] ?? [];
-		$this->assertCount( 1, $columnCallbacks );
-		$this->assertSame( [ $scopeColumn, 'addColumn' ], $columnCallbacks[ 0 ][ 'callback' ] );
-		$this->assertSame( 1, $columnCallbacks[ 0 ][ 'accepted_args' ] );
+		$page = $GLOBALS[ 'wpm_test_management_pages' ][ Plugin::MENU_SLUG ] ?? null;
+		$this->assertIsArray( $page );
+		$this->assertSame( 'read', $page[ 'capability' ] );
+		$this->assertSame( 'tools_page_'.Plugin::MENU_SLUG, $page[ 'hook_suffix' ] );
+		$this->assertHookRegistered( 'load-'.$page[ 'hook_suffix' ], 'action', 10, 1 );
 
-		$renderCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column' ][ 10 ] ?? [];
-		$this->assertCount( 1, $renderCallbacks );
-		$this->assertSame( [ $scopeColumn, 'renderColumn' ], $renderCallbacks[ 0 ][ 'callback' ] );
-		$this->assertSame( 2, $renderCallbacks[ 0 ][ 'accepted_args' ] );
-
-		$templateCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column_js_template' ][ 10 ] ?? [];
-		$this->assertCount( 1, $templateCallbacks );
-		$this->assertSame( [ $scopeColumn, 'renderColumnJsTemplate' ], $templateCallbacks[ 0 ][ 'callback' ] );
-		$this->assertSame( 1, $templateCallbacks[ 0 ][ 'accepted_args' ] );
+		do_action( 'load-'.$page[ 'hook_suffix' ] );
+		$this->assertHookRegistered( 'admin_enqueue_scripts', 'action', 10, 1 );
 	}
 
 	public function testApplicationPasswordScopeColumnOrdersScopeBeforeRevoke() :void {
@@ -826,7 +837,8 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testAdminPagePrependsSettingsPluginActionLink() :void {
-		$this->adminPage()->registerHooks();
+		$GLOBALS[ 'wpm_test_is_admin' ] = true;
+		Plugin::boot( $this->pluginFile() );
 
 		$links = apply_filters(
 			'plugin_action_links_'.PluginIdentity::MAIN_FILE,
@@ -847,7 +859,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [ 'page' => Plugin::MENU_SLUG ], $params );
 	}
 
-	public function testAdminAssetsEnqueueOnlyForRegisteredPageHookAndExistingDistFiles() :void {
+	public function testPluginAdminAssetsEnqueueOnlyForLoadedPageHookAndExistingDistFiles() :void {
 		$root = sys_get_temp_dir().'/mandate-admin-assets-'.bin2hex( random_bytes( 4 ) );
 		$dist = $root.'/assets/dist';
 		$pluginFile = $root.'/'.PluginIdentity::MAIN_FILE;
@@ -858,46 +870,17 @@ final class MandateTest extends Wpm_Test_Case {
 		file_put_contents( $dist.'/admin-page.css', "body{}\n" );
 
 		try {
-			$scopeRepository = $this->scopeRepository();
-			$passwordRepository = new ApplicationPasswordRepository();
-			$candidateProvider = new CapabilityCandidateProvider();
-			$descriptionProvider = new CapabilityDescriptionProvider();
-			$metaRegistry = new MetaCapabilityRegistry();
-			$groupProvider = new CapabilityGroupProvider();
-			$expirationDatePolicy = new ExpirationDatePolicy();
-			$roleProvider = new AdminUserRoleProvider();
-			$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
-			$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
-			$adminPage = new AdminPage(
-				$scopeRepository,
-				$passwordRepository,
-				$candidateProvider,
-				$metaRegistry,
-				$pluginFile,
-				$expirationDatePolicy,
-				$roleProvider,
-				$formSecurity,
-				new AdminPageViewDataBuilder(
-					$scopeRepository,
-					$passwordRepository,
-					$candidateProvider,
-					$descriptionProvider,
-					$metaRegistry,
-					$groupProvider,
-					$expirationDatePolicy,
-					$roleProvider,
-					$formSecurity,
-					$trustedHtmlSanitizer
-				),
-				new AdminTemplateRenderer()
-			);
+			$GLOBALS[ 'wpm_test_is_admin' ] = true;
+			Plugin::boot( $pluginFile );
+			do_action( 'admin_menu' );
 
-			$adminPage->registerMenu();
-			$adminPage->enqueueAssets( 'dashboard_page_not_mandate' );
+			$pageHook = $GLOBALS[ 'wpm_test_management_pages' ][ Plugin::MENU_SLUG ][ 'hook_suffix' ];
+			do_action( 'load-'.$pageHook );
+			do_action( 'admin_enqueue_scripts', 'dashboard_page_not_mandate' );
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_styles' ] );
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
 
-			$adminPage->enqueueAssets( 'tools_page_'.PluginIdentity::SLUG );
+			do_action( 'admin_enqueue_scripts', $pageHook );
 			$this->assertArrayHasKey( 'mandate-admin-page', $GLOBALS[ 'wpm_test_enqueued_styles' ] );
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
 			$this->assertSame(
@@ -1567,23 +1550,23 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 9, $storedScopes[ self::UUID ][ 'user_id' ] );
 	}
 
-	public function testPluginBootRegistersApplicationPasswordScopeColumnHooks() :void {
+	public function testPluginBootAdminTableHooksUseScopeColumnBehavior() :void {
+		$GLOBALS[ 'wpm_test_is_admin' ] = true;
+		$GLOBALS[ 'user_id' ] = 5;
+
 		Plugin::boot( $this->pluginFile() );
 
-		$columnCallbacks = $GLOBALS[ 'wpm_test_filters' ][ 'manage_application-passwords-user_columns' ][ 10 ] ?? [];
-		$this->assertCount( 1, $columnCallbacks );
-		$this->assertInstanceOf( ApplicationPasswordScopeColumn::class, $columnCallbacks[ 0 ][ 'callback' ][ 0 ] );
-		$this->assertSame( 'addColumn', $columnCallbacks[ 0 ][ 'callback' ][ 1 ] );
+		$columns = apply_filters( 'manage_application-passwords-user_columns', [ 'revoke' => 'Revoke' ] );
+		$this->assertSame( [ ApplicationPasswordScopeColumn::COLUMN_KEY, 'revoke' ], array_keys( $columns ) );
 
-		$renderCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column' ][ 10 ] ?? [];
-		$this->assertCount( 1, $renderCallbacks );
-		$this->assertInstanceOf( ApplicationPasswordScopeColumn::class, $renderCallbacks[ 0 ][ 'callback' ][ 0 ] );
-		$this->assertSame( 'renderColumn', $renderCallbacks[ 0 ][ 'callback' ][ 1 ] );
-
-		$templateCallbacks = $GLOBALS[ 'wpm_test_actions' ][ 'manage_application-passwords-user_custom_column_js_template' ][ 10 ] ?? [];
-		$this->assertCount( 1, $templateCallbacks );
-		$this->assertInstanceOf( ApplicationPasswordScopeColumn::class, $templateCallbacks[ 0 ][ 'callback' ][ 0 ] );
-		$this->assertSame( 'renderColumnJsTemplate', $templateCallbacks[ 0 ][ 'callback' ][ 1 ] );
+		$html = $this->captureOutput(
+			fn() => do_action(
+				'manage_application-passwords-user_custom_column',
+				ApplicationPasswordScopeColumn::COLUMN_KEY,
+				[ 'uuid' => self::UUID ]
+			)
+		);
+		$this->assertSame( self::UUID, $this->queryParamFromHref( $this->actionLinkHref( $html ), 'app_password_uuid' ) );
 	}
 
 	private function adminPage( ?ScopeRepository $repository = null ) :AdminPage {
@@ -1645,6 +1628,19 @@ final class MandateTest extends Wpm_Test_Case {
 
 	private function pluginFile() :string {
 		return dirname( __DIR__, 2 ).'/'.PluginIdentity::MAIN_FILE;
+	}
+
+	private function assertHookRegistered( string $hookName, string $type, int $priority, int $acceptedArgs ) :void {
+		$storage = $type === 'filter' ? $GLOBALS[ 'wpm_test_filters' ] : $GLOBALS[ 'wpm_test_actions' ];
+		$callbacks = $storage[ $hookName ][ $priority ] ?? [];
+		$this->assertNotSame( [], $callbacks, $hookName );
+		$this->assertSame( $acceptedArgs, (int)$callbacks[ 0 ][ 'accepted_args' ], $hookName );
+		$this->assertIsCallable( $callbacks[ 0 ][ 'callback' ], $hookName );
+	}
+
+	private function assertHookNotRegistered( string $hookName, string $type ) :void {
+		$storage = $type === 'filter' ? $GLOBALS[ 'wpm_test_filters' ] : $GLOBALS[ 'wpm_test_actions' ];
+		$this->assertArrayNotHasKey( $hookName, $storage );
 	}
 
 	private function seedAdminFixture() :void {

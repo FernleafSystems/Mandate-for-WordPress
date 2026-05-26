@@ -40,8 +40,6 @@ class AdminPage {
 
 	private AdminScopeAccessPolicy $accessPolicy;
 
-	private string $pageHookSuffix = '';
-
 	public function __construct(
 		ScopeRepository $scopeRepository,
 		ApplicationPasswordRepository $passwordRepository,
@@ -68,40 +66,7 @@ class AdminPage {
 		$this->accessPolicy = $accessPolicy ?? new AdminScopeAccessPolicy();
 	}
 
-	public function registerHooks() :void {
-		add_action( 'admin_menu', [ $this, 'registerMenu' ] );
-		add_action( 'admin_init', [ $this, 'handlePost' ] );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueueAssets' ] );
-		add_filter( 'plugin_action_links_'.plugin_basename( $this->pluginFile ), [ $this, 'addSettingsActionLink' ] );
-	}
-
-	/**
-	 * @param array<int|string,string> $links
-	 * @return array<int|string,string>
-	 */
-	public function addSettingsActionLink( array $links ) :array {
-		$url = add_query_arg( [ 'page' => Plugin::MENU_SLUG ], admin_url( 'tools.php' ) );
-
-		return [
-			'settings' => '<a href="'.esc_url( $url ).'">'.esc_html__( 'Settings', 'mandate-app-security' ).'</a>',
-		] + $links;
-	}
-
-	public function registerMenu() :void {
-		$this->pageHookSuffix = (string)add_management_page(
-			__( 'Mandate App Security', 'mandate-app-security' ),
-			__( 'Mandate App Security', 'mandate-app-security' ),
-			$this->accessPolicy->pageCapability(),
-			Plugin::MENU_SLUG,
-			[ $this, 'render' ]
-		);
-	}
-
 	public function enqueueAssets( string $hookSuffix ) :void {
-		if ( $this->pageHookSuffix === '' || $hookSuffix !== $this->pageHookSuffix ) {
-			return;
-		}
-
 		$distPath = plugin_dir_path( $this->pluginFile ).'assets/dist/';
 		$distUrl = plugin_dir_url( $this->pluginFile ).'assets/dist/';
 		$cssPath = $distPath.'admin-page.css';
