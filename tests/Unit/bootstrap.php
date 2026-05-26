@@ -270,6 +270,19 @@ if ( !function_exists( 'admin_url' ) ) {
 	}
 }
 
+if ( !function_exists( 'plugin_basename' ) ) {
+	function plugin_basename( string $file ) :string {
+		$normalizedFile = str_replace( '\\', '/', $file );
+		$normalizedRoot = rtrim( str_replace( '\\', '/', ABSPATH ), '/' ).'/';
+
+		if ( str_starts_with( $normalizedFile, $normalizedRoot ) ) {
+			return ltrim( substr( $normalizedFile, strlen( $normalizedRoot ) ), '/' );
+		}
+
+		return basename( $normalizedFile );
+	}
+}
+
 if ( !function_exists( 'add_management_page' ) ) {
 	function add_management_page(
 		string $pageTitle,

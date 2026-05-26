@@ -490,6 +490,40 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( [], $this->scopeRepository()->all() );
 	}
 
+	public function testAdminPageRegistersPluginActionLinksFilter() :void {
+		$adminPage = $this->adminPage();
+
+		$adminPage->registerHooks();
+
+		$filterName = 'plugin_action_links_'.PluginIdentity::MAIN_FILE;
+		$callbacks = $GLOBALS[ 'wpm_test_filters' ][ $filterName ][ 10 ] ?? [];
+		$this->assertCount( 1, $callbacks );
+		$this->assertSame( [ $adminPage, 'addSettingsActionLink' ], $callbacks[ 0 ][ 'callback' ] );
+		$this->assertSame( 1, $callbacks[ 0 ][ 'accepted_args' ] );
+	}
+
+	public function testAdminPagePrependsSettingsPluginActionLink() :void {
+		$this->adminPage()->registerHooks();
+
+		$links = apply_filters(
+			'plugin_action_links_'.PluginIdentity::MAIN_FILE,
+			[ 'deactivate' => 'existing-link' ]
+		);
+
+		$this->assertSame( [ 'settings', 'deactivate' ], array_keys( $links ) );
+		$this->assertSame( 'existing-link', $links[ 'deactivate' ] );
+
+		$href = $this->actionLinkHref( $links[ 'settings' ] );
+		$this->assertSame( 'https', parse_url( $href, PHP_URL_SCHEME ) );
+		$this->assertSame( 'example.test', parse_url( $href, PHP_URL_HOST ) );
+		$this->assertSame( '/wp-admin/tools.php', parse_url( $href, PHP_URL_PATH ) );
+
+		$query = parse_url( $href, PHP_URL_QUERY );
+		$this->assertIsString( $query );
+		parse_str( $query, $params );
+		$this->assertSame( [ 'page' => Plugin::MENU_SLUG ], $params );
+	}
+
 	public function testAdminAssetsEnqueueOnlyForRegisteredPageHookAndExistingDistFiles() :void {
 		$root = sys_get_temp_dir().'/mandate-admin-assets-'.bin2hex( random_bytes( 4 ) );
 		$dist = $root.'/assets/dist';
@@ -1147,6 +1181,11 @@ final class MandateTest extends Wpm_Test_Case {
 		parse_str( $query, $params );
 		$message = $params[ 'mandate_message' ] ?? '';
 		return is_scalar( $message ) ? (string)$message : '';
+	}
+
+	private function actionLinkHref( string $html ) :string {
+		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
+		return $this->firstElement( $xpath, '//a' )->getAttribute( 'href' );
 	}
 
 	/**
