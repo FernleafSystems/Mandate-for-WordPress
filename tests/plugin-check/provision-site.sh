@@ -27,7 +27,7 @@ fi
 if ! wp core is-installed --allow-root >/dev/null 2>&1; then
 	wp core install \
 		--url="${SITE_URL}" \
-		--title="Mandate Plugin Check" \
+		--title="Mandate App Security Plugin Check" \
 		--admin_user=admin \
 		--admin_password=password \
 		--admin_email=devnull@example.com \
@@ -46,6 +46,6 @@ else
 	wp plugin install plugin-check --version="${PLUGIN_CHECK_VERSION}" --activate --allow-root
 fi
 
-if ! wp plugin is-active mandate --allow-root >/dev/null 2>&1; then
-	wp plugin activate mandate --allow-root
+if ! wp plugin is-active mandate-app-security --allow-root >/dev/null 2>&1; then
+	wp plugin activate mandate-app-security --allow-root
 fi

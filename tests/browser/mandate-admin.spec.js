@@ -101,7 +101,7 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	const secondaryPassword = primary.passwords.secondary;
 	const otherPassword = otherUser.passwords.primary;
 
-	await page.goto( '/wp-admin/tools.php?page=mandate', { waitUntil: 'load' } );
+	await page.goto( '/wp-admin/tools.php?page=mandate-app-security', { waitUntil: 'load' } );
 	const userSelect = page.locator( '#mandate-user' );
 	await expect( userSelect ).toBeVisible();
 
@@ -330,7 +330,7 @@ test( 'admin can manage tabbed application password scopes with progressive enha
 	);
 	expect( expirationResponse.ok() ).toBeTruthy();
 	expect( ( await expirationResponse.json() ).saved ).toBe( true );
-	await page.goto( `/wp-admin/tools.php?page=mandate&user_id=${primary.user_id}&app_password_uuid=${secondaryPassword.uuid}`, { waitUntil: 'load' } );
+	await page.goto( `/wp-admin/tools.php?page=mandate-app-security&user_id=${primary.user_id}&app_password_uuid=${secondaryPassword.uuid}`, { waitUntil: 'load' } );
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'expired' );
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveText( `${fixture.expiration_dates.expired} (expired)` );
 	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveCSS( 'color', 'rgb(179, 45, 46)' );

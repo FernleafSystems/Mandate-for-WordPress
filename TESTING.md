@@ -1,4 +1,4 @@
-# Mandate Testing
+# Mandate App Security Testing
 
 `TESTING.md` is the source of truth for this plugin's local verification commands.
 
@@ -17,7 +17,7 @@ The plugin runtime, unit test bootstrap, and build tooling require `vendor/autol
 | Goal | Command | Notes |
 | --- | --- | --- |
 | Admin assets | `npm run build` | Builds the committed Vite admin JS/CSS assets in `assets/dist`. |
-| Build zip | `composer build-zip` | Builds assets, creates a production-shaped package, and writes `build/mandate-YYYYmmdd-HHMMSS.zip`. |
+| Build zip | `composer build-zip` | Builds assets, creates a production-shaped package, and writes `build/mandate-app-security-YYYYmmdd-HHMMSS.zip`. |
 | Unit tests | `composer test:unit` | Runs the PHPUnit 11 unit suite in `tests/Unit`. |
 | WordPress integration tests | `composer test:integration` | Starts a minimal MySQL Docker sidecar, prepares WordPress core, and runs `tests/Integration` through `wp-phpunit`. |
 | WordPress test install | `composer test:integration:install` | Prepares the WordPress core checkout used by the integration bootstrap without running tests. |
@@ -65,18 +65,18 @@ composer test:browser -- --clean -- --workers=1
 
 - runs `npm ci --no-audit --no-fund` and `npm run build` in the source checkout
 - stages the package under the system temp directory and removes it after the zip is built
-- copies only `plugin.php`, `init.php`, `unsupported.php`, `readme.txt`, `LICENSE`, `src`, and `assets/dist`
+- copies only `mandate-app-security.php`, `init.php`, `unsupported.php`, `readme.txt`, `LICENSE`, `src`, and `assets/dist`
 - creates production Composer autoload files in the staged package with `composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader`
 - removes the staged Composer lock file before zipping, while keeping the generated package `composer.json` alongside `vendor/`
-- writes the zip under `build/` with the archive root folder `mandate/`
+- writes the zip under `build/` with the archive root folder `mandate-app-security/`
 
-Use `composer build-zip -- --output=mandate-test.zip` to choose a filename inside `build/`. Output paths outside `build/` are rejected. Use `--keep-package` when you need to inspect the temp package directory after a build; the retained path is printed in the command output.
+Use `composer build-zip -- --output=mandate-app-security-test.zip` to choose a filename inside `build/`. Output paths outside `build/` are rejected. Use `--keep-package` when you need to inspect the temp package directory after a build; the retained path is printed in the command output.
 
 `composer test:plugin-check` installs the WordPress.org Plugin Check plugin in a disposable Docker WordPress site and fails on Plugin Check `ERROR` findings. `WARNING` findings are printed for convergence cleanup, but they do not fail the command.
 
 ## Plugin Check Coverage
 
-The Plugin Check lane uses `tests/docker/docker-compose.plugin-check.yml`, which starts MySQL and a WP-CLI container only. It does not expose a WordPress web server or port. The runner seeds WordPress from the local reference checkout, provisions the site through WP-CLI, installs Plugin Check, activates this plugin, and runs `wp plugin check mandate --format=json`.
+The Plugin Check lane uses `tests/docker/docker-compose.plugin-check.yml`, which starts MySQL and a WP-CLI container only. It does not expose a WordPress web server or port. The runner seeds WordPress from the local reference checkout, provisions the site through WP-CLI, installs Plugin Check, activates this plugin, and runs `wp plugin check mandate-app-security --format=json`.
 
 Plugin Check inspects a release-shaped package under the system temp directory, not the raw repo root. The temp package is mounted read-only into Docker, removed after the check finishes, and built with the same runtime package builder as `composer build-zip`. It skips the source asset rebuild and expects `assets/dist` to already exist. Run `composer install` and `npm run build` before the gate.
 
@@ -101,7 +101,7 @@ The browser lane follows the lightweight shape of Shield's Docker/Playwright tes
 ## Manual Smoke Test
 
 1. Activate the plugin.
-2. Open Tools > Mandate.
+2. Open Tools > Mandate App Security.
 3. Select a user with an application password.
 4. Save a restricted allowlist.
 5. Call a REST endpoint with that application password.

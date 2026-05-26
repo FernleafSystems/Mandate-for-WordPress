@@ -3,6 +3,7 @@
 declare( strict_types=1 );
 
 use Symfony\Component\Filesystem\Path;
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 
 $rootDir = dirname( __DIR__, 2 );
 $autoload = $rootDir.'/vendor/autoload.php';
@@ -43,7 +44,7 @@ require_once $wpFunctions;
 tests_add_filter(
 	'muplugins_loaded',
 	static function () use ( $rootDir ) :void {
-		require_once $rootDir.'/plugin.php';
+		require_once $rootDir.'/'.PluginIdentity::MAIN_FILE;
 	},
 	0
 );

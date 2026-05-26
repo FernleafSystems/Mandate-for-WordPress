@@ -30,7 +30,7 @@ services:
       - "${WPM_BROWSER_PORT:-8898}:80"
     volumes:
       - wpm-browser-wp:/var/www/html
-      - ../../:/var/www/html/wp-content/plugins/mandate
+      - ../../:/var/www/html/wp-content/plugins/mandate-app-security
 
   wp-cli:
     image: wordpress:cli-php8.2
@@ -48,7 +48,7 @@ services:
     volumes:
       - wpm-browser-wp:/var/www/html
       - ../../../../../Libraries/wordpress:/wordpress-src:ro
-      - ../../:/var/www/html/wp-content/plugins/mandate
+      - ../../:/var/www/html/wp-content/plugins/mandate-app-security
       - ../../:/app
 
 volumes:

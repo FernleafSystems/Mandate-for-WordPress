@@ -3,6 +3,11 @@
 declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
@@ -15,6 +20,7 @@ use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
 
 final class ExpirationTest extends Wpm_Test_Case {
 
@@ -438,13 +444,14 @@ final class ExpirationTest extends Wpm_Test_Case {
 	}
 
 	public function testPluginBootRegistersExpirationHooksAndDeactivationCleanup() :void {
-		Plugin::boot( dirname( __DIR__, 2 ).'/plugin.php' );
+		$pluginFile = $this->pluginFile();
+		Plugin::boot( $pluginFile );
 
 		$this->assertNotFalse( wp_next_scheduled( ApplicationPasswordExpirationReaper::HOOK ) );
 		$this->assertArrayHasKey( ApplicationPasswordExpirationReaper::HOOK, $GLOBALS[ 'wpm_test_actions' ] );
-		$this->assertArrayHasKey( dirname( __DIR__, 2 ).'/plugin.php', $GLOBALS[ 'wpm_test_deactivation_hooks' ] );
+		$this->assertArrayHasKey( $pluginFile, $GLOBALS[ 'wpm_test_deactivation_hooks' ] );
 
-		$GLOBALS[ 'wpm_test_deactivation_hooks' ][ dirname( __DIR__, 2 ).'/plugin.php' ]();
+		$GLOBALS[ 'wpm_test_deactivation_hooks' ][ $pluginFile ]();
 
 		$this->assertFalse( wp_next_scheduled( ApplicationPasswordExpirationReaper::HOOK ) );
 	}
@@ -535,16 +542,44 @@ final class ExpirationTest extends Wpm_Test_Case {
 	}
 
 	private function adminPage( ScopeRepository $repository ) :AdminPage {
+		$passwordRepository = new ApplicationPasswordRepository();
+		$candidateProvider = new CapabilityCandidateProvider();
+		$descriptionProvider = new CapabilityDescriptionProvider();
+		$metaRegistry = new MetaCapabilityRegistry();
+		$groupProvider = new CapabilityGroupProvider();
+		$expirationDatePolicy = new ExpirationDatePolicy();
+		$roleProvider = new AdminUserRoleProvider();
+		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
+		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
+		$viewDataBuilder = new AdminPageViewDataBuilder(
+			$repository,
+			$passwordRepository,
+			$candidateProvider,
+			$descriptionProvider,
+			$metaRegistry,
+			$groupProvider,
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity,
+			$trustedHtmlSanitizer
+		);
+
 		return new AdminPage(
 			$repository,
-			new ApplicationPasswordRepository(),
-			new CapabilityCandidateProvider(),
-			new CapabilityDescriptionProvider(),
-			new MetaCapabilityRegistry(),
-			new CapabilityGroupProvider(),
-			dirname( __DIR__, 2 ).'/plugin.php',
-			new ExpirationDatePolicy()
+			$passwordRepository,
+			$candidateProvider,
+			$metaRegistry,
+			$this->pluginFile(),
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity,
+			$viewDataBuilder,
+			new AdminTemplateRenderer()
 		);
+	}
+
+	private function pluginFile() :string {
+		return dirname( __DIR__, 2 ).'/'.PluginIdentity::MAIN_FILE;
 	}
 
 	/**
@@ -570,10 +605,11 @@ final class ExpirationTest extends Wpm_Test_Case {
 			'expiration_date'   => $expirationDate,
 		];
 		if ( $withNonce ) {
-			$nonceName = $this->adminPagePrivateString( $action, 'nonceName', [ $action ] );
+			$formSecurity = new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() );
+			$nonceName = $formSecurity->nonceName( $action );
 			$_POST[ $nonceName ] = wpm_test_set_valid_nonce(
 				$nonceName,
-				$this->adminPagePrivateString( $action, 'nonceAction', [ $action, $userId, $uuid ] )
+				$formSecurity->nonceAction( $action, $userId, $uuid )
 			);
 		}
 	}
@@ -662,20 +698,6 @@ final class ExpirationTest extends Wpm_Test_Case {
 		}
 
 		return $node;
-	}
-
-	/**
-	 * @param array<int,mixed> $args
-	 */
-	private function adminPagePrivateString( string $action, string $method, array $args ) :string {
-		$reflection = new ReflectionMethod( AdminPage::class, $method );
-		$reflection->setAccessible( true );
-		$result = $reflection->invokeArgs( $this->adminPage( $this->scopeRepository() ), $args );
-		if ( !is_string( $result ) ) {
-			throw new RuntimeException( 'Expected AdminPage::'.$method.'() to return a string for '.$action.'.' );
-		}
-
-		return $result;
 	}
 
 	private function scopeRepository( ?PluginOptionsRepository $optionsRepository = null ) :ScopeRepository {

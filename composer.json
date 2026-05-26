@@ -1,51 +1,52 @@
 {
-  "name": "fernleafsystems/mandate",
-  "description": "Scoping AI access for WordPress by controlling Application Password capabilities.",
-  "type": "wordpress-plugin",
-  "license": "GPL-2.0-or-later",
-  "require": {
+  "name":              "fernleafsystems/mandate",
+  "description":       "Scoping AI access for WordPress by controlling Application Password capabilities.",
+  "version":           "0.3.0",
+  "type":              "wordpress-plugin",
+  "license":           "GPL-2.0-or-later",
+  "require":           {
     "php": ">=8.2"
   },
-  "require-dev": {
-    "ext-zip": "*",
-    "phpunit/phpunit": ">=11.5 <12",
-    "symfony/filesystem": "^7.0",
-    "symfony/process": "^7.0",
-    "wp-phpunit/wp-phpunit": ">=7 <8",
+  "require-dev":       {
+    "ext-zip":                 "*",
+    "phpunit/phpunit":         ">=11.5 <12",
+    "symfony/filesystem":      "^7.0",
+    "symfony/process":         "^7.0",
+    "wp-phpunit/wp-phpunit":   ">=7 <8",
     "yoast/phpunit-polyfills": ">=4 <5"
   },
-  "config": {
-    "platform": {
+  "config":            {
+    "platform":      {
       "php": "8.2"
     },
     "sort-packages": true,
     "allow-plugins": {}
   },
-  "autoload": {
+  "autoload":          {
     "psr-4": {
       "FernleafSystems\\Wordpress\\Plugin\\Mandate\\": "src/"
     }
   },
-  "autoload-dev": {
+  "autoload-dev":      {
     "psr-4": {
       "FernleafSystems\\Wordpress\\Plugin\\Mandate\\Tooling\\": "infrastructure/src/Tooling/"
     }
   },
-  "scripts": {
-    "build-zip": [
+  "scripts":           {
+    "build-zip":                [
       "Composer\\Config::disableProcessTimeout",
       "@php bin/build-zip.php"
     ],
-    "test": "@test:unit",
-    "test:unit": "vendor/bin/phpunit -c phpunit-unit.xml",
-    "test:integration": [
+    "test":                     "@test:unit",
+    "test:unit":                "vendor/bin/phpunit -c phpunit-unit.xml",
+    "test:integration":         [
       "Composer\\Config::disableProcessTimeout",
       "@php tests/Integration/run.php"
     ],
     "test:integration:install": "@php bin/install-wp-tests.php",
-    "test:plugin-check": "@php tests/plugin-check/run-plugin-check.php",
-    "test:browser": "@php tests/browser/run-browser.php"
+    "test:plugin-check":        "@php tests/plugin-check/run-plugin-check.php",
+    "test:browser":             "@php tests/browser/run-browser.php"
   },
   "minimum-stability": "stable",
-  "prefer-stable": true
+  "prefer-stable":     true
 }

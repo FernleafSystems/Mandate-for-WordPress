@@ -32,7 +32,7 @@ services:
       - ../../../../../Libraries/wordpress:/wordpress-src:ro
       - type: bind
         source: ${WPM_PLUGIN_CHECK_PACKAGE_DIR:?WPM_PLUGIN_CHECK_PACKAGE_DIR must be set}
-        target: /var/www/html/wp-content/plugins/mandate
+        target: /var/www/html/wp-content/plugins/mandate-app-security
         read_only: true
       - ../../:/app:ro
 

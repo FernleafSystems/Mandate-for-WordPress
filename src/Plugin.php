@@ -1,10 +1,13 @@
-<?php
-
-declare( strict_types=1 );
+<?php declare( strict_types=1 );
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate;
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
+use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
@@ -23,8 +26,8 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class Plugin {
 
-	public const VERSION = '0.2.0';
-	public const MENU_SLUG = 'mandate';
+	public const VERSION = '0.3.0';
+	public const MENU_SLUG = PluginIdentity::SLUG;
 
 	public static function boot( string $pluginFile ) :void {
 		( new self() )->register( $pluginFile );
@@ -40,16 +43,34 @@ class Plugin {
 		$groupProvider = new CapabilityGroupProvider();
 		$metaRegistry = new MetaCapabilityRegistry();
 		$context = new CurrentApplicationPasswordContext();
-
-		$adminPage = new AdminPage(
+		$roleProvider = new AdminUserRoleProvider();
+		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
+		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
+		$templateRenderer = new AdminTemplateRenderer();
+		$viewDataBuilder = new AdminPageViewDataBuilder(
 			$scopeRepository,
 			$passwordRepository,
 			$candidateProvider,
 			$descriptionProvider,
 			$metaRegistry,
 			$groupProvider,
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity,
+			$trustedHtmlSanitizer
+		);
+
+		$adminPage = new AdminPage(
+			$scopeRepository,
+			$passwordRepository,
+			$candidateProvider,
+			$metaRegistry,
 			$pluginFile,
-			$expirationDatePolicy
+			$expirationDatePolicy,
+			$roleProvider,
+			$formSecurity,
+			$viewDataBuilder,
+			$templateRenderer
 		);
 		$enforcer = new CapabilityScopeEnforcer(
 			$scopeRepository,
