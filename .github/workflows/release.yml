@@ -50,21 +50,17 @@ jobs:
 
       - name: Build release zips
         run: |
-          WORDPRESS_ORG_ZIP_NAME="mandate-app-security-${GITHUB_REF_NAME}.zip"
-          GITHUB_ZIP_NAME="mandate-app-security-github-${GITHUB_REF_NAME}.zip"
-          LEGACY_GITHUB_ZIP_NAME="mandate-github-${GITHUB_REF_NAME}.zip"
+          WORDPRESS_ORG_ZIP_NAME="$(php bin/release-zip-name.php --variant=wordpress-org --tag="$GITHUB_REF_NAME")"
+          GITHUB_ZIP_NAME="$(php bin/release-zip-name.php --variant=github --tag="$GITHUB_REF_NAME")"
           composer build-zip -- --output="$WORDPRESS_ORG_ZIP_NAME"
           composer build-zip -- --variant=github --skip-assets --output="$GITHUB_ZIP_NAME"
-          composer build-zip -- --variant=github --skip-assets --output="$LEGACY_GITHUB_ZIP_NAME"
           echo "WORDPRESS_ORG_ZIP_NAME=$WORDPRESS_ORG_ZIP_NAME" >> "$GITHUB_ENV"
           echo "GITHUB_ZIP_NAME=$GITHUB_ZIP_NAME" >> "$GITHUB_ENV"
-          echo "LEGACY_GITHUB_ZIP_NAME=$LEGACY_GITHUB_ZIP_NAME" >> "$GITHUB_ENV"
 
       - name: Verify release packages
         run: |
           php bin/verify-package.php --variant=wordpress-org --zip="${GITHUB_WORKSPACE}/build/${WORDPRESS_ORG_ZIP_NAME}"
           php bin/verify-package.php --variant=github --zip="${GITHUB_WORKSPACE}/build/${GITHUB_ZIP_NAME}"
-          php bin/verify-package.php --variant=github --zip="${GITHUB_WORKSPACE}/build/${LEGACY_GITHUB_ZIP_NAME}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -72,5 +68,4 @@ jobs:
           files: |
             ${{ github.workspace }}/build/${{ env.WORDPRESS_ORG_ZIP_NAME }}
             ${{ github.workspace }}/build/${{ env.GITHUB_ZIP_NAME }}
-            ${{ github.workspace }}/build/${{ env.LEGACY_GITHUB_ZIP_NAME }}
           generate_release_notes: true

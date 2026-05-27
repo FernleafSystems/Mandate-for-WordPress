@@ -19,6 +19,7 @@ Mandate App Security now supports owner-managed scopes, administrator locks, and
 
 - Admin output filtering and WordPress.org compatibility were tightened.
 - Existing scope records load as unlocked unless they explicitly contain an administrator lock.
+- Release packaging now publishes only the WordPress.org ZIP and current GitHub updater ZIP.
 
 ## 0.3.1 - 2026-05-26
 
@@ -31,7 +32,7 @@ Mandate keeps existing GitHub-updater installs on built release packages, adds a
 
 ### Compatibility
 
-- Legacy `mandate-github` release asset is published and verified alongside the renamed GitHub package so existing updater installs keep receiving built ZIPs.
+- This release temporarily published and verified a legacy GitHub updater release asset alongside the renamed GitHub package for existing updater installs.
 
 ## 0.3.0 - 2026-05-26
 
