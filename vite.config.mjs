@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
 export default defineConfig( {
+	base: './',
 	build: {
 		assetsDir: '.',
 		cssCodeSplit: false,
@@ -14,7 +15,9 @@ export default defineConfig( {
 		outDir: 'assets/dist',
 		rollupOptions: {
 			output: {
-				assetFileNames: 'admin-page.css',
+				assetFileNames: ( assetInfo ) => assetInfo.name && assetInfo.name.endsWith( '.css' )
+					? 'admin-page.css'
+					: '[name][extname]',
 				entryFileNames: 'admin-page.js',
 			},
 		},

@@ -59,22 +59,40 @@ function enhanceBulkControls( root ) {
 			return;
 		}
 
-		const button = event.target.closest( '[data-wpm-select-panel]' );
-		if ( !button || button.disabled ) {
+		const sectionButton = event.target.closest( '[data-wpm-select-section]' );
+		if ( sectionButton ) {
+			if ( sectionButton.disabled ) {
+				return;
+			}
+
+			const section = sectionButton.closest( '[data-wpm-capability-section]' );
+			if ( !section ) {
+				return;
+			}
+
+			setCheckedState( section, sectionButton.dataset.wpmSelectState === 'checked' );
 			return;
 		}
 
-		const panel = button.closest( '[data-wpm-capability-panel]' );
+		const panelButton = event.target.closest( '[data-wpm-select-panel]' );
+		if ( !panelButton || panelButton.disabled ) {
+			return;
+		}
+
+		const panel = panelButton.closest( '[data-wpm-capability-panel]' );
 		if ( !panel ) {
 			return;
 		}
 
-		const checked = button.dataset.wpmSelectState === 'checked';
-		panel.querySelectorAll( 'input[type="checkbox"][name="allowed_caps[]"], input[type="checkbox"][name="allowed_meta_caps[]"]' )
-			.forEach( ( input ) => {
-				input.checked = checked;
-			} );
+		setCheckedState( panel, panelButton.dataset.wpmSelectState === 'checked' );
 	} );
+}
+
+function setCheckedState( container, checked ) {
+	container.querySelectorAll( 'input[type="checkbox"][name="allowed_caps[]"], input[type="checkbox"][name="allowed_meta_caps[]"]' )
+		.forEach( ( input ) => {
+			input.checked = checked;
+		} );
 }
 
 function parseGroupingConfig( container ) {
@@ -94,16 +112,28 @@ function createCapabilitySection( sectionConfig, items ) {
 	const section = document.createElement( 'fieldset' );
 	section.id = sectionConfig.id;
 	section.className = 'mandate-capability-section';
+	section.dataset.wpmCapabilitySection = '';
 
 	const legend = document.createElement( 'legend' );
+	const title = document.createElement( 'span' );
+	title.className = 'mandate-capability-section-title';
+
 	const label = document.createElement( 'span' );
 	label.textContent = sectionConfig.label;
-	legend.appendChild( label );
+	title.appendChild( label );
 
 	const count = document.createElement( 'span' );
 	count.className = 'mandate-capability-section-count';
 	count.textContent = sectionConfig.count;
-	legend.appendChild( count );
+	title.appendChild( count );
+	legend.appendChild( title );
+
+	const actions = document.createElement( 'span' );
+	actions.className = 'mandate-capability-section-actions';
+	actions.appendChild( createSectionBulkButton( sectionConfig.bulk_actions.select_all ) );
+	actions.appendChild( createSectionActionSeparator() );
+	actions.appendChild( createSectionBulkButton( sectionConfig.bulk_actions.deselect_all ) );
+	legend.appendChild( actions );
 	section.appendChild( legend );
 
 	const list = document.createElement( 'div' );
@@ -112,6 +142,25 @@ function createCapabilitySection( sectionConfig, items ) {
 	section.appendChild( list );
 
 	return section;
+}
+
+function createSectionActionSeparator() {
+	const separator = document.createElement( 'span' );
+	separator.className = 'mandate-capability-section-action-separator';
+	separator.setAttribute( 'aria-hidden', 'true' );
+	separator.textContent = '/';
+	return separator;
+}
+
+function createSectionBulkButton( actionConfig ) {
+	const button = document.createElement( 'button' );
+	button.type = 'button';
+	button.className = 'mandate-link-button';
+	button.dataset.wpmSelectState = actionConfig.state;
+	button.dataset.wpmSelectSection = '';
+	button.disabled = actionConfig.disabled;
+	button.textContent = actionConfig.label;
+	return button;
 }
 
 function createCapabilityIndexLink( sectionConfig ) {
@@ -195,10 +244,7 @@ function renderCapabilitySourcePanel( panel, source, mode, items ) {
 
 	const fragment = document.createDocumentFragment();
 	modeConfig.sections.forEach( ( sectionConfig ) => {
-		const currentItems = sectionItems( sectionConfig, items );
-		if ( currentItems.length ) {
-			fragment.appendChild( createCapabilitySection( sectionConfig, currentItems ) );
-		}
+		fragment.appendChild( createCapabilitySection( sectionConfig, sectionItems( sectionConfig, items ) ) );
 	} );
 
 	if ( !fragment.childNodes.length ) {
@@ -213,6 +259,7 @@ function renderCapabilityGroups( container, config, mode ) {
 		return;
 	}
 
+	container.dataset.wpmCapabilityMode = mode;
 	const items = capabilityItemMap( container );
 	config.sources.forEach( ( source ) => {
 		const panel = sourcePanelFor( container, source );
@@ -220,8 +267,6 @@ function renderCapabilityGroups( container, config, mode ) {
 			renderCapabilitySourcePanel( panel, source, mode, items );
 		}
 	} );
-
-	container.dataset.wpmCapabilityMode = mode;
 }
 
 function setActiveCapabilitySource( form, container, sourceKey ) {
@@ -442,7 +487,7 @@ function enhanceTooltips( root ) {
 	} );
 
 	root.addEventListener( 'click', ( event ) => {
-		if ( event.target instanceof Element && event.target.closest( '[data-wpm-capability-grouping], [data-wpm-select-panel]' ) ) {
+		if ( event.target instanceof Element && event.target.closest( '[data-wpm-capability-grouping], [data-wpm-capability-source-tab], [data-wpm-select-panel], [data-wpm-select-section]' ) ) {
 			hideTooltip();
 		}
 	} );

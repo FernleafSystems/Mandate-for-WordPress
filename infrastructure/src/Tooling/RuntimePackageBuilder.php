@@ -29,6 +29,7 @@ class RuntimePackageBuilder {
 	private const BUILT_ASSET_FILES = [
 		'assets/dist/admin-page.css',
 		'assets/dist/admin-page.js',
+		'assets/dist/info-square.svg',
 	];
 
 	private const GITHUB_UPDATER_TEMPLATE = 'infrastructure/templates/github-updater.php';

@@ -9,7 +9,7 @@ if ( !defined( 'ABSPATH' ) ) {
 /**
  * @phpstan-type CapabilitySource 'wordpress'|'third_party'
  * @phpstan-type CapabilityArea 'posts'|'pages'|'media'|'taxonomy'|'comments'|'users'|'plugins'|'themes'|'general'|'network'|'privacy'|'updates'|'legacy'|'third_party'
- * @phpstan-type CapabilityAction 'read'|'create'|'edit'|'delete'
+ * @phpstan-type CapabilityAction 'read'|'write'|'delete'
  * @phpstan-type CapabilityDefinition array{area:CapabilityArea,action:CapabilityAction}
  * @phpstan-type CapabilityGroupItem array{name:string,type:'primitive'|'meta',source:CapabilitySource,area:CapabilityArea,action:CapabilityAction,known:bool}
  * @phpstan-type CapabilityGroupSection array{key:string,items:list<CapabilityGroupItem>}
@@ -40,8 +40,7 @@ class CapabilityGroupProvider {
 	public const AREA_THIRD_PARTY = 'third_party';
 
 	public const ACTION_READ = 'read';
-	public const ACTION_CREATE = 'create';
-	public const ACTION_EDIT = 'edit';
+	public const ACTION_WRITE = 'write';
 	public const ACTION_DELETE = 'delete';
 
 	private const AREA_ORDER = [
@@ -63,8 +62,7 @@ class CapabilityGroupProvider {
 
 	private const ACTION_ORDER = [
 		self::ACTION_READ,
-		self::ACTION_CREATE,
-		self::ACTION_EDIT,
+		self::ACTION_WRITE,
 		self::ACTION_DELETE,
 	];
 
@@ -77,12 +75,12 @@ class CapabilityGroupProvider {
 	 * @var array<string,CapabilityDefinition>
 	 */
 	private const DEFINITIONS = [
-		'activate_plugins'            => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_EDIT ],
-		'add_users'                   => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_CREATE ],
-		'assign_term'                 => [ 'area' => self::AREA_TAXONOMY, 'action' => self::ACTION_EDIT ],
-		'create_sites'                => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_CREATE ],
-		'create_users'                => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_CREATE ],
-		'customize'                   => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_EDIT ],
+		'activate_plugins'            => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_WRITE ],
+		'add_users'                   => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_WRITE ],
+		'assign_term'                 => [ 'area' => self::AREA_TAXONOMY, 'action' => self::ACTION_WRITE ],
+		'create_sites'                => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_WRITE ],
+		'create_users'                => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_WRITE ],
+		'customize'                   => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
 		'delete_others_pages'         => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_DELETE ],
 		'delete_others_posts'         => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_DELETE ],
 		'delete_page'                 => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_DELETE ],
@@ -100,31 +98,31 @@ class CapabilityGroupProvider {
 		'delete_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_DELETE ],
 		'delete_user'                 => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_DELETE ],
 		'delete_users'                => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_DELETE ],
-		'edit_comment'                => [ 'area' => self::AREA_COMMENTS, 'action' => self::ACTION_EDIT ],
-		'edit_dashboard'              => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_EDIT ],
-		'edit_files'                  => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_EDIT ],
-		'edit_others_pages'           => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_EDIT ],
-		'edit_others_posts'           => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_EDIT ],
-		'edit_page'                   => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_EDIT ],
-		'edit_pages'                  => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_EDIT ],
-		'edit_plugins'                => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_EDIT ],
-		'edit_post'                   => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_EDIT ],
-		'edit_posts'                  => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_EDIT ],
-		'edit_private_pages'          => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_EDIT ],
-		'edit_private_posts'          => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_EDIT ],
-		'edit_published_pages'        => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_EDIT ],
-		'edit_published_posts'        => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_EDIT ],
-		'edit_term'                   => [ 'area' => self::AREA_TAXONOMY, 'action' => self::ACTION_EDIT ],
-		'edit_theme_options'          => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_EDIT ],
-		'edit_themes'                 => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_EDIT ],
-		'edit_user'                   => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_EDIT ],
-		'edit_users'                  => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_EDIT ],
+		'edit_comment'                => [ 'area' => self::AREA_COMMENTS, 'action' => self::ACTION_WRITE ],
+		'edit_dashboard'              => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_WRITE ],
+		'edit_files'                  => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_WRITE ],
+		'edit_others_pages'           => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_WRITE ],
+		'edit_others_posts'           => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_WRITE ],
+		'edit_page'                   => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_WRITE ],
+		'edit_pages'                  => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_WRITE ],
+		'edit_plugins'                => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_WRITE ],
+		'edit_post'                   => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_WRITE ],
+		'edit_posts'                  => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_WRITE ],
+		'edit_private_pages'          => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_WRITE ],
+		'edit_private_posts'          => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_WRITE ],
+		'edit_published_pages'        => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_WRITE ],
+		'edit_published_posts'        => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_WRITE ],
+		'edit_term'                   => [ 'area' => self::AREA_TAXONOMY, 'action' => self::ACTION_WRITE ],
+		'edit_theme_options'          => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
+		'edit_themes'                 => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
+		'edit_user'                   => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_WRITE ],
+		'edit_users'                  => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_WRITE ],
 		'erase_others_personal_data'  => [ 'area' => self::AREA_PRIVACY, 'action' => self::ACTION_DELETE ],
 		'export'                      => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_READ ],
 		'export_others_personal_data' => [ 'area' => self::AREA_PRIVACY, 'action' => self::ACTION_READ ],
-		'import'                      => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_CREATE ],
-		'install_plugins'             => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_CREATE ],
-		'install_themes'              => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_CREATE ],
+		'import'                      => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_WRITE ],
+		'install_plugins'             => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_WRITE ],
+		'install_themes'              => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
 		'level_0'                     => [ 'area' => self::AREA_LEGACY, 'action' => self::ACTION_READ ],
 		'level_1'                     => [ 'area' => self::AREA_LEGACY, 'action' => self::ACTION_READ ],
 		'level_2'                     => [ 'area' => self::AREA_LEGACY, 'action' => self::ACTION_READ ],
@@ -137,40 +135,40 @@ class CapabilityGroupProvider {
 		'level_9'                     => [ 'area' => self::AREA_LEGACY, 'action' => self::ACTION_READ ],
 		'level_10'                    => [ 'area' => self::AREA_LEGACY, 'action' => self::ACTION_READ ],
 		'list_users'                  => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_READ ],
-		'manage_categories'           => [ 'area' => self::AREA_TAXONOMY, 'action' => self::ACTION_EDIT ],
-		'manage_links'                => [ 'area' => self::AREA_LEGACY, 'action' => self::ACTION_EDIT ],
-		'manage_network'              => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_EDIT ],
-		'manage_network_options'      => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_EDIT ],
-		'manage_network_plugins'      => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_EDIT ],
-		'manage_network_themes'       => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_EDIT ],
-		'manage_network_users'        => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_EDIT ],
-		'manage_options'              => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_EDIT ],
-		'manage_privacy_options'      => [ 'area' => self::AREA_PRIVACY, 'action' => self::ACTION_EDIT ],
-		'manage_sites'                => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_EDIT ],
-		'moderate_comments'           => [ 'area' => self::AREA_COMMENTS, 'action' => self::ACTION_EDIT ],
-		'promote_users'               => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_EDIT ],
-		'publish_pages'               => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_CREATE ],
-		'publish_posts'               => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_CREATE ],
+		'manage_categories'           => [ 'area' => self::AREA_TAXONOMY, 'action' => self::ACTION_WRITE ],
+		'manage_links'                => [ 'area' => self::AREA_LEGACY, 'action' => self::ACTION_WRITE ],
+		'manage_network'              => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_WRITE ],
+		'manage_network_options'      => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_WRITE ],
+		'manage_network_plugins'      => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_WRITE ],
+		'manage_network_themes'       => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
+		'manage_network_users'        => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_WRITE ],
+		'manage_options'              => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_WRITE ],
+		'manage_privacy_options'      => [ 'area' => self::AREA_PRIVACY, 'action' => self::ACTION_WRITE ],
+		'manage_sites'                => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_WRITE ],
+		'moderate_comments'           => [ 'area' => self::AREA_COMMENTS, 'action' => self::ACTION_WRITE ],
+		'promote_users'               => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_WRITE ],
+		'publish_pages'               => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_WRITE ],
+		'publish_posts'               => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_WRITE ],
 		'read'                        => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_READ ],
 		'read_page'                   => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_READ ],
 		'read_post'                   => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_READ ],
 		'read_private_pages'          => [ 'area' => self::AREA_PAGES, 'action' => self::ACTION_READ ],
 		'read_private_posts'          => [ 'area' => self::AREA_POSTS, 'action' => self::ACTION_READ ],
 		'remove_users'                => [ 'area' => self::AREA_USERS, 'action' => self::ACTION_DELETE ],
-		'resume_plugins'              => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_EDIT ],
-		'resume_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_EDIT ],
-		'setup_network'               => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_CREATE ],
-		'switch_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_EDIT ],
-		'unfiltered_html'             => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_EDIT ],
-		'unfiltered_upload'           => [ 'area' => self::AREA_MEDIA, 'action' => self::ACTION_CREATE ],
-		'update_core'                 => [ 'area' => self::AREA_UPDATES, 'action' => self::ACTION_EDIT ],
-		'update_languages'            => [ 'area' => self::AREA_UPDATES, 'action' => self::ACTION_EDIT ],
-		'update_plugins'              => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_EDIT ],
-		'update_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_EDIT ],
-		'upgrade_network'             => [ 'area' => self::AREA_UPDATES, 'action' => self::ACTION_EDIT ],
-		'upload_files'                => [ 'area' => self::AREA_MEDIA, 'action' => self::ACTION_CREATE ],
-		'upload_plugins'              => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_CREATE ],
-		'upload_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_CREATE ],
+		'resume_plugins'              => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_WRITE ],
+		'resume_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
+		'setup_network'               => [ 'area' => self::AREA_NETWORK, 'action' => self::ACTION_WRITE ],
+		'switch_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
+		'unfiltered_html'             => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_WRITE ],
+		'unfiltered_upload'           => [ 'area' => self::AREA_MEDIA, 'action' => self::ACTION_WRITE ],
+		'update_core'                 => [ 'area' => self::AREA_UPDATES, 'action' => self::ACTION_WRITE ],
+		'update_languages'            => [ 'area' => self::AREA_UPDATES, 'action' => self::ACTION_WRITE ],
+		'update_plugins'              => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_WRITE ],
+		'update_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
+		'upgrade_network'             => [ 'area' => self::AREA_UPDATES, 'action' => self::ACTION_WRITE ],
+		'upload_files'                => [ 'area' => self::AREA_MEDIA, 'action' => self::ACTION_WRITE ],
+		'upload_plugins'              => [ 'area' => self::AREA_PLUGINS, 'action' => self::ACTION_WRITE ],
+		'upload_themes'               => [ 'area' => self::AREA_THEMES, 'action' => self::ACTION_WRITE ],
 		'view_site_health_checks'     => [ 'area' => self::AREA_GENERAL, 'action' => self::ACTION_READ ],
 	];
 
@@ -262,19 +260,37 @@ class CapabilityGroupProvider {
 			}
 		}
 
-		foreach ( [ 'create', 'add', 'install', 'upload', 'import', 'publish' ] as $prefix ) {
-			if ( $capability === $prefix || str_starts_with( $capability, $prefix.'_' ) ) {
-				return self::ACTION_CREATE;
-			}
-		}
-
 		foreach ( [ 'delete', 'remove', 'erase' ] as $prefix ) {
 			if ( $capability === $prefix || str_starts_with( $capability, $prefix.'_' ) ) {
 				return self::ACTION_DELETE;
 			}
 		}
 
-		return self::ACTION_EDIT;
+		foreach ( [
+			'create',
+			'add',
+			'install',
+			'upload',
+			'import',
+			'publish',
+			'edit',
+			'manage',
+			'activate',
+			'resume',
+			'switch',
+			'customize',
+			'moderate',
+			'promote',
+			'assign',
+			'update',
+			'upgrade',
+		] as $prefix ) {
+			if ( $capability === $prefix || str_starts_with( $capability, $prefix.'_' ) ) {
+				return self::ACTION_WRITE;
+			}
+		}
+
+		return self::ACTION_WRITE;
 	}
 
 	/**
@@ -385,8 +401,18 @@ class CapabilityGroupProvider {
 	private function sortSectionItems( array &$items ) :void {
 		usort(
 			$items,
-			fn( array $a, array $b ) :int => $this->compareItemsByName( $a, $b )
+			fn( array $a, array $b ) :int => $this->compareItemsByAction( $a, $b )
+				?: $this->compareItemsByName( $a, $b )
 		);
+	}
+
+	/**
+	 * @param CapabilityGroupItem $a
+	 * @param CapabilityGroupItem $b
+	 */
+	private function compareItemsByAction( array $a, array $b ) :int {
+		$actionPositions = array_flip( self::ACTION_ORDER );
+		return $actionPositions[ $a[ 'action' ] ] <=> $actionPositions[ $b[ 'action' ] ];
 	}
 
 	/**

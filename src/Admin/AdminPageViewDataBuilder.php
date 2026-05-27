@@ -533,7 +533,7 @@ class AdminPageViewDataBuilder {
 			'lock_notice'         => $adminLocked
 				? $this->notice( 'notice notice-info', __( 'This application password scope is locked by an administrator.', 'mandate-app-security' ) )
 				: $this->hiddenNotice(),
-			'grouping'            => $this->capabilityGrouping( $capabilityGroups ),
+			'grouping'            => $this->capabilityGrouping( $capabilityGroups, $isReadOnly ),
 			'source_tabs'         => $this->capabilitySourceTabs( $capabilityGroups[ 'sources' ] ),
 			'source_panels'       => $this->capabilitySourcePanels(
 				$capabilityGroups[ 'sources' ],
@@ -563,12 +563,12 @@ class AdminPageViewDataBuilder {
 	 * @param CapabilityGroupingResult $capabilityGroups
 	 * @return array{label:string,default_source:'wordpress',default_mode:'area',config_json:string,modes:list<array{key:'area'|'action',label:string,checked:bool}>}
 	 */
-	private function capabilityGrouping( array $capabilityGroups ) :array {
+	private function capabilityGrouping( array $capabilityGroups, bool $isReadOnly ) :array {
 		return [
 			'label'          => __( 'Group capabilities by', 'mandate-app-security' ),
 			'default_source' => self::DEFAULT_CAPABILITY_SOURCE,
 			'default_mode'   => self::DEFAULT_CAPABILITY_GROUPING,
-			'config_json'    => $this->capabilityGroupingConfigJson( $capabilityGroups ),
+			'config_json'    => $this->capabilityGroupingConfigJson( $capabilityGroups, $isReadOnly ),
 			'modes'          => [
 				[
 					'key'     => CapabilityGroupProvider::MODE_AREA,
@@ -587,19 +587,19 @@ class AdminPageViewDataBuilder {
 	/**
 	 * @param CapabilityGroupingResult $capabilityGroups
 	 */
-	private function capabilityGroupingConfigJson( array $capabilityGroups ) :string {
+	private function capabilityGroupingConfigJson( array $capabilityGroups, bool $isReadOnly ) :string {
 		return json_encode(
 			[
 				'defaultSource' => self::DEFAULT_CAPABILITY_SOURCE,
 				'defaultMode'   => self::DEFAULT_CAPABILITY_GROUPING,
-				'sources'       => $this->capabilitySourceConfig( $capabilityGroups[ 'sources' ] ),
+				'sources'       => $this->capabilitySourceConfig( $capabilityGroups[ 'sources' ], $isReadOnly ),
 			],
 			JSON_THROW_ON_ERROR
 		);
 	}
 
 	/**
-	 * @return array{select_all:array{label:string,state:string,disabled:bool},deselect_all:array{label:string,state:string,disabled:bool}}
+	 * @return array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}
 	 */
 	private function capabilityBulkActions( bool $isReadOnly ) :array {
 		return [
@@ -618,9 +618,9 @@ class AdminPageViewDataBuilder {
 
 	/**
 	 * @param list<CapabilitySourceGroup> $sources
-	 * @return list<array{key:string,emptyText:string,modes:array{area:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>}>},action:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>}>}}}>
+	 * @return list<array{key:string,emptyText:string,modes:array{area:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>,bulk_actions:array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}}>},action:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>,bulk_actions:array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}>}}}>
 	 */
-	private function capabilitySourceConfig( array $sources ) :array {
+	private function capabilitySourceConfig( array $sources, bool $isReadOnly ) :array {
 		$config = [];
 		foreach ( $sources as $source ) {
 			$config[] = [
@@ -631,14 +631,16 @@ class AdminPageViewDataBuilder {
 						'sections' => $this->capabilitySectionConfig(
 							$source[ CapabilityGroupProvider::MODE_AREA ],
 							$source[ 'key' ],
-							CapabilityGroupProvider::MODE_AREA
+							CapabilityGroupProvider::MODE_AREA,
+							$isReadOnly
 						),
 					],
 					CapabilityGroupProvider::MODE_ACTION => [
 						'sections' => $this->capabilitySectionConfig(
 							$source[ CapabilityGroupProvider::MODE_ACTION ],
 							$source[ 'key' ],
-							CapabilityGroupProvider::MODE_ACTION
+							CapabilityGroupProvider::MODE_ACTION,
+							$isReadOnly
 						),
 					],
 				],
@@ -650,9 +652,9 @@ class AdminPageViewDataBuilder {
 
 	/**
 	 * @param list<CapabilityGroupSection> $sections
-	 * @return list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>}>
+	 * @return list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>,bulk_actions:array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}}>
 	 */
-	private function capabilitySectionConfig( array $sections, string $sourceKey, string $mode ) :array {
+	private function capabilitySectionConfig( array $sections, string $sourceKey, string $mode, bool $isReadOnly ) :array {
 		$config = [];
 		foreach ( $sections as $section ) {
 			$config[] = [
@@ -666,6 +668,7 @@ class AdminPageViewDataBuilder {
 					fn( array $item ) :string => $this->capabilityItemKey( $item[ 'type' ], $item[ 'name' ] ),
 					$section[ 'items' ]
 				),
+				'bulk_actions' => $this->capabilityBulkActions( $isReadOnly ),
 			];
 		}
 
@@ -757,30 +760,40 @@ class AdminPageViewDataBuilder {
 		$items = [];
 		foreach ( $capabilities as $capability ) {
 			$name = $capability[ 'name' ];
+			$itemKey = $this->capabilityItemKey( $capability[ 'type' ], $name );
 			$description = $this->descriptionProvider->descriptionFor( $name );
 			$checked = $capability[ 'type' ] === 'primitive'
 				? isset( $selectedCaps[ $name ] )
 				: isset( $selectedMetaCaps[ $name ] );
 			$items[] = [
-				'item_key'     => $this->capabilityItemKey( $capability[ 'type' ], $name ),
-				'name'         => $name,
-				'type'         => $capability[ 'type' ],
-				'field_name'   => $capability[ 'type' ] === 'primitive' ? 'allowed_caps' : 'allowed_meta_caps',
-				'checked'      => $checked,
-				'disabled'     => $isReadOnly,
-				'source'       => $capability[ 'source' ],
-				'area'         => $capability[ 'area' ],
-				'action'       => $capability[ 'action' ],
-				'has_tooltip'  => $description !== '',
-				'tooltip_text' => $description,
+				'item_key'            => $itemKey,
+				'input_id'            => $this->capabilityInputId( $itemKey ),
+				'name'                => $name,
+				'type'                => $capability[ 'type' ],
+				'field_name'          => $capability[ 'type' ] === 'primitive' ? 'allowed_caps' : 'allowed_meta_caps',
+				'checked'             => $checked,
+				'disabled'            => $isReadOnly,
+				'source'              => $capability[ 'source' ],
+				'area'                => $capability[ 'area' ],
+				'action'              => $capability[ 'action' ],
+				'action_label'        => $this->actionLabel( $capability[ 'action' ] ),
+				'action_abbreviation' => $this->actionAbbreviation( $capability[ 'action' ] ),
+				'has_tooltip'         => $description !== '',
+				'tooltip_text'        => $description,
+				'tooltip_aria_label'  => sprintf(
+					/* translators: %s: capability name. */
+					__( 'More information about %s', 'mandate-app-security' ),
+					$name
+				),
 			];
 		}
 
 		return [
-			'id'         => $this->capabilitySectionId( $sourceKey, $mode, $sectionKey ),
-			'label'      => $label,
-			'count'      => count( $items ),
-			'items'      => $items,
+			'id'           => $this->capabilitySectionId( $sourceKey, $mode, $sectionKey ),
+			'label'        => $label,
+			'count'        => count( $items ),
+			'items'        => $items,
+			'bulk_actions' => $this->capabilityBulkActions( $isReadOnly ),
 		];
 	}
 
@@ -805,6 +818,10 @@ class AdminPageViewDataBuilder {
 
 	private function capabilityItemKey( string $type, string $name ) :string {
 		return $type.':'.$name;
+	}
+
+	private function capabilityInputId( string $itemKey ) :string {
+		return 'mandate-capability-'.str_replace( ':', '-', $itemKey );
 	}
 
 	private function capabilitySourcePanelId( string $source ) :string {
@@ -844,9 +861,16 @@ class AdminPageViewDataBuilder {
 	private function actionLabel( string $action ) :string {
 		return match ( $action ) {
 			CapabilityGroupProvider::ACTION_READ   => __( 'Read', 'mandate-app-security' ),
-			CapabilityGroupProvider::ACTION_CREATE => __( 'Create', 'mandate-app-security' ),
-			CapabilityGroupProvider::ACTION_EDIT   => __( 'Edit', 'mandate-app-security' ),
+			CapabilityGroupProvider::ACTION_WRITE  => __( 'Write', 'mandate-app-security' ),
 			CapabilityGroupProvider::ACTION_DELETE => __( 'Delete', 'mandate-app-security' ),
+		};
+	}
+
+	private function actionAbbreviation( string $action ) :string {
+		return match ( $action ) {
+			CapabilityGroupProvider::ACTION_READ   => 'R',
+			CapabilityGroupProvider::ACTION_WRITE  => 'W',
+			CapabilityGroupProvider::ACTION_DELETE => 'D',
 		};
 	}
 

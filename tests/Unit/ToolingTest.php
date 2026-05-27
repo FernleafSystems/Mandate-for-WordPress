@@ -171,6 +171,7 @@ final class ToolingTest extends Wpm_Test_Case {
 
 			$this->assertTrue( \is_file( Path::join( $packageDir, RuntimePackageBuilder::MAIN_PLUGIN_FILE ) ) );
 			$this->assertTrue( \is_file( Path::join( $packageDir, 'assets/dist/admin-page.js' ) ) );
+			$this->assertTrue( \is_file( Path::join( $packageDir, 'assets/dist/info-square.svg' ) ) );
 			$this->assertFalse( \file_exists( Path::join( $packageDir, 'site' ) ) );
 			$this->assertPackageComposerJsonContainsRuntimeConfigOnly( $packageDir );
 
@@ -194,6 +195,7 @@ final class ToolingTest extends Wpm_Test_Case {
 
 			$this->assertTrue( in_array( PluginIdentity::PACKAGE_ROOT.PluginIdentity::MAIN_FILE, $names, true ) );
 			$this->assertTrue( in_array( PluginIdentity::PACKAGE_ROOT.'assets/dist/admin-page.js', $names, true ) );
+			$this->assertTrue( in_array( PluginIdentity::PACKAGE_ROOT.'assets/dist/info-square.svg', $names, true ) );
 			$this->assertFalse( in_array( PluginIdentity::PACKAGE_ROOT.'site/index.html', $names, true ) );
 		}
 		finally {
@@ -202,6 +204,15 @@ final class ToolingTest extends Wpm_Test_Case {
 				$packageRoot,
 			] );
 		}
+	}
+
+	public function testBuiltAdminCssReferencesPackagedInfoIconAsset() :void {
+		$css = $this->readProjectFile( 'assets/dist/admin-page.css' );
+
+		$this->assertStringContainsString( 'url(./info-square.svg)', $css );
+		$this->assertStringNotContainsString( 'data:image/svg', $css );
+		$this->assertStringNotContainsString( 'url(/info-square.svg)', $css );
+		$this->assertStringNotContainsString( '?no-inline', $css );
 	}
 
 	public function testWordPressOrgPackageDoesNotContainGithubUpdaterLeakage() :void {
@@ -626,6 +637,7 @@ final class ToolingTest extends Wpm_Test_Case {
 			'src/Plugin.php',
 			'assets/dist/admin-page.css',
 			'assets/dist/admin-page.js',
+			'assets/dist/info-square.svg',
 			'site/index.html',
 			'site/assets/shield-icon.png',
 		] as $file ) {

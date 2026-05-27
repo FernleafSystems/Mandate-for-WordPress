@@ -88,8 +88,24 @@ function capabilitySection( page, source, mode, section ) {
 	return page.locator( `#mandate-${source}-${mode}-${section}-capabilities` );
 }
 
-function primitiveCapTooltipTarget( page, source, capability ) {
-	return page.locator( `[data-wpm-capability-source-panel][data-wpm-capability-source="${source}"] [data-wpm-tooltip]` ).filter( { hasText: capability } );
+function capabilityItem( page, source, capability ) {
+	return page.locator( `[data-wpm-capability-source-panel][data-wpm-capability-source="${source}"] [data-wpm-capability-item][data-wpm-capability-name="${capability}"]` );
+}
+
+function primitiveCapSlug( page, source, capability ) {
+	return capabilityItem( page, source, capability ).locator( 'code' );
+}
+
+function primitiveCapInfoTarget( page, source, capability ) {
+	return capabilityItem( page, source, capability ).locator( '.mandate-capability-info' );
+}
+
+function capabilityActionBadge( page, source, capability ) {
+	return capabilityItem( page, source, capability ).locator( '.mandate-capability-action-badge' );
+}
+
+function sectionBulkButton( page, source, mode, section, state ) {
+	return capabilitySection( page, source, mode, section ).locator( `[data-wpm-select-section][data-wpm-select-state="${state}"]` );
 }
 
 function anyPrimitiveCapInput( page, capability ) {
@@ -123,9 +139,9 @@ async function locatorRect( locator ) {
 }
 
 async function firstRowCapabilityColumns( section ) {
-	return section.locator( '.mandate-capability-list label' ).evaluateAll( ( labels ) => {
-		const positions = labels.map( ( label ) => {
-			const rect = label.getBoundingClientRect();
+	return section.locator( '.mandate-capability-list [data-wpm-capability-item]' ).evaluateAll( ( items ) => {
+		const positions = items.map( ( item ) => {
+			const rect = item.getBoundingClientRect();
 			return {
 				left: Math.round( rect.left ),
 				top: Math.round( rect.top ),
@@ -135,6 +151,99 @@ async function firstRowCapabilityColumns( section ) {
 		return positions.filter( ( position ) => Math.abs( position.top - firstTop ) <= 2 )
 			.map( ( position ) => position.left );
 	} );
+}
+
+async function sectionHeadingLayout( section ) {
+	return section.evaluate( ( sectionElement ) => {
+		const legendElement = sectionElement.querySelector( 'legend' );
+		const legend = legendElement.getBoundingClientRect();
+		const title = legendElement.querySelector( '.mandate-capability-section-title span:first-child' ).getBoundingClientRect();
+		const count = legendElement.querySelector( '.mandate-capability-section-count' ).getBoundingClientRect();
+		const actions = legendElement.querySelector( '.mandate-capability-section-actions' ).getBoundingClientRect();
+		const selectAll = legendElement.querySelector( '[data-wpm-select-section][data-wpm-select-state="checked"]' ).getBoundingClientRect();
+		const separator = legendElement.querySelector( '.mandate-capability-section-action-separator' ).getBoundingClientRect();
+		const deselectAll = legendElement.querySelector( '[data-wpm-select-section][data-wpm-select-state="unchecked"]' ).getBoundingClientRect();
+		const scroll = sectionElement.closest( '.mandate-capability-scroll' ).getBoundingClientRect();
+		const sectionStyle = getComputedStyle( sectionElement );
+		const legendStyle = getComputedStyle( legendElement );
+		const countStyle = getComputedStyle( legendElement.querySelector( '.mandate-capability-section-count' ) );
+		return {
+			leftOffset: Math.round( Math.abs( legend.left - scroll.left ) ),
+			widthOffset: Math.round( Math.abs( legend.width - scroll.width ) ),
+			titleCountGap: Math.round( count.left - title.right ),
+			actionsStartGap: Math.round( actions.left - count.right ),
+			selectSeparatorGap: Math.round( separator.left - selectAll.right ),
+			separatorDeselectGap: Math.round( deselectAll.left - separator.right ),
+			separatorText: legendElement.querySelector( '.mandate-capability-section-action-separator' ).textContent.trim(),
+			sectionBorderBottomWidth: sectionStyle.borderBottomWidth,
+			legendBackgroundColor: legendStyle.backgroundColor,
+			legendBorderTopWidth: legendStyle.borderTopWidth,
+			legendBorderRightWidth: legendStyle.borderRightWidth,
+			legendBorderLeftWidth: legendStyle.borderLeftWidth,
+			countBackgroundColor: countStyle.backgroundColor,
+			countBorderTopWidth: countStyle.borderTopWidth,
+		};
+	} );
+}
+
+function expectLeftAlignedSectionActions( layout ) {
+	expect( layout.leftOffset ).toBeLessThanOrEqual( 2 );
+	expect( layout.widthOffset ).toBeLessThanOrEqual( 2 );
+	expect( layout.titleCountGap ).toBeGreaterThanOrEqual( 0 );
+	expect( layout.titleCountGap ).toBeLessThanOrEqual( 12 );
+	expect( layout.actionsStartGap ).toBeGreaterThanOrEqual( 0 );
+	expect( layout.actionsStartGap ).toBeLessThanOrEqual( 18 );
+	expect( layout.selectSeparatorGap ).toBeGreaterThanOrEqual( 0 );
+	expect( layout.selectSeparatorGap ).toBeLessThanOrEqual( 12 );
+	expect( layout.separatorDeselectGap ).toBeGreaterThanOrEqual( 0 );
+	expect( layout.separatorDeselectGap ).toBeLessThanOrEqual( 12 );
+	expect( layout.separatorText ).toBe( '/' );
+	expect( layout.sectionBorderBottomWidth ).toBe( '0px' );
+	expect( layout.legendBackgroundColor ).toBe( 'rgba(0, 0, 0, 0)' );
+	expect( layout.legendBorderTopWidth ).toBe( '0px' );
+	expect( layout.legendBorderRightWidth ).toBe( '0px' );
+	expect( layout.legendBorderLeftWidth ).toBe( '0px' );
+	expect( layout.countBackgroundColor ).toBe( 'rgba(0, 0, 0, 0)' );
+	expect( layout.countBorderTopWidth ).toBe( '0px' );
+}
+
+async function capabilityControlLayout( page, source, capability ) {
+	return capabilityItem( page, source, capability ).evaluate( ( item ) => {
+		const rect = ( element ) => {
+			const bounds = element.getBoundingClientRect();
+			return {
+				left: Math.round( bounds.left ),
+				right: Math.round( bounds.right ),
+				width: Math.round( bounds.width ),
+			};
+		};
+		return {
+			input: rect( item.querySelector( 'input[type="checkbox"]' ) ),
+			code: rect( item.querySelector( '.mandate-capability-name code' ) ),
+			badge: rect( item.querySelector( '.mandate-capability-action-badge' ) ),
+			info: rect( item.querySelector( '.mandate-capability-info, .mandate-capability-info-space' ) ),
+			badgeDisplay: getComputedStyle( item.querySelector( '.mandate-capability-action-badge' ) ).display,
+		};
+	} );
+}
+
+function expectAreaControlLayout( layout ) {
+	expect( layout.badgeDisplay ).not.toBe( 'none' );
+	expect( layout.input.right ).toBeLessThanOrEqual( layout.code.left );
+	expect( layout.code.right ).toBeLessThanOrEqual( layout.badge.left );
+	expect( layout.badge.right ).toBeLessThanOrEqual( layout.info.left );
+	expect( layout.badge.left - layout.code.right ).toBeGreaterThanOrEqual( 0 );
+	expect( layout.badge.left - layout.code.right ).toBeLessThanOrEqual( 16 );
+	expect( layout.info.left - layout.badge.right ).toBeGreaterThanOrEqual( 0 );
+	expect( layout.info.left - layout.badge.right ).toBeLessThanOrEqual( 16 );
+}
+
+function expectActionControlLayout( layout ) {
+	expect( layout.badgeDisplay ).toBe( 'none' );
+	expect( layout.input.right ).toBeLessThanOrEqual( layout.code.left );
+	expect( layout.code.right ).toBeLessThanOrEqual( layout.info.left );
+	expect( layout.info.left - layout.code.right ).toBeGreaterThanOrEqual( 0 );
+	expect( layout.info.left - layout.code.right ).toBeLessThanOrEqual( 16 );
 }
 
 test( 'admin can manage grouped application password scopes with progressive enhancement', async ( { page, baseURL } ) => {
@@ -296,41 +405,17 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	const pagesRect = await locatorRect( pagesSection );
 	expect( Math.abs( postsRect.left - pagesRect.left ) ).toBeLessThanOrEqual( 2 );
 	expect( pagesRect.top ).toBeGreaterThanOrEqual( postsRect.bottom );
-	const sectionHeadingSpan = await postsSection.evaluate( ( section ) => {
-		const legendElement = section.querySelector( 'legend' );
-		const legend = legendElement.getBoundingClientRect();
-		const title = legendElement.querySelector( 'span:first-child' ).getBoundingClientRect();
-		const count = legendElement.querySelector( '.mandate-capability-section-count' ).getBoundingClientRect();
-		const scroll = section.closest( '.mandate-capability-scroll' ).getBoundingClientRect();
-		const sectionStyle = getComputedStyle( section );
-		const legendStyle = getComputedStyle( legendElement );
-		const countStyle = getComputedStyle( legendElement.querySelector( '.mandate-capability-section-count' ) );
-		return {
-			leftOffset: Math.round( Math.abs( legend.left - scroll.left ) ),
-			widthOffset: Math.round( Math.abs( legend.width - scroll.width ) ),
-			titleCountGap: Math.round( count.left - title.right ),
-			sectionBorderBottomWidth: sectionStyle.borderBottomWidth,
-			legendBackgroundColor: legendStyle.backgroundColor,
-			legendBorderTopWidth: legendStyle.borderTopWidth,
-			legendBorderRightWidth: legendStyle.borderRightWidth,
-			legendBorderLeftWidth: legendStyle.borderLeftWidth,
-			countBackgroundColor: countStyle.backgroundColor,
-			countBorderTopWidth: countStyle.borderTopWidth,
-		};
-	} );
-	expect( sectionHeadingSpan.leftOffset ).toBeLessThanOrEqual( 2 );
-	expect( sectionHeadingSpan.widthOffset ).toBeLessThanOrEqual( 2 );
-	expect( sectionHeadingSpan.titleCountGap ).toBeGreaterThanOrEqual( 0 );
-	expect( sectionHeadingSpan.titleCountGap ).toBeLessThanOrEqual( 12 );
-	expect( sectionHeadingSpan.sectionBorderBottomWidth ).toBe( '0px' );
-	expect( sectionHeadingSpan.legendBackgroundColor ).toBe( 'rgba(0, 0, 0, 0)' );
-	expect( sectionHeadingSpan.legendBorderTopWidth ).toBe( '0px' );
-	expect( sectionHeadingSpan.legendBorderRightWidth ).toBe( '0px' );
-	expect( sectionHeadingSpan.legendBorderLeftWidth ).toBe( '0px' );
-	expect( sectionHeadingSpan.countBackgroundColor ).toBe( 'rgba(0, 0, 0, 0)' );
-	expect( sectionHeadingSpan.countBorderTopWidth ).toBe( '0px' );
+	expectLeftAlignedSectionActions( await sectionHeadingLayout( postsSection ) );
+	await expect( sectionBulkButton( page, 'wordpress', 'area', 'posts', 'checked' ) ).toBeVisible();
+	await expect( sectionBulkButton( page, 'wordpress', 'area', 'posts', 'unchecked' ) ).toBeVisible();
+	const postsItemOrder = await postsSection.locator( '[data-wpm-capability-item]' ).evaluateAll( ( items ) => items.map( ( item ) => item.dataset.wpmCapabilityName ) );
+	expect( postsItemOrder ).toEqual( [ 'read_post', 'edit_post', 'edit_posts', 'delete_post' ] );
+	const postsActionBadges = await postsSection.locator( '.mandate-capability-action-badge' ).evaluateAll( ( badges ) => badges.map( ( badge ) => badge.textContent.trim() ) );
+	expect( postsActionBadges ).toEqual( [ 'R', 'W', 'W', 'D' ] );
+	expectAreaControlLayout( await capabilityControlLayout( page, 'wordpress', 'upload_files' ) );
 	expect( await firstRowCapabilityColumns( postsSection ) ).toHaveLength( 3 );
 	await page.setViewportSize( { width: 760, height: 900 } );
+	expectAreaControlLayout( await capabilityControlLayout( page, 'wordpress', 'upload_files' ) );
 	expect( await firstRowCapabilityColumns( postsSection ) ).toHaveLength( 1 );
 	await page.setViewportSize( { width: 1280, height: 900 } );
 	const scrollRect = await locatorRect( scrollRegion );
@@ -365,7 +450,10 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await selectGroupingMode( page, 'action' );
 	await expect( page.locator( '[data-wpm-capability-groups]' ) ).toHaveAttribute( 'data-wpm-capability-mode', 'action' );
 	await expect( wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-action-read-capabilities"]' ) ).toBeVisible();
+	expectLeftAlignedSectionActions( await sectionHeadingLayout( capabilitySection( page, 'wordpress', 'action', 'read' ) ) );
 	await expect( wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-area-posts-capabilities"]' ) ).toHaveCount( 0 );
+	await expect( capabilityActionBadge( page, 'wordpress', 'upload_files' ) ).toBeHidden();
+	expectActionControlLayout( await capabilityControlLayout( page, 'wordpress', 'upload_files' ) );
 	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
@@ -405,9 +493,27 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await expect( anyPrimitiveCapInput( page, primary.direct_cap ) ).toHaveCount( 0 );
 	await expect( anyPrimitiveCapInput( page, fixture.unassigned_role_cap ) ).toHaveCount( 0 );
 
-	const uploadFilesName = primitiveCapTooltipTarget( page, 'wordpress', 'upload_files' );
-	await expect( uploadFilesName ).toHaveAttribute( 'data-wpm-tooltip', '' );
-	await expect( primitiveCapTooltipTarget( page, 'third_party', 'wpm_manage_widget' ) ).toHaveCount( 0 );
+	const uploadFilesSlug = primitiveCapSlug( page, 'wordpress', 'upload_files' );
+	await expect( uploadFilesSlug ).not.toHaveAttribute( 'data-wpm-tooltip', '' );
+	await uploadFilesSlug.hover();
+	await expect( page.locator( '#mandate-capability-tooltip' ) ).toHaveCount( 0 );
+	const uploadFilesInfo = primitiveCapInfoTarget( page, 'wordpress', 'upload_files' );
+	await expect( uploadFilesInfo ).toHaveCount( 1 );
+	await uploadFilesInfo.hover();
+	await expect( page.locator( '#mandate-capability-tooltip' ) ).toBeVisible();
+	await page.keyboard.press( 'Escape' );
+	await uploadFilesInfo.focus();
+	await expect( page.locator( '#mandate-capability-tooltip' ) ).toBeVisible();
+	await page.keyboard.press( 'Escape' );
+	await expect( primitiveCapInfoTarget( page, 'third_party', 'wpm_manage_widget' ) ).toHaveCount( 0 );
+	const uploadFilesActionBadge = capabilityActionBadge( page, 'wordpress', 'upload_files' );
+	await expect( uploadFilesActionBadge ).toHaveText( 'W' );
+	await uploadFilesActionBadge.hover();
+	await expect( page.locator( '#mandate-capability-tooltip' ) ).toHaveText( 'Write' );
+	await page.keyboard.press( 'Escape' );
+	await uploadFilesActionBadge.focus();
+	await expect( page.locator( '#mandate-capability-tooltip' ) ).toHaveText( 'Write' );
+	await page.keyboard.press( 'Escape' );
 
 	const scopedRequest = await request.newContext( {
 		baseURL,
@@ -426,20 +532,29 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	expect( capabilities.delete_posts ).toBe( true );
 	expect( capabilities.wpm_manage_widget ).toBe( true );
 
-	await page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-state="unchecked"]' ).click();
+	await sectionBulkButton( page, 'wordpress', 'area', 'posts', 'unchecked' ).click();
+	await expect( primitiveCapInput( page, 'wordpress', 'edit_posts' ) ).not.toBeChecked();
+	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
+	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
+
+	await sectionBulkButton( page, 'wordpress', 'area', 'posts', 'checked' ).click();
+	await expect( primitiveCapInput( page, 'wordpress', 'edit_posts' ) ).toBeChecked();
+	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
+
+	await page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-panel][data-wpm-select-state="unchecked"]' ).click();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
 
-	await page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-state="checked"]' ).click();
+	await page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-panel][data-wpm-select-state="checked"]' ).click();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).toBeChecked();
 
 	await selectCapabilitySource( page, 'third_party' );
-	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-state="unchecked"]' ).click();
+	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-panel][data-wpm-select-state="unchecked"]' ).click();
 	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).toBeChecked();
-	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-state="checked"]' ).click();
+	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-panel][data-wpm-select-state="checked"]' ).click();
 	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
 
 	await selectCapabilitySource( page, 'wordpress' );
@@ -571,7 +686,8 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeDisabled();
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeDisabled();
-	await expect( page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-state="unchecked"]' ) ).toBeDisabled();
+	await expect( page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-panel][data-wpm-select-state="unchecked"]' ) ).toBeDisabled();
+	await expect( page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-section]:disabled' ) ).toHaveCount( 12 );
 	await expect( page.locator( 'button[name="mandate_action"][value="save_scope"]' ) ).toBeDisabled();
 	await expect( page.locator( 'button[name="mandate_action"][value="clear_scope"]' ) ).toBeDisabled();
 
