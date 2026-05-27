@@ -3,6 +3,7 @@
 declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ProcessRunner;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
 use Symfony\Component\Filesystem\Filesystem;
@@ -165,7 +166,7 @@ function wpm_plugin_check_build_package( string $rootDir, string $temporaryRoot,
 
 	( new RuntimePackageBuilder(
 		$rootDir,
-		new CommandRunner( $rootDir, $logger ),
+		new CommandRunner( $rootDir ),
 		new Filesystem(),
 		$logger
 	) )->build( $packageDir, $temporaryRoot, false );
@@ -176,9 +177,14 @@ function wpm_plugin_check_build_package( string $rootDir, string $temporaryRoot,
  * @param array<string,string> $env
  */
 function wpm_plugin_check_run( array $command, string $cwd, array $env = [] ) :void {
-	$result = wpm_plugin_check_run_capture( $command, $cwd, $env, true );
-	if ( $result[ 'exit_code' ] !== 0 ) {
-		throw new RuntimeException( 'Command failed with exit code '.$result[ 'exit_code' ].': '.implode( ' ', $command ) );
+	$exitCode = wpm_plugin_check_process_runner()->runForExitCode(
+		$command,
+		$cwd,
+		null,
+		array_merge( $env, [ 'COMPOSE_PROGRESS' => 'quiet' ] )
+	);
+	if ( $exitCode !== 0 ) {
+		throw new RuntimeException( 'Command failed with exit code '.$exitCode.': '.implode( ' ', $command ) );
 	}
 }
 
@@ -187,44 +193,12 @@ function wpm_plugin_check_run( array $command, string $cwd, array $env = [] ) :v
  * @param array<string,string> $env
  * @return array{exit_code:int,stdout:string,stderr:string}
  */
-function wpm_plugin_check_run_capture( array $command, string $cwd, array $env = [], bool $stream = false ) :array {
-	echo '> '.implode( ' ', array_map( 'wpm_plugin_check_quote_arg', $command ) ).PHP_EOL;
-	$descriptorSpec = [
-		0 => [ 'file', 'php://stdin', 'r' ],
-		1 => [ 'pipe', 'w' ],
-		2 => [ 'pipe', 'w' ],
-	];
-	$baseEnv = getenv();
-	if ( !is_array( $baseEnv ) ) {
-		$baseEnv = [];
-	}
-	$process = proc_open(
+function wpm_plugin_check_run_capture( array $command, string $cwd, array $env = [] ) :array {
+	return wpm_plugin_check_process_runner()->runAndCapture(
 		$command,
-		$descriptorSpec,
-		$pipes,
 		$cwd,
-		array_merge( $baseEnv, $env, [ 'COMPOSE_PROGRESS' => 'quiet' ] )
+		array_merge( $env, [ 'COMPOSE_PROGRESS' => 'quiet' ] )
 	);
-	if ( !is_resource( $process ) ) {
-		throw new RuntimeException( 'Failed to start command.' );
-	}
-
-	$stdout = stream_get_contents( $pipes[ 1 ] );
-	$stderr = stream_get_contents( $pipes[ 2 ] );
-	fclose( $pipes[ 1 ] );
-	fclose( $pipes[ 2 ] );
-	$exitCode = proc_close( $process );
-
-	if ( $stream ) {
-		echo $stdout;
-		fwrite( STDERR, $stderr );
-	}
-
-	return [
-		'exit_code' => $exitCode,
-		'stdout'    => $stdout,
-		'stderr'    => $stderr,
-	];
 }
 
 /**
@@ -307,6 +281,11 @@ function wpm_plugin_check_print_findings( array $findings ) :void {
 	}
 }
 
-function wpm_plugin_check_quote_arg( string $arg ) :string {
-	return preg_match( '/\s/', $arg ) === 1 ? '"'.$arg.'"' : $arg;
+function wpm_plugin_check_process_runner() :ProcessRunner {
+	static $runner = null;
+	if ( !$runner instanceof ProcessRunner ) {
+		$runner = new ProcessRunner();
+	}
+
+	return $runner;
 }

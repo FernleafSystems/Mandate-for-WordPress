@@ -23,7 +23,7 @@ The plugin runtime, unit test bootstrap, and build tooling require `vendor/autol
 | WordPress test install | `composer test:integration:install` | Prepares the WordPress core checkout used by the integration bootstrap without running tests. |
 | Default PHP test gate | `composer test` | Alias for `composer test:unit`. |
 | Plugin Check | `composer test:plugin-check -- --clean` | Builds a production-shaped plugin package and runs WordPress.org Plugin Check through WP-CLI. Omit `-- --clean` for a warm repeat. |
-| Browser smoke | `composer test:browser -- --clean -- --workers=1` | Provisions a Docker WordPress site, activates the plugin, and runs Playwright UI/API checks. |
+| Browser smoke | `composer test:browser -- --clean --lanes=1 -- --workers=1` | Provisions a Docker WordPress lane, activates the plugin, and runs Playwright UI/API checks. |
 
 The unit lane uses the latest PHPUnit line compatible with the Composer PHP 8.2 platform (`>=11.5 <12`). WordPress integration tests use the Composer-installed `wp-phpunit` library and `yoast/phpunit-polyfills`, with a small local bootstrap shim for WordPress' current PHPUnit 11 compatibility gaps.
 
@@ -56,7 +56,7 @@ Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 composer test:unit
 composer test:integration
 composer test:plugin-check -- --clean
-composer test:browser -- --clean -- --workers=1
+composer test:browser -- --clean --lanes=1 -- --workers=1
 ```
 
 ## Build Zip
@@ -94,9 +94,31 @@ Remove-Item Env:\WPM_PLUGIN_CHECK_VERSION
 
 The browser lane follows the lightweight shape of Shield's Docker/Playwright tests without copying its full CLI stack. It seeds Docker's WordPress volume from the local WordPress reference checkout at `D:\Work\Dev\Libraries\wordpress`, which currently reports `7.1-alpha-62408`; this keeps the smoke test aligned with the plugin's literal `Requires at least: 7.0` header.
 
-- `tests/docker/docker-compose.browser.yml` starts MySQL, WordPress, and WP-CLI.
+- `tests/docker/docker-compose.browser-db.yml` starts the shared MySQL service on the `mandate-browser-tests` Docker network.
+- `tests/docker/docker-compose.browser.yml` starts one isolated WordPress/WP-CLI lane per compose project, with lane-specific port, database, and WordPress volume.
 - `tests/docker/provision-browser-site.sh` installs WordPress, activates the plugin, creates fixture roles/users/application passwords, and installs a test-only mu-plugin fixture endpoint.
+- `tests/browser/run-browser.php` writes `wp-content/.mandate-browser-lane-ready.json` after provisioning. Warm runs skip the WordPress core seed when that marker and the installed site are valid.
+- Browser workers map to isolated lanes. Multi-worker runs are launched as concurrent Playwright shards, one worker per shard, so each lane writes Playwright artifacts and HTML reports under sibling directories in `test-results/playwright/lane-N`.
 - `tests/browser/mandate-admin.spec.js` verifies the real wp-admin selection flow, user/password auto-reload behavior, grouped capability controls, save/reset behavior, and REST capability enforcement through WordPress filters.
+
+The existing single-lane command remains valid and is the safest diagnostic path:
+
+```powershell
+composer test:browser -- --clean --lanes=1 -- --workers=1
+composer test:browser -- --warm --lanes=1 -- --workers=1
+```
+
+For normal local feedback, use warm two-lane execution:
+
+```powershell
+composer test:browser -- --warm --lanes=2 -- --workers=2
+```
+
+For CI-style full reset with parallel browser workers:
+
+```powershell
+composer test:browser -- --clean --lanes=2 -- --workers=2
+```
 
 ## Manual Smoke Test
 

@@ -1,4 +1,70 @@
-const { test, expect, request } = require( '@playwright/test' );
+const base = require( '@playwright/test' );
+const { expect, request } = base;
+
+function laneMap() {
+	const rawMap = process.env.WPM_BROWSER_LANE_MAP;
+	if ( rawMap ) {
+		return JSON.parse( rawMap );
+	}
+
+	return {
+		0: {
+			laneIndex: 1,
+			baseUrl: process.env.WPM_BROWSER_BASE_URL || 'http://127.0.0.1:8898',
+			outputDir: process.env.WPM_BROWSER_OUTPUT_DIR || './test-results/playwright/lane-1/artifacts',
+			htmlReportDir: process.env.PLAYWRIGHT_HTML_OUTPUT_DIR || './test-results/playwright/lane-1/html-report',
+		},
+	};
+}
+
+function laneForParallelIndex( parallelIndex ) {
+	const lane = laneMap()[ String( parallelIndex ) ];
+	if ( !lane || typeof lane !== 'object' ) {
+		throw new Error( `No Mandate browser lane configured for parallel index ${parallelIndex}.` );
+	}
+	if ( !lane.baseUrl ) {
+		throw new Error( `Mandate browser lane ${parallelIndex} is missing baseUrl.` );
+	}
+	if ( !lane.outputDir ) {
+		throw new Error( `Mandate browser lane ${parallelIndex} is missing outputDir.` );
+	}
+	if ( !lane.htmlReportDir ) {
+		throw new Error( `Mandate browser lane ${parallelIndex} is missing htmlReportDir.` );
+	}
+
+	return {
+		laneIndex: Number( lane.laneIndex || parallelIndex + 1 ),
+		baseUrl: String( lane.baseUrl ),
+		outputDir: String( lane.outputDir ),
+		htmlReportDir: String( lane.htmlReportDir ),
+	};
+}
+
+const test = base.test.extend( {
+	lane: [
+		async ( {}, use, workerInfo ) => {
+			await use( laneForParallelIndex( workerInfo.parallelIndex ) );
+		},
+		{ scope: 'worker' },
+	],
+	context: async ( { browser, lane }, use ) => {
+		const context = await browser.newContext( {
+			baseURL: lane.baseUrl,
+		} );
+		await use( context );
+		await context.close();
+	},
+	page: async ( { context }, use ) => {
+		const page = await context.newPage();
+		await use( page );
+		await page.close();
+	},
+	fixture: async ( { page }, use ) => {
+		const fixtureResponse = await page.request.get( '/wp-json/mandate-test/v1/fixture' );
+		expect( fixtureResponse.ok() ).toBeTruthy();
+		await use( await fixtureResponse.json() );
+	},
+} );
 
 async function loginAsAdmin( page ) {
 	await loginAs( page, process.env.WPM_BROWSER_ADMIN_USER || 'admin', process.env.WPM_BROWSER_ADMIN_PASSWORD || 'password' );
@@ -6,14 +72,21 @@ async function loginAsAdmin( page ) {
 
 async function loginAs( page, username, password ) {
 	await page.goto( '/wp-admin/', { waitUntil: 'load' } );
-	if ( await page.locator( '#loginform' ).count() ) {
-		await page.locator( '#user_login' ).fill( username );
-		await page.locator( '#user_pass' ).fill( password );
+	const loginForm = page.locator( '#loginform' );
+	if ( await loginForm.isVisible().catch( () => false ) ) {
 		await Promise.all( [
-			page.waitForNavigation( { waitUntil: 'domcontentloaded' } ),
-			page.locator( '#wp-submit' ).click(),
+			page.waitForURL( /\/wp-admin\//, { waitUntil: 'domcontentloaded' } ),
+			loginForm.evaluate(
+				( form, credentials ) => {
+					form.querySelector( '#user_login' ).value = credentials.username;
+					form.querySelector( '#user_pass' ).value = credentials.password;
+					form.requestSubmit();
+				},
+				{ username, password }
+			),
 		] );
 	}
+	await expect( page.locator( '#wpadminbar' ) ).toBeVisible();
 }
 
 async function loginAsFixtureUser( page, username ) {
@@ -246,13 +319,10 @@ function expectActionControlLayout( layout ) {
 	expect( layout.info.left - layout.code.right ).toBeLessThanOrEqual( 16 );
 }
 
-test( 'admin can manage grouped application password scopes with progressive enhancement', async ( { page, baseURL } ) => {
+test( 'admin can manage grouped application password scopes with progressive enhancement', async ( { page, lane, fixture } ) => {
 	await page.setViewportSize( { width: 1280, height: 900 } );
 	await loginAsAdmin( page );
 
-	const fixtureResponse = await page.request.get( '/wp-json/mandate-test/v1/fixture' );
-	expect( fixtureResponse.ok() ).toBeTruthy();
-	const fixture = await fixtureResponse.json();
 	const primary = fixture.primary;
 	const otherUser = fixture.secondary_user;
 	const primaryPassword = primary.passwords.primary;
@@ -516,7 +586,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await page.keyboard.press( 'Escape' );
 
 	const scopedRequest = await request.newContext( {
-		baseURL,
+		baseURL: lane.baseUrl,
 		extraHTTPHeaders: {
 			Authorization: basicAuthHeader( primary.user_login, primaryPassword.app_password ),
 		},
@@ -596,7 +666,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await scopedRequest.dispose();
 
 	const secondaryRequest = await request.newContext( {
-		baseURL,
+		baseURL: lane.baseUrl,
 		extraHTTPHeaders: {
 			Authorization: basicAuthHeader( primary.user_login, secondaryPassword.app_password ),
 		},
@@ -646,19 +716,16 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await secondaryRequest.dispose();
 } );
 
-test( 'admin can lock a scope and the owner cannot edit it from UI or forged POST', async ( { page } ) => {
+test( 'admin can lock a scope and the owner cannot edit it from UI or forged POST', async ( { page, fixture } ) => {
 	await page.setViewportSize( { width: 1280, height: 900 } );
 	await loginAsAdmin( page );
 
-	const fixtureResponse = await page.request.get( '/wp-json/mandate-test/v1/fixture' );
-	expect( fixtureResponse.ok() ).toBeTruthy();
-	const fixture = await fixtureResponse.json();
 	const primary = fixture.primary;
 	const otherUser = fixture.secondary_user;
 	const primaryPassword = primary.passwords.primary;
 
 	await page.goto( '/wp-admin/tools.php?page=mandate-app-security', { waitUntil: 'load' } );
-	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
+	await ensureSelectedOption( page, page.locator( '#mandate-user' ), primary.user_id );
 	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
 	const adminLockInput = page.locator( '#mandate-rules-summary [data-wpm-admin-lock-input]' );

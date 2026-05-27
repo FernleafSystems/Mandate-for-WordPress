@@ -4,6 +4,7 @@ declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
 use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ProcessRunner;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ReleasePackageIdentity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
@@ -49,6 +50,103 @@ final class Wpm_Test_Package_CommandRunner extends CommandRunner {
 }
 
 final class ToolingTest extends Wpm_Test_Case {
+
+	public function testProcessRunnerCapturesLargeOutputWithoutStreaming() :void {
+		$runner = new ProcessRunner();
+		$projectRoot = \dirname( __DIR__, 2 );
+
+		\ob_start();
+		try {
+			$result = $runner->runAndCapture(
+				[
+					PHP_BINARY,
+					'-r',
+					'echo str_repeat("out", 20000); fwrite(STDERR, str_repeat("err", 20000));',
+				],
+				$projectRoot
+			);
+		}
+		finally {
+			\ob_end_clean();
+		}
+
+		$this->assertSame( 0, $result[ 'exit_code' ] );
+		$this->assertSame( 60000, \strlen( $result[ 'stdout' ] ) );
+		$this->assertSame( 60000, \strlen( $result[ 'stderr' ] ) );
+	}
+
+	public function testProcessRunnerStreamsOutputThroughCallback() :void {
+		$runner = new ProcessRunner();
+		$projectRoot = \dirname( __DIR__, 2 );
+		$output = [];
+
+		\ob_start();
+		try {
+			$process = $runner->run(
+				[
+					PHP_BINARY,
+					'-r',
+					'echo "stdout"; fwrite(STDERR, "stderr");',
+				],
+				$projectRoot,
+				static function ( string $type, string $buffer ) use ( &$output ) :void {
+					$output[] = [ $type, $buffer ];
+				}
+			);
+		}
+		finally {
+			\ob_end_clean();
+		}
+
+		$this->assertSame( 0, $process->getExitCode() );
+		$this->assertContains( [ Process::OUT, 'stdout' ], $output );
+		$this->assertContains( [ Process::ERR, 'stderr' ], $output );
+	}
+
+	public function testProcessRunnerRunsConcurrentCommands() :void {
+		$runner = new ProcessRunner();
+		$projectRoot = \dirname( __DIR__, 2 );
+
+		\ob_start();
+		try {
+			$results = $runner->runConcurrent( [
+				[
+					'command'     => [ PHP_BINARY, '-r', 'usleep(200000); echo "one";' ],
+					'working_dir' => $projectRoot,
+					'label'       => 'one',
+				],
+				[
+					'command'     => [ PHP_BINARY, '-r', 'usleep(200000); echo "two";' ],
+					'working_dir' => $projectRoot,
+					'label'       => 'two',
+				],
+			] );
+		}
+		finally {
+			\ob_end_clean();
+		}
+
+		$this->assertSame( 0, $results[ 0 ][ 'exit_code' ] );
+		$this->assertSame( 0, $results[ 1 ][ 'exit_code' ] );
+		$this->assertSame( 'one', $results[ 0 ][ 'label' ] );
+		$this->assertSame( 'two', $results[ 1 ][ 'label' ] );
+	}
+
+	public function testCommandRunnerThrowsOnFailedCommand() :void {
+		$runner = new CommandRunner( \dirname( __DIR__, 2 ) );
+
+		\ob_start();
+		try {
+			$this->assertThrowsRuntimeException(
+				static function () use ( $runner ) :void {
+					$runner->run( [ PHP_BINARY, '-r', 'exit(3);' ] );
+				}
+			);
+		}
+		finally {
+			\ob_end_clean();
+		}
+	}
 
 	public function testTemporaryDirectoryManagerCreatesDirectoryInsideSystemTemp() :void {
 		$manager = new TemporaryDirectoryManager();
@@ -164,7 +262,7 @@ final class ToolingTest extends Wpm_Test_Case {
 
 			$builder = new RuntimePackageBuilder(
 				$fixtureRoot,
-				new Wpm_Test_Package_CommandRunner( $fixtureRoot, static function ( string $message ) :void {} ),
+				new Wpm_Test_Package_CommandRunner( $fixtureRoot ),
 				$filesystem,
 				static function ( string $message ) :void {}
 			);
@@ -444,13 +542,36 @@ final class ToolingTest extends Wpm_Test_Case {
 
 		$browserCompose = $this->readProjectFile( 'tests/docker/docker-compose.browser.yml' );
 		$this->assertStringContainsString( '/wp-content/plugins/'.PluginIdentity::SLUG, $browserCompose );
+		$this->assertStringContainsString( 'WPM_BROWSER_DB_NAME', $browserCompose );
+		$this->assertStringContainsString( 'WPM_BROWSER_PORT', $browserCompose );
+		$this->assertStringContainsString( 'mandate-browser-tests', $browserCompose );
+
+		$browserDbCompose = $this->readProjectFile( 'tests/docker/docker-compose.browser-db.yml' );
+		$this->assertStringContainsString( 'container_name: mandate-browser-db', $browserDbCompose );
+		$this->assertStringContainsString( 'mandate-browser-tests', $browserDbCompose );
 
 		$pluginCheckCompose = $this->readProjectFile( 'tests/docker/docker-compose.plugin-check.yml' );
 		$this->assertStringContainsString( '/wp-content/plugins/'.PluginIdentity::SLUG, $pluginCheckCompose );
 
 		$browserProvision = $this->readProjectFile( 'tests/docker/provision-browser-site.sh' );
-		$this->assertStringContainsString( 'PLUGIN_SLUG="'.PluginIdentity::SLUG.'"', $browserProvision );
+		$this->assertStringContainsString( 'WPM_BROWSER_DB_NAME', $browserProvision );
+		$this->assertStringContainsString( 'WPM_BROWSER_DB_HOST', $browserProvision );
+		$this->assertStringContainsString( 'WPM_BROWSER_PLUGIN_SLUG:-'.PluginIdentity::SLUG, $browserProvision );
 		$this->assertStringContainsString( 'PLUGIN_MAIN="${PLUGIN_SLUG}/'.PluginIdentity::MAIN_FILE.'"', $browserProvision );
+
+		$browserRunner = $this->readProjectFile( 'tests/browser/run-browser.php' );
+		$this->assertStringContainsString( '.mandate-browser-lane-ready.json', $browserRunner );
+		$this->assertStringContainsString( 'WPM_BROWSER_LANE_MAP', $browserRunner );
+		$this->assertStringContainsString( 'WPM_BROWSER_OUTPUT_DIR', $browserRunner );
+		$this->assertStringContainsString( 'PLAYWRIGHT_HTML_OUTPUT_DIR', $browserRunner );
+		$this->assertStringContainsString( 'htmlReportDir', $browserRunner );
+		$this->assertStringContainsString( '--shard=', $browserRunner );
+		$this->assertStringContainsString( 'runConcurrent', $browserRunner );
+		$this->assertStringContainsString( 'wordpress_browser_lane_', $browserRunner );
+		$this->assertStringContainsString( 'mandate-browser-lane-', $browserRunner );
+		$this->assertStringContainsString( 'WPM_BROWSER_PLUGIN_SLUG', $browserRunner );
+		$this->assertStringNotContainsString( 'proc_open', $browserRunner );
+		$this->assertStringNotContainsString( 'stream_get_contents', $browserRunner );
 
 		$pluginCheckProvision = $this->readProjectFile( 'tests/plugin-check/provision-site.sh' );
 		$this->assertStringContainsString( 'wp plugin activate '.PluginIdentity::SLUG, $pluginCheckProvision );
@@ -458,9 +579,17 @@ final class ToolingTest extends Wpm_Test_Case {
 		$pluginCheckRunner = $this->readProjectFile( 'tests/plugin-check/run-plugin-check.php' );
 		$this->assertStringContainsString( "'".PluginIdentity::SLUG."'", $pluginCheckRunner );
 		$this->assertStringContainsString( "'--slug=".PluginIdentity::SLUG."'", $pluginCheckRunner );
+		$this->assertStringContainsString( 'ProcessRunner', $pluginCheckRunner );
+		$this->assertStringNotContainsString( 'proc_open', $pluginCheckRunner );
+		$this->assertStringNotContainsString( 'stream_get_contents', $pluginCheckRunner );
 
 		$browserSpec = $this->readProjectFile( 'tests/browser/mandate-admin.spec.js' );
 		$this->assertStringContainsString( 'page='.PluginIdentity::SLUG, $browserSpec );
+		$this->assertStringContainsString( 'outputDir', $browserSpec );
+		$this->assertStringContainsString( 'htmlReportDir', $browserSpec );
+
+		$playwrightConfig = $this->readProjectFile( 'playwright.config.js' );
+		$this->assertStringContainsString( 'WPM_BROWSER_OUTPUT_DIR', $playwrightConfig );
 
 		$githubUpdater = $this->readProjectFile( 'infrastructure/templates/github-updater.php' );
 		$this->assertStringContainsString( 'PluginIdentity::MAIN_FILE', $githubUpdater );
@@ -553,7 +682,7 @@ final class ToolingTest extends Wpm_Test_Case {
 	) :void {
 		$builder = new RuntimePackageBuilder(
 			$projectRoot,
-			new Wpm_Test_Package_CommandRunner( $projectRoot, static function ( string $message ) :void {} ),
+			new Wpm_Test_Package_CommandRunner( $projectRoot ),
 			$filesystem,
 			static function ( string $message ) :void {}
 		);

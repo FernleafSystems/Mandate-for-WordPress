@@ -1,56 +1,53 @@
 services:
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: testpass
-      MYSQL_DATABASE: wordpress
-    command: --default-authentication-plugin=mysql_native_password --bind-address=0.0.0.0
-    volumes:
-      - wpm-browser-db:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysql -h localhost -uroot -ptestpass -e 'USE wordpress; SELECT 1;' >/dev/null 2>&1"]
-      interval: 2s
-      timeout: 5s
-      retries: 30
-      start_period: 10s
-
   wordpress:
     image: wordpress:php8.2-apache
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
-      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_HOST: ${WPM_BROWSER_DB_HOST:-mandate-browser-db:3306}
       WORDPRESS_DB_USER: root
       WORDPRESS_DB_PASSWORD: testpass
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_CONFIG_EXTRA: |
-        define( 'WP_ENVIRONMENT_TYPE', 'local' );
+      WORDPRESS_DB_NAME: ${WPM_BROWSER_DB_NAME:-wordpress_browser_lane_1}
+      WPM_BROWSER_SITE_URL: ${WPM_BROWSER_SITE_URL:-http://127.0.0.1:8898}
+      WPM_BROWSER_ADMIN_USER: ${WPM_BROWSER_ADMIN_USER:-admin}
+      WPM_BROWSER_ADMIN_PASSWORD: ${WPM_BROWSER_ADMIN_PASSWORD:-password}
+      WPM_BROWSER_ADMIN_EMAIL: ${WPM_BROWSER_ADMIN_EMAIL:-devnull@example.com}
+      WPM_BROWSER_DB_HOST: ${WPM_BROWSER_DB_HOST:-mandate-browser-db:3306}
+      WPM_BROWSER_DB_NAME: ${WPM_BROWSER_DB_NAME:-wordpress_browser_lane_1}
+      WPM_BROWSER_PLUGIN_SLUG: ${WPM_BROWSER_PLUGIN_SLUG:-mandate-app-security}
     ports:
       - "${WPM_BROWSER_PORT:-8898}:80"
     volumes:
       - wpm-browser-wp:/var/www/html
       - ../../:/var/www/html/wp-content/plugins/mandate-app-security
+    networks:
+      - browser-shared
 
   wp-cli:
     image: wordpress:cli-php8.2
     user: "0:0"
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
-      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_HOST: ${WPM_BROWSER_DB_HOST:-mandate-browser-db:3306}
       WORDPRESS_DB_USER: root
       WORDPRESS_DB_PASSWORD: testpass
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_CONFIG_EXTRA: |
-        define( 'WP_ENVIRONMENT_TYPE', 'local' );
+      WORDPRESS_DB_NAME: ${WPM_BROWSER_DB_NAME:-wordpress_browser_lane_1}
+      WPM_BROWSER_SITE_URL: ${WPM_BROWSER_SITE_URL:-http://127.0.0.1:8898}
+      WPM_BROWSER_ADMIN_USER: ${WPM_BROWSER_ADMIN_USER:-admin}
+      WPM_BROWSER_ADMIN_PASSWORD: ${WPM_BROWSER_ADMIN_PASSWORD:-password}
+      WPM_BROWSER_ADMIN_EMAIL: ${WPM_BROWSER_ADMIN_EMAIL:-devnull@example.com}
+      WPM_BROWSER_DB_HOST: ${WPM_BROWSER_DB_HOST:-mandate-browser-db:3306}
+      WPM_BROWSER_DB_NAME: ${WPM_BROWSER_DB_NAME:-wordpress_browser_lane_1}
+      WPM_BROWSER_PLUGIN_SLUG: ${WPM_BROWSER_PLUGIN_SLUG:-mandate-app-security}
     volumes:
       - wpm-browser-wp:/var/www/html
       - ../../../../../Libraries/wordpress:/wordpress-src:ro
       - ../../:/var/www/html/wp-content/plugins/mandate-app-security
       - ../../:/app
+    networks:
+      - browser-shared
 
 volumes:
-  wpm-browser-db:
   wpm-browser-wp:
+
+networks:
+  browser-shared:
+    external: true
+    name: mandate-browser-tests

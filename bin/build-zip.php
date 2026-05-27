@@ -61,7 +61,7 @@ $exitCode = 0;
 try {
 	$variant = resolve_package_variant( $options[ 'variant' ] ?? null );
 	$outputZip = resolve_output_zip( $options[ 'output' ] ?? null, $projectRoot, $buildDir, $variant );
-	$commandRunner = new CommandRunner( $projectRoot, $logger );
+	$commandRunner = new CommandRunner( $projectRoot );
 	$packageBuilder = new RuntimePackageBuilder( $projectRoot, $commandRunner, $filesystem, $logger );
 	$zipBuilder = new ZipBuilder( $filesystem, $logger );
 
