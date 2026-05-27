@@ -4,7 +4,7 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.3.1
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -92,9 +92,15 @@ The public development repository, release packages, and build documentation are
 
 == Changelog ==
 
-= 0.3.1 =
+= 0.4.0 =
 * Allows users to scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator locks the scope.
 * Adds administrator locks that make selected scopes read-only for password owners.
+* Adds a Restrict Scope shortcut to Application Password profile tables when the current user can manage that password.
+* Adds source tabs, area/action grouping, section select/deselect controls, and read/write/delete badges to the capability editor.
+* Splits selected password details from Mandate rule status in the admin summary.
+* Improves admin page output hardening.
+
+= 0.3.1 =
 * Adds a Plugins page Settings link that opens the Mandate admin tool.
 * Adds favicon and sitemap metadata for the static product site.
 * Keeps legacy GitHub updater installs on built release ZIPs by publishing and verifying the legacy package asset.
