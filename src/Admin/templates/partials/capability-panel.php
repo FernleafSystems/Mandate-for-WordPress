@@ -9,11 +9,11 @@ if ( !defined( 'ABSPATH' ) ) {
 	<div class="mandate-capability-toolbar">
 		<nav class="mandate-capability-section-index" aria-label="<?php echo esc_attr__( 'Capability groups', 'mandate-app-security' ); ?>" data-wpm-capability-section-index>
 			<?php
-			foreach ( $panel[ 'section_index' ] as $mandateIndexItem ) {
+			foreach ( $panel[ 'section_index' ] as $mandate_app_security_index_item ) {
 				?>
-				<a href="#<?php echo esc_attr( $mandateIndexItem[ 'target_id' ] ); ?>" data-wpm-capability-index-link data-wpm-capability-section-target="<?php echo esc_attr( $mandateIndexItem[ 'target_id' ] ); ?>">
-					<span><?php echo esc_html( $mandateIndexItem[ 'label' ] ); ?></span>
-					<span class="mandate-capability-section-count"><?php echo esc_html( (string)$mandateIndexItem[ 'count' ] ); ?></span>
+				<a href="#<?php echo esc_attr( $mandate_app_security_index_item[ 'target_id' ] ); ?>" data-wpm-capability-index-link data-wpm-capability-section-target="<?php echo esc_attr( $mandate_app_security_index_item[ 'target_id' ] ); ?>">
+					<span><?php echo esc_html( $mandate_app_security_index_item[ 'label' ] ); ?></span>
+					<span class="mandate-capability-section-count"><?php echo esc_html( (string)$mandate_app_security_index_item[ 'count' ] ); ?></span>
 				</a>
 				<?php
 			}
@@ -28,9 +28,9 @@ if ( !defined( 'ABSPATH' ) ) {
 			<?php
 		}
 		else {
-			foreach ( $panel[ 'sections' ] as $mandateSection ) {
-				$mandateSectionHtml = $this->render( 'partials/capability-section.php', [ 'section' => $mandateSection ] );
-				echo wp_kses( $mandateSectionHtml, $this->allowedAdminHtml() );
+			foreach ( $panel[ 'sections' ] as $mandate_app_security_section ) {
+				$mandate_app_security_section_html = $this->render( 'partials/capability-section.php', [ 'section' => $mandate_app_security_section ] );
+				echo wp_kses( $mandate_app_security_section_html, $this->allowedAdminHtml() );
 			}
 		}
 		?>

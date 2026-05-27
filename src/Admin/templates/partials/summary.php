@@ -17,16 +17,16 @@ if ( !$summary[ 'is_visible' ] ) {
 	<?php } ?>
 	<dl class="mandate-summary-details">
 		<?php
-		foreach ( $summary[ 'details' ] as $mandateDetail ) {
-			$mandateDetailHtml = $this->render( 'partials/summary-detail.php', [ 'detail' => $mandateDetail ] );
-			echo wp_kses( $mandateDetailHtml, $this->allowedAdminHtml() );
+		foreach ( $summary[ 'details' ] as $mandate_app_security_detail ) {
+			$mandate_app_security_detail_html = $this->render( 'partials/summary-detail.php', [ 'detail' => $mandate_app_security_detail ] );
+			echo wp_kses( $mandate_app_security_detail_html, $this->allowedAdminHtml() );
 		}
 		?>
 	</dl>
 	<?php
-	foreach ( $summary[ 'warnings' ] as $mandateWarning ) {
+	foreach ( $summary[ 'warnings' ] as $mandate_app_security_warning ) {
 		?>
-		<div class="<?php echo esc_attr( $mandateWarning[ 'classes' ] ); ?>" data-wpm-role-snapshot-status="<?php echo esc_attr( $mandateWarning[ 'role_snapshot_status' ] ); ?>"><p><?php echo esc_html( $mandateWarning[ 'text' ] ); ?></p></div>
+		<div class="<?php echo esc_attr( $mandate_app_security_warning[ 'classes' ] ); ?>" data-wpm-role-snapshot-status="<?php echo esc_attr( $mandate_app_security_warning[ 'role_snapshot_status' ] ); ?>"><p><?php echo esc_html( $mandate_app_security_warning[ 'text' ] ); ?></p></div>
 		<?php
 	}
 	?>

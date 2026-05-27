@@ -19,9 +19,9 @@ if ( !defined( 'ABSPATH' ) ) {
 	</legend>
 	<div class="mandate-capability-list">
 		<?php
-		foreach ( $section[ 'items' ] as $mandateItem ) {
-			$mandateItemHtml = $this->render( 'partials/capability-item.php', [ 'item' => $mandateItem ] );
-			echo wp_kses( $mandateItemHtml, $this->allowedAdminHtml() );
+		foreach ( $section[ 'items' ] as $mandate_app_security_item ) {
+			$mandate_app_security_item_html = $this->render( 'partials/capability-item.php', [ 'item' => $mandate_app_security_item ] );
+			echo wp_kses( $mandate_app_security_item_html, $this->allowedAdminHtml() );
 		}
 		?>
 	</div>

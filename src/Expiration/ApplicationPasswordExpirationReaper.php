@@ -10,7 +10,7 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class ApplicationPasswordExpirationReaper {
 
-	public const HOOK = 'mandate_revoke_expired_application_passwords';
+	public const HOOK = 'mandate_app_security_revoke_expired_application_passwords';
 
 	private ScopeRepository $scopeRepository;
 

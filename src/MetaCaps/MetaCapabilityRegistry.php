@@ -30,7 +30,7 @@ class MetaCapabilityRegistry {
 	public function registered() :array {
 		$capabilities = self::DEFAULT_META_CAPABILITIES;
 		if ( function_exists( 'apply_filters' ) ) {
-			$filtered = apply_filters( 'mandate_meta_capabilities', $capabilities );
+			$filtered = apply_filters( 'mandate_app_security_meta_capabilities', $capabilities );
 			if ( is_array( $filtered ) ) {
 				$capabilities = $filtered;
 			}

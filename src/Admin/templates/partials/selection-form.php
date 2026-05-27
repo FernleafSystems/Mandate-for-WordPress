@@ -16,11 +16,11 @@ if ( !defined( 'ABSPATH' ) ) {
 				?>
 			</div>
 			<?php
-			$mandateRoleSummaryHtml = $this->render( 'partials/role-summary.php', [
+			$mandate_app_security_role_summary_html = $this->render( 'partials/role-summary.php', [
 				'roleSummary' => $selectionForm[ 'role_summary' ],
 				'strings'     => $strings,
 			] );
-			echo wp_kses( $mandateRoleSummaryHtml, $this->allowedAdminHtml() );
+			echo wp_kses( $mandate_app_security_role_summary_html, $this->allowedAdminHtml() );
 			?>
 		</div>
 
@@ -32,9 +32,9 @@ if ( !defined( 'ABSPATH' ) ) {
 					?>
 					<select id="mandate-password" name="app_password_uuid">
 						<?php
-						foreach ( $selectionForm[ 'password_options' ] as $mandateOption ) {
+						foreach ( $selectionForm[ 'password_options' ] as $mandate_app_security_option ) {
 							?>
-							<option value="<?php echo esc_attr( $mandateOption[ 'uuid' ] ); ?>"<?php if ( $mandateOption[ 'selected' ] ) { ?> selected="selected"<?php } ?>><?php echo esc_html( $mandateOption[ 'name' ] ); ?></option>
+							<option value="<?php echo esc_attr( $mandate_app_security_option[ 'uuid' ] ); ?>"<?php if ( $mandate_app_security_option[ 'selected' ] ) { ?> selected="selected"<?php } ?>><?php echo esc_html( $mandate_app_security_option[ 'name' ] ); ?></option>
 							<?php
 						}
 						?>
@@ -49,15 +49,15 @@ if ( !defined( 'ABSPATH' ) ) {
 				?>
 			</div>
 			<?php
-			$mandatePasswordInfoHtml = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'password_info' ] ] );
-			echo wp_kses( $mandatePasswordInfoHtml, $this->allowedAdminHtml() );
+			$mandate_app_security_password_info_html = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'password_info' ] ] );
+			echo wp_kses( $mandate_app_security_password_info_html, $this->allowedAdminHtml() );
 			?>
 		</div>
 
 		<div class="mandate-selection-column">
 			<?php
-			$mandateRulesHtml = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'mandate_rules' ] ] );
-			echo wp_kses( $mandateRulesHtml, $this->allowedAdminHtml() );
+			$mandate_app_security_rules_html = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'mandate_rules' ] ] );
+			echo wp_kses( $mandate_app_security_rules_html, $this->allowedAdminHtml() );
 			?>
 		</div>
 	</div>

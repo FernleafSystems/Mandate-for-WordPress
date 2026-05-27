@@ -597,7 +597,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 	) :void {
 		$_SERVER[ 'REQUEST_METHOD' ] = 'POST';
 		$_POST = [
-			'mandate_action'    => $action,
+			AdminScopeFormSecurity::ACTION_FIELD => $action,
 			'user_id'           => (string)$userId,
 			'app_password_uuid' => $uuid,
 			'allowed_caps'      => $allowedCaps,
@@ -632,7 +632,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 		}
 
 		parse_str( $query, $params );
-		$message = $params[ 'mandate_message' ] ?? '';
+		$message = $params[ AdminPage::MESSAGE_QUERY_KEY ] ?? '';
 		return is_scalar( $message ) ? (string)$message : '';
 	}
 

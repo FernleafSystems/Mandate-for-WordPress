@@ -180,7 +180,7 @@ class AdminPageViewDataBuilder {
 	 * @return AdminNoticeContract
 	 */
 	private function buildRequestMessage() :array {
-		$message = sanitize_key( $this->getScalar( 'mandate_message' ) );
+		$message = sanitize_key( $this->getScalar( AdminPage::MESSAGE_QUERY_KEY ) );
 		$messages = [
 			'saved'                   => [ 'success', __( 'Scope saved.', 'mandate-app-security' ) ],
 			'reset'                   => [ 'success', __( 'Scope reset to defaults.', 'mandate-app-security' ) ],
@@ -879,7 +879,7 @@ class AdminPageViewDataBuilder {
 	 */
 	private function scopeAction( string $value, string $label, string $classes, bool $disabled ) :array {
 		return [
-			'name'     => 'mandate_action',
+			'name'     => AdminScopeFormSecurity::ACTION_FIELD,
 			'value'    => $value,
 			'label'    => $label,
 			'classes'  => $classes,

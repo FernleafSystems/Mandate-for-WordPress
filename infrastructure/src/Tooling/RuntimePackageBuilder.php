@@ -233,7 +233,7 @@ class RuntimePackageBuilder {
 	private function addGithubUpdaterBootstrap( string $targetDir ) :void {
 		$initPath = Path::join( $targetDir, 'init.php' );
 		$content = $this->readPackageFile( $initPath );
-		$needle = "\t\trequire_once \$mandate_autoload;\n";
+		$needle = "\t\trequire_once \$mandate_app_security_autoload;\n";
 		$replacement = $needle."\t\trequire_once __DIR__.'/github-updater.php';\n";
 
 		if ( \str_contains( $content, "github-updater.php" ) ) {

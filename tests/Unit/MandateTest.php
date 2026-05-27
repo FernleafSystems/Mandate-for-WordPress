@@ -700,7 +700,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 	public function testMetaCapabilityRegistryUsesMandateFilter() :void {
 		add_filter(
-			'mandate_meta_capabilities',
+			'mandate_app_security_meta_capabilities',
 			static function ( array $capabilities ) :array {
 				$capabilities[] = 'wpm_manage_widget';
 				return $capabilities;
@@ -713,7 +713,7 @@ final class MandateTest extends Wpm_Test_Case {
 	public function testAdminPostIgnoresNonPostRequests() :void {
 		$this->seedAdminFixture();
 		$_SERVER[ 'REQUEST_METHOD' ] = 'GET';
-		$_POST[ 'mandate_action' ] = 'save_scope';
+		$_POST[ AdminScopeFormSecurity::ACTION_FIELD ] = 'save_scope';
 
 		$this->adminPage()->handlePost();
 
@@ -740,6 +740,21 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertHookNotRegistered( 'manage_application-passwords-user_custom_column_js_template', 'action' );
 		$this->assertHookNotRegistered( 'manage_application-passwords-user_columns', 'filter' );
 		$this->assertHookNotRegistered( 'plugin_action_links_'.PluginIdentity::MAIN_FILE, 'filter' );
+	}
+
+	public function testUnsupportedNoticeRegistersFullPrefixedCallback() :void {
+		require dirname( __DIR__, 2 ).'/unsupported.php';
+
+		$this->assertHookRegistered( 'admin_notices', 'action', 10, 1 );
+		$this->assertHookRegistered( 'network_admin_notices', 'action', 10, 1 );
+		$this->assertSame(
+			'mandate_app_security_unsupported_notice',
+			$GLOBALS[ 'wpm_test_actions' ][ 'admin_notices' ][ 10 ][ 0 ][ 'callback' ]
+		);
+		$this->assertSame(
+			'mandate_app_security_unsupported_notice',
+			$GLOBALS[ 'wpm_test_actions' ][ 'network_admin_notices' ][ 10 ][ 0 ][ 'callback' ]
+		);
 	}
 
 	public function testPluginBootRegistersAdminHooksOnlyInsideAdmin() :void {
@@ -812,6 +827,8 @@ final class MandateTest extends Wpm_Test_Case {
 
 	public function testApplicationPasswordScopeColumnOrdersScopeBeforeRevoke() :void {
 		$scopeColumn = new ApplicationPasswordScopeColumn();
+
+		$this->assertSame( 'mandate_app_security_scope', ApplicationPasswordScopeColumn::COLUMN_KEY );
 
 		$columns = $scopeColumn->addColumn(
 			[
@@ -1512,8 +1529,8 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 4, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @disabled="disabled"]' ) );
 		$this->assertSame( 12, $this->nodeCount( $xpath, '//*[@data-wpm-select-section and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-input and @disabled="disabled"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="save_scope" and @disabled="disabled"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="mandate_action" and @value="clear_scope" and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="'.AdminScopeFormSecurity::ACTION_FIELD.'" and @value="save_scope" and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="'.AdminScopeFormSecurity::ACTION_FIELD.'" and @value="clear_scope" and @disabled="disabled"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//input[@name="admin_locked"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-rules-summary"]//dt[normalize-space(.) = "Lock This Scope"]/following-sibling::dd[1][not(.//input)]' ) );
 	}
@@ -1686,7 +1703,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 	public function testAdminTrustedHtmlSanitizerKeepsOnlyHiddenNonceInputs() :void {
 		$html = ( new AdminTrustedHtmlSanitizer() )->nonceFields(
-			'<input type="hidden" id="mandate-save-nonce" name="mandate_save_nonce" value="abc" onclick="evil()" />'
+			'<input type="hidden" id="custom-save-nonce" name="custom_save_nonce" value="abc" onclick="evil()" />'
 			.'<input type="text" name="bad" value="bad" />'
 			.'<select name="bad"><option value="bad">Bad</option></select>'
 		);
@@ -1695,8 +1712,8 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//input' ) );
 		$input = $this->firstElement( $xpath, '//input' );
 		$this->assertSame( 'hidden', $input->getAttribute( 'type' ) );
-		$this->assertSame( 'mandate-save-nonce', $input->getAttribute( 'id' ) );
-		$this->assertSame( 'mandate_save_nonce', $input->getAttribute( 'name' ) );
+		$this->assertSame( 'custom-save-nonce', $input->getAttribute( 'id' ) );
+		$this->assertSame( 'custom_save_nonce', $input->getAttribute( 'name' ) );
 		$this->assertSame( 'abc', $input->getAttribute( 'value' ) );
 		$this->assertSame( '', $input->getAttribute( 'onclick' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//select|//option' ) );
@@ -1704,12 +1721,22 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testAdminScopeFormSecurityEmitsOnlyActionNonceFields() :void {
-		$html = ( new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() ) )->nonceFields( 5, self::UUID );
+		$formSecurity = new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() );
+		$html = $formSecurity->nonceFields( 5, self::UUID );
 		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
 
+		$this->assertSame( 'mandate_app_security_action', AdminScopeFormSecurity::ACTION_FIELD );
+		$this->assertSame(
+			'mandate_app_security_scope:save_scope:5:'.self::UUID,
+			$formSecurity->nonceAction( AdminScopeFormSecurity::ACTION_SAVE, 5, self::UUID )
+		);
+		$this->assertSame(
+			'mandate_app_security_save_scope_nonce',
+			$formSecurity->nonceName( AdminScopeFormSecurity::ACTION_SAVE )
+		);
 		$this->assertSame( 2, $this->nodeCount( $xpath, '//input' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @id="mandate_save_scope_nonce" and @name="mandate_save_scope_nonce"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @id="mandate_clear_scope_nonce" and @name="mandate_clear_scope_nonce"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @id="mandate_app_security_save_scope_nonce" and @name="mandate_app_security_save_scope_nonce"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @id="mandate_app_security_clear_scope_nonce" and @name="mandate_app_security_clear_scope_nonce"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//input[@name="_wp_http_referer"]' ) );
 	}
 
@@ -1761,7 +1788,7 @@ final class MandateTest extends Wpm_Test_Case {
 	public function testAdminTemplateAllowedHtmlStripsDisallowedMarkupAndPreservesAllowedControls() :void {
 		$html = wp_kses(
 			'<form method="post" action="https://example.test" data-wpm-selection-form onclick="evil()">'
-			.'<input type="hidden" name="mandate_action" value="save_scope" data-wpm-admin-lock-input />'
+			.'<input type="hidden" name="'.AdminScopeFormSecurity::ACTION_FIELD.'" value="save_scope" data-wpm-admin-lock-input />'
 			.'<script>alert(1)</script><span data-wpm-select-panel data-wpm-select-state="checked">ok</span>'
 			.'</form>',
 			( new AdminTemplateRenderer() )->allowedAdminHtml()
@@ -1769,7 +1796,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
 
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//form[@method="post" and @data-wpm-selection-form]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @name="mandate_action" and @data-wpm-admin-lock-input]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @name="'.AdminScopeFormSecurity::ACTION_FIELD.'" and @data-wpm-admin-lock-input]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//span[@data-wpm-select-panel and @data-wpm-select-state="checked"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//script|//@onclick' ) );
 	}
@@ -2019,7 +2046,7 @@ final class MandateTest extends Wpm_Test_Case {
 	) :void {
 		$_SERVER[ 'REQUEST_METHOD' ] = 'POST';
 		$_POST = [
-			'mandate_action'    => $action,
+			AdminScopeFormSecurity::ACTION_FIELD => $action,
 			'user_id'           => (string)$userId,
 			'app_password_uuid' => $uuid,
 			'allowed_caps'      => $allowedCaps,
@@ -2056,7 +2083,7 @@ final class MandateTest extends Wpm_Test_Case {
 		}
 
 		parse_str( $query, $params );
-		$message = $params[ 'mandate_message' ] ?? '';
+		$message = $params[ AdminPage::MESSAGE_QUERY_KEY ] ?? '';
 		return is_scalar( $message ) ? (string)$message : '';
 	}
 

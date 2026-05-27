@@ -480,7 +480,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await page.locator( '[data-wpm-expiration-input]' ).fill( fixture.expiration_dates.future );
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
+		page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ).click(),
 	] );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( fixture.expiration_dates.future );
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
@@ -561,7 +561,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
+		page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ).click(),
 	] );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'edit_posts' ) ).toBeChecked();
@@ -579,7 +579,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_action"][value="clear_scope"]' ).click(),
+		page.locator( 'button[name="mandate_app_security_action"][value="clear_scope"]' ).click(),
 	] );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
@@ -667,7 +667,7 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await adminLockInput.check();
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_action"][value="save_scope"]' ).click(),
+		page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ).click(),
 	] );
 	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
 	await expect( adminLockInput ).toBeChecked();
@@ -688,13 +688,13 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeDisabled();
 	await expect( page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-panel][data-wpm-select-state="unchecked"]' ) ).toBeDisabled();
 	await expect( page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-section]:disabled' ) ).toHaveCount( 12 );
-	await expect( page.locator( 'button[name="mandate_action"][value="save_scope"]' ) ).toBeDisabled();
-	await expect( page.locator( 'button[name="mandate_action"][value="clear_scope"]' ) ).toBeDisabled();
+	await expect( page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ) ).toBeDisabled();
+	await expect( page.locator( 'button[name="mandate_app_security_action"][value="clear_scope"]' ) ).toBeDisabled();
 
 	const forged = await page.locator( '#mandate-scope-form' ).evaluate( async ( form ) => {
 		const params = new URLSearchParams();
 		new FormData( form ).forEach( ( value, key ) => params.append( key, value ) );
-		params.set( 'mandate_action', 'save_scope' );
+		params.set( 'mandate_app_security_action', 'save_scope' );
 		params.append( 'allowed_caps[]', 'read' );
 		params.append( 'allowed_caps[]', 'edit_posts' );
 		params.append( 'allowed_caps[]', 'upload_files' );
@@ -714,7 +714,7 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 		};
 	} );
 	expect( forged.status ).toBe( 200 );
-	expect( new URL( forged.url ).searchParams.get( 'mandate_message' ) ).toBe( 'locked' );
+	expect( new URL( forged.url ).searchParams.get( 'mandate_app_security_message' ) ).toBe( 'locked' );
 
 	await page.reload( { waitUntil: 'load' } );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();

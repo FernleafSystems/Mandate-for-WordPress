@@ -16,8 +16,9 @@ class AdminScopeFormSecurity {
 		self::ACTION_SAVE  => true,
 		self::ACTION_CLEAR => true,
 	];
+	public const ACTION_FIELD = 'mandate_app_security_action';
 
-	private const NONCE_ACTION_PREFIX = 'mandate_scope';
+	private const NONCE_ACTION_PREFIX = 'mandate_app_security_scope';
 
 	private AdminTrustedHtmlSanitizer $trustedHtmlSanitizer;
 
@@ -42,7 +43,7 @@ class AdminScopeFormSecurity {
 	}
 
 	public function nonceName( string $action ) :string {
-		return 'mandate_'.$action.'_nonce';
+		return 'mandate_app_security_'.$action.'_nonce';
 	}
 
 	public function nonceFields( int $userId, string $uuid ) :string {

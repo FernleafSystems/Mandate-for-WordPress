@@ -4,17 +4,17 @@ if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'admin_notices', 'mandate_unsupported_notice' );
-add_action( 'network_admin_notices', 'mandate_unsupported_notice' );
+add_action( 'admin_notices', 'mandate_app_security_unsupported_notice' );
+add_action( 'network_admin_notices', 'mandate_app_security_unsupported_notice' );
 
-function mandate_unsupported_notice() {
-	global $mandate_plugin_file, $mandate_unsupported_reason;
+function mandate_app_security_unsupported_notice() {
+	global $mandate_app_security_plugin_file, $mandate_app_security_unsupported_reason;
 
 	$title = 'Mandate App Security cannot run';
-	if ( 'wordpress' === $mandate_unsupported_reason ) {
+	if ( 'wordpress' === $mandate_app_security_unsupported_reason ) {
 		$message = 'Mandate App Security requires WordPress 7.0 or newer.';
 	}
-	elseif ( 'autoload' === $mandate_unsupported_reason ) {
+	elseif ( 'autoload' === $mandate_app_security_unsupported_reason ) {
 		$message = 'Mandate App Security is missing Composer autoload files. Run composer dump-autoload before activating or testing the plugin.';
 	}
 	else {
@@ -24,8 +24,8 @@ function mandate_unsupported_notice() {
 	$deactivate_url = add_query_arg(
 		array(
 			'action'   => 'deactivate',
-			'plugin'   => urlencode( $mandate_plugin_file ),
-			'_wpnonce' => wp_create_nonce( 'deactivate-plugin_'.$mandate_plugin_file )
+			'plugin'   => urlencode( $mandate_app_security_plugin_file ),
+			'_wpnonce' => wp_create_nonce( 'deactivate-plugin_'.$mandate_app_security_plugin_file )
 		),
 		self_admin_url( 'plugins.php' )
 	);

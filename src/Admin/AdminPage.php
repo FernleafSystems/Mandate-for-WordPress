@@ -17,6 +17,7 @@ if ( !defined( 'ABSPATH' ) ) {
 class AdminPage {
 
 	private const ASSET_HANDLE = 'mandate-admin-page';
+	public const MESSAGE_QUERY_KEY = 'mandate_app_security_message';
 
 	private ScopeRepository $scopeRepository;
 
@@ -98,7 +99,7 @@ class AdminPage {
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only detects whether this plugin form was submitted before verifying the nonce.
-		$hasFormAction = isset( $_POST[ 'mandate_action' ] );
+		$hasFormAction = isset( $_POST[ AdminScopeFormSecurity::ACTION_FIELD ] );
 		if ( !$hasFormAction ) {
 			return;
 		}
@@ -107,7 +108,7 @@ class AdminPage {
 
 		$userId = absint( $this->postScalar( 'user_id' ) );
 		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->postScalar( 'app_password_uuid' ) );
-		$action = sanitize_key( $this->postScalar( 'mandate_action' ) );
+		$action = sanitize_key( $this->postScalar( AdminScopeFormSecurity::ACTION_FIELD ) );
 		$message = 'invalid';
 
 		if ( !$this->formSecurity->isSupportedAction( $action ) ) {
@@ -189,7 +190,7 @@ class AdminPage {
 					'page'              => Plugin::MENU_SLUG,
 					'user_id'           => $userId,
 					'app_password_uuid' => $uuid,
-					'mandate_message'   => $message,
+					self::MESSAGE_QUERY_KEY => $message,
 				],
 				admin_url( 'tools.php' )
 			)

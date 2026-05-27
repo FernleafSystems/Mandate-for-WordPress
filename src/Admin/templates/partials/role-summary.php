@@ -17,11 +17,11 @@ if ( !defined( 'ABSPATH' ) ) {
 		?>
 		<ul>
 			<?php
-			foreach ( $roleSummary[ 'rows' ] as $mandateRole ) {
+			foreach ( $roleSummary[ 'rows' ] as $mandate_app_security_role ) {
 				?>
 				<li>
-					<?php echo esc_html( $mandateRole[ 'name' ] ); ?>
-					<span class="mandate-role-slug">(<?php echo esc_html( $strings[ 'role_slug_label' ] ); ?> <code><?php echo esc_html( $mandateRole[ 'slug' ] ); ?></code>)</span>
+					<?php echo esc_html( $mandate_app_security_role[ 'name' ] ); ?>
+					<span class="mandate-role-slug">(<?php echo esc_html( $strings[ 'role_slug_label' ] ); ?> <code><?php echo esc_html( $mandate_app_security_role[ 'slug' ] ); ?></code>)</span>
 				</li>
 				<?php
 			}

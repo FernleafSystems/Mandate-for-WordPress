@@ -54,7 +54,7 @@ final class CapabilityContractsTest extends Wpm_Test_Case {
 
 	public function testMetaCapabilityRegistryNormalizesFilteredCaps() :void {
 		add_filter(
-			'mandate_meta_capabilities',
+			'mandate_app_security_meta_capabilities',
 			static function () :array {
 				return [ 'Edit_Post', 'wpm custom meta', 'delete_post' => false ];
 			}
@@ -75,7 +75,7 @@ final class CapabilityContractsTest extends Wpm_Test_Case {
 
 	public function testMetaCapabilityRegistryIgnoresNonArrayFilterOutput() :void {
 		add_filter(
-			'mandate_meta_capabilities',
+			'mandate_app_security_meta_capabilities',
 			static fn() :string => 'not-a-list'
 		);
 

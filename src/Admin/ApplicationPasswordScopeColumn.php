@@ -11,7 +11,7 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class ApplicationPasswordScopeColumn {
 
-	public const COLUMN_KEY = 'mandate_scope';
+	public const COLUMN_KEY = 'mandate_app_security_scope';
 
 	private const JS_TEMPLATE_UUID = '{{ data.uuid }}';
 	private const JS_URL_PLACEHOLDER = 'MANDATE_APPLICATION_PASSWORD_UUID';

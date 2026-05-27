@@ -627,7 +627,7 @@ final class ToolingTest extends Wpm_Test_Case {
 		] );
 
 		$filesystem->dumpFile( Path::join( $fixtureRoot, RuntimePackageBuilder::MAIN_PLUGIN_FILE ), "<?php\n/*\n * Plugin Name: Fixture\n * Plugin URI: https://example.test\n * Version: 1.0.0\n */\n" );
-		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\\call_user_func( function () {\n\t\$mandate_autoload = __DIR__.'/vendor/autoload.php';\n\tif ( \\is_file( \$mandate_autoload ) ) {\n\t\trequire_once \$mandate_autoload;\n\t\tPlugin::boot( __DIR__.'/".RuntimePackageBuilder::MAIN_PLUGIN_FILE."' );\n\t}\n} );\n" );
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\\call_user_func( function () {\n\t\$mandate_app_security_autoload = __DIR__.'/vendor/autoload.php';\n\tif ( \\is_file( \$mandate_app_security_autoload ) ) {\n\t\trequire_once \$mandate_app_security_autoload;\n\t\tPlugin::boot( __DIR__.'/".RuntimePackageBuilder::MAIN_PLUGIN_FILE."' );\n\t}\n} );\n" );
 		$filesystem->dumpFile( Path::join( $fixtureRoot, 'infrastructure/templates/github-updater.php' ), "<?php\nuse YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory;\n" );
 
 		foreach ( [
