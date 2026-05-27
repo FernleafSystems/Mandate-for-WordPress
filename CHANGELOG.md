@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 - 2026-05-27
+
+Mandate App Security tightens release packaging metadata after the 0.4.0 release.
+
+### Changed
+
+- Release packaging now publishes only the WordPress.org ZIP and current GitHub updater ZIP.
+- GitHub release asset naming now lives in tooling-only identity code instead of runtime plugin identity.
+
+### Compatibility
+
+- Plugin header author metadata was removed for WordPress.org package compatibility.
+
 ## 0.4.0 - 2026-05-27
 
 Mandate App Security now supports owner-managed scopes, administrator locks, and a clearer capability editor.
@@ -19,7 +32,6 @@ Mandate App Security now supports owner-managed scopes, administrator locks, and
 
 - Admin output filtering and WordPress.org compatibility were tightened.
 - Existing scope records load as unlocked unless they explicitly contain an administrator lock.
-- Release packaging now publishes only the WordPress.org ZIP and current GitHub updater ZIP.
 
 ## 0.3.1 - 2026-05-26
 
