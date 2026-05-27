@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 - 2026-05-27
+
+Mandate App Security tightens release packaging metadata after the 0.4.0 release.
+
+### Changed
+
+- Release packaging now publishes only the WordPress.org ZIP and current GitHub updater ZIP.
+- GitHub release asset naming now lives in tooling-only identity code instead of runtime plugin identity.
+
+### Compatibility
+
+- Plugin header author metadata was removed for WordPress.org package compatibility.
+
 ## 0.4.0 - 2026-05-27
 
 Mandate App Security now supports owner-managed scopes, administrator locks, and a clearer capability editor.
@@ -31,7 +44,7 @@ Mandate keeps existing GitHub-updater installs on built release packages, adds a
 
 ### Compatibility
 
-- Legacy `mandate-github` release asset is published and verified alongside the renamed GitHub package so existing updater installs keep receiving built ZIPs.
+- This release temporarily published and verified a legacy GitHub updater release asset alongside the renamed GitHub package for existing updater installs.
 
 ## 0.3.0 - 2026-05-26
 

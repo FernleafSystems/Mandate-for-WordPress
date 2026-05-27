@@ -33,6 +33,7 @@ class RuntimePackageBuilder {
 	];
 
 	private const GITHUB_UPDATER_TEMPLATE = 'infrastructure/templates/github-updater.php';
+	private const GITHUB_ASSET_PREFIX_PLACEHOLDER = '{{MANDATE_GITHUB_ASSET_PREFIX}}';
 	private const GITHUB_UPDATE_URI = 'https://github.com/FernleafSystems/Mandate-for-WordPress';
 	private const GITHUB_UPDATER_DEPENDENCY = 'yahnis-elsts/plugin-update-checker';
 	private const GITHUB_UPDATER_VERSION = '^5.6';
@@ -206,7 +207,18 @@ class RuntimePackageBuilder {
 			throw new \RuntimeException( 'Missing GitHub updater template: '.self::GITHUB_UPDATER_TEMPLATE );
 		}
 
-		$this->filesystem->copy( $templatePath, Path::join( $targetDir, 'github-updater.php' ), true );
+		$template = $this->readPackageFile( $templatePath );
+		$updater = \str_replace(
+			self::GITHUB_ASSET_PREFIX_PLACEHOLDER,
+			ReleasePackageIdentity::GITHUB_ASSET_PREFIX,
+			$template,
+			$replacementCount
+		);
+		if ( $replacementCount !== 1 ) {
+			throw new \RuntimeException( 'GitHub updater template must contain exactly one asset prefix placeholder.' );
+		}
+
+		$this->filesystem->dumpFile( Path::join( $targetDir, 'github-updater.php' ), $updater );
 	}
 
 	private function addGithubUpdateUri( string $targetDir ) :void {

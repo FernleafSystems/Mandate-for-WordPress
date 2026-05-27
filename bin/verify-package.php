@@ -2,12 +2,14 @@
 <?php declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ReleasePackageIdentity;
 
 if ( !\defined( 'ABSPATH' ) ) {
 	\define( 'ABSPATH', \dirname( __DIR__ ).'/' );
 }
 
 require_once dirname( __DIR__ ).'/src/PluginIdentity.php';
+require_once dirname( __DIR__ ).'/infrastructure/src/Tooling/ReleasePackageIdentity.php';
 
 const MANDATE_PACKAGE_ROOT = PluginIdentity::PACKAGE_ROOT;
 const MANDATE_MAIN_PLUGIN_FILE = PluginIdentity::MAIN_FILE;
@@ -171,23 +173,14 @@ function mandate_verify_github_package( ZipArchive $zip, array $entries ) :void 
 		'https://github.com/FernleafSystems/Mandate-for-WordPress/',
 		'PluginIdentity::MAIN_FILE',
 		'PluginIdentity::SLUG',
-		'PluginIdentity::GITHUB_ASSET_PREFIXES',
+		'/'.ReleasePackageIdentity::GITHUB_ASSET_PREFIX.'-',
 	] as $token ) {
 		if ( !\str_contains( $updater, $token ) ) {
 			throw new \RuntimeException( 'GitHub updater bootstrap is missing expected token: '.$token );
 		}
 	}
 
-	$identity = mandate_verify_read_entry( $zip, MANDATE_PACKAGE_ROOT.'src/PluginIdentity.php' );
-	foreach ( [
-		'GITHUB_ASSET_PREFIX',
-		'LEGACY_GITHUB_ASSET_PREFIX',
-		'GITHUB_ASSET_PREFIXES',
-	] as $token ) {
-		if ( !\str_contains( $identity, $token ) ) {
-			throw new \RuntimeException( 'GitHub package identity is missing expected token: '.$token );
-		}
-	}
+	mandate_verify_plugin_identity_has_no_github_asset_tokens( $zip );
 
 	$hasVendoredUpdater = false;
 	foreach ( $entries as $entry ) {
@@ -227,24 +220,41 @@ function mandate_verify_package_require( ZipArchive $zip ) :array {
 	return $composer[ 'require' ];
 }
 
+function mandate_verify_plugin_identity_has_no_github_asset_tokens( ZipArchive $zip ) :void {
+	$identity = mandate_verify_read_entry( $zip, MANDATE_PACKAGE_ROOT.'src/PluginIdentity.php' );
+	foreach ( [
+		'GITHUB_ASSET_PREFIX',
+		ReleasePackageIdentity::GITHUB_ASSET_PREFIX,
+	] as $token ) {
+		if ( \str_contains( $identity, $token ) ) {
+			throw new \RuntimeException( 'Packaged PluginIdentity contains GitHub asset token: '.$token );
+		}
+	}
+}
+
 /**
  * @param string[] $entries
  */
 function mandate_verify_no_updater_tokens( ZipArchive $zip, array $entries ) :void {
 	$tokens = [
+		'github-updater.php',
 		'YahnisElsts',
 		'PluginUpdateChecker',
 		'PucFactory',
 		'plugin-update-checker',
-		...array_map(
-			static fn( string $assetPrefix ) :string => $assetPrefix.'-',
-			PluginIdentity::GITHUB_ASSET_PREFIXES
-		),
+		'GITHUB_ASSET_PREFIX',
+		ReleasePackageIdentity::GITHUB_ASSET_PREFIX.'-',
 	];
 
 	foreach ( $entries as $entry ) {
 		if ( \str_ends_with( $entry, '/' ) ) {
 			continue;
+		}
+
+		foreach ( $tokens as $token ) {
+			if ( \str_contains( $entry, $token ) ) {
+				throw new \RuntimeException( 'WordPress.org package contains updater token "'.$token.'" in entry path '.$entry.'.' );
+			}
 		}
 
 		$content = mandate_verify_read_entry( $zip, $entry );

@@ -4,7 +4,7 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -91,6 +91,11 @@ Mandate App Security is available at https://wpmandate.com.
 The public development repository, release packages, and build documentation are at https://github.com/FernleafSystems/Mandate-for-WordPress.
 
 == Changelog ==
+
+= 0.4.1 =
+* Publishes only the WordPress.org ZIP and current GitHub updater ZIP for releases.
+* Keeps GitHub release asset naming in tooling code instead of runtime plugin identity.
+* Removes plugin header author metadata for WordPress.org package compatibility.
 
 = 0.4.0 =
 * Allows users to scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator locks the scope.
