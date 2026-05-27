@@ -4,8 +4,6 @@
  * Plugin URI: https://wpmandate.com
  * Description: Scoping AI access for WordPress by controlling Application Password capabilities.
  * Version: 0.4.0
- * Author: WPMandate
- * Author URI: https://wpmandate.com
  * Requires at least: 7.0
  * Requires PHP: 8.2
  * License: GPL-2.0-or-later
