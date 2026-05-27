@@ -5,20 +5,38 @@ if ( !defined( 'ABSPATH' ) ) {
 }
 
 ?>
-<section id="<?php echo esc_attr( $panel[ 'id' ] ); ?>" class="mandate-capability-panel" data-wpm-panel="<?php echo esc_attr( $panel[ 'key' ] ); ?>" aria-labelledby="<?php echo esc_attr( $panel[ 'tab_id' ] ); ?>">
-	<div class="mandate-panel-heading">
-		<p>
-			<button type="button" class="button" data-wpm-select-group="<?php echo esc_attr( $panel[ 'key' ] ); ?>" data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'select_all' ][ 'state' ] ); ?>"><?php echo esc_html( $panel[ 'bulk_actions' ][ 'select_all' ][ 'label' ] ); ?></button>
-			<button type="button" class="button" data-wpm-select-group="<?php echo esc_attr( $panel[ 'key' ] ); ?>" data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'state' ] ); ?>"><?php echo esc_html( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'label' ] ); ?></button>
-		</p>
+<section id="<?php echo esc_attr( $panel[ 'id' ] ); ?>" class="mandate-capability-panel" role="tabpanel" aria-labelledby="<?php echo esc_attr( $panel[ 'tab_id' ] ); ?>" data-wpm-capability-panel="<?php echo esc_attr( $panel[ 'key' ] ); ?>" data-wpm-capability-source-panel data-wpm-capability-source="<?php echo esc_attr( $panel[ 'key' ] ); ?>">
+	<div class="mandate-capability-toolbar">
+		<nav class="mandate-capability-section-index" aria-label="<?php echo esc_attr__( 'Capability groups', 'mandate-app-security' ); ?>" data-wpm-capability-section-index>
+			<?php
+			foreach ( $panel[ 'section_index' ] as $mandate_app_security_index_item ) {
+				?>
+				<a href="#<?php echo esc_attr( $mandate_app_security_index_item[ 'target_id' ] ); ?>" data-wpm-capability-index-link data-wpm-capability-section-target="<?php echo esc_attr( $mandate_app_security_index_item[ 'target_id' ] ); ?>">
+					<span><?php echo esc_html( $mandate_app_security_index_item[ 'label' ] ); ?></span>
+					<span class="mandate-capability-section-count"><?php echo esc_html( (string)$mandate_app_security_index_item[ 'count' ] ); ?></span>
+				</a>
+				<?php
+			}
+			?>
+		</nav>
 	</div>
 	<div class="mandate-capability-scroll">
 		<?php
-		foreach ( $panel[ 'sections' ] as $mandateSection ) {
-			$mandateSectionHtml = $this->render( 'partials/capability-section.php', [ 'section' => $mandateSection ] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandateSectionHtml;
+		if ( $panel[ 'is_empty' ] ) {
+			?>
+			<p class="description"><?php echo esc_html( $panel[ 'empty_text' ] ); ?></p>
+			<?php
+		}
+		else {
+			foreach ( $panel[ 'sections' ] as $mandate_app_security_section ) {
+				$mandate_app_security_section_html = $this->render( 'partials/capability-section.php', [ 'section' => $mandate_app_security_section ] );
+				echo wp_kses( $mandate_app_security_section_html, $this->allowedAdminHtml() );
+			}
 		}
 		?>
 	</div>
+	<p class="mandate-panel-actions">
+		<button type="button" class="button" data-wpm-select-panel data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'select_all' ][ 'state' ] ); ?>"<?php if ( $panel[ 'bulk_actions' ][ 'select_all' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?>><?php echo esc_html( $panel[ 'bulk_actions' ][ 'select_all' ][ 'label' ] ); ?></button>
+		<button type="button" class="button" data-wpm-select-panel data-wpm-select-state="<?php echo esc_attr( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'state' ] ); ?>"<?php if ( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'disabled' ] ) { ?> disabled="disabled"<?php } ?>><?php echo esc_html( $panel[ 'bulk_actions' ][ 'deselect_all' ][ 'label' ] ); ?></button>
+	</p>
 </section>

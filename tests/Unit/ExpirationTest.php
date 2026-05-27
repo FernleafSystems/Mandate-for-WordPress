@@ -391,7 +391,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 		$document = $this->renderAdminDocument( $repository );
 		$xpath = new DOMXPath( $document );
 		$inputs = $xpath->query( '//*[@data-wpm-expiration-input]' );
-		$summaryInputs = $xpath->query( '//*[@id="mandate-password-summary"]//*[@data-wpm-expiration-input]' );
+		$summaryInputs = $xpath->query( '//*[@id="mandate-rules-summary"]//*[@data-wpm-expiration-input]' );
 		$scopeFormInputs = $xpath->query( '//*[@id="mandate-scope-form"]//*[@data-wpm-expiration-input]' );
 		$summaries = $xpath->query( '//*[@data-wpm-expiration-summary]' );
 		$roleCaps = $xpath->query( '//input[@name="allowed_caps[]" and @value="upload_files"]' );
@@ -597,7 +597,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 	) :void {
 		$_SERVER[ 'REQUEST_METHOD' ] = 'POST';
 		$_POST = [
-			'mandate_action'    => $action,
+			AdminScopeFormSecurity::ACTION_FIELD => $action,
 			'user_id'           => (string)$userId,
 			'app_password_uuid' => $uuid,
 			'allowed_caps'      => $allowedCaps,
@@ -632,7 +632,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 		}
 
 		parse_str( $query, $params );
-		$message = $params[ 'mandate_message' ] ?? '';
+		$message = $params[ AdminPage::MESSAGE_QUERY_KEY ] ?? '';
 		return is_scalar( $message ) ? (string)$message : '';
 	}
 
@@ -669,7 +669,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 	private function summaryDetailValue( DOMXPath $xpath, string $label ) :string {
 		$value = $this->summaryDetailValueOrNull( $xpath, $label );
 		if ( $value === null ) {
-			throw new RuntimeException( 'Expected selected password summary detail for '.$label.'.' );
+			throw new RuntimeException( 'Expected Mandate rules summary detail for '.$label.'.' );
 		}
 
 		return $value;
@@ -677,7 +677,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 
 	private function summaryDetailValueOrNull( DOMXPath $xpath, string $label ) :?string {
 		$labelLiteral = json_encode( $label, JSON_THROW_ON_ERROR );
-		$nodes = $xpath->query( '//*[@id="mandate-password-summary"]//dt[normalize-space(.) = '.$labelLiteral.']/following-sibling::dd[1]' );
+		$nodes = $xpath->query( '//*[@id="mandate-rules-summary"]//dt[normalize-space(.) = '.$labelLiteral.']/following-sibling::dd[1]' );
 		if ( !$nodes instanceof DOMNodeList || $nodes->length < 1 ) {
 			return null;
 		}

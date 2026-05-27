@@ -10,7 +10,7 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class ApplicationPasswordExpirationReaper {
 
-	public const HOOK = 'mandate_revoke_expired_application_passwords';
+	public const HOOK = 'mandate_app_security_revoke_expired_application_passwords';
 
 	private ScopeRepository $scopeRepository;
 
@@ -30,6 +30,10 @@ class ApplicationPasswordExpirationReaper {
 	}
 
 	public function ensureScheduled() :void {
+		self::ensureScheduledHook();
+	}
+
+	public static function ensureScheduledHook() :void {
 		if ( !function_exists( 'wp_next_scheduled' ) || !function_exists( 'wp_schedule_event' ) ) {
 			return;
 		}

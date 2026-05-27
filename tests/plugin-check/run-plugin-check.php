@@ -11,6 +11,10 @@ use Symfony\Component\Filesystem\Path;
 const WPM_PLUGIN_CHECK_DEFAULT_VERSION = '1.9.0';
 
 $rootDir = dirname( __DIR__, 2 );
+if ( !defined( 'ABSPATH' ) ) {
+	define( 'ABSPATH', $rootDir.'/' );
+}
+
 $autoload = $rootDir.'/vendor/autoload.php';
 if ( !is_file( $autoload ) ) {
 	fwrite( STDERR, "Missing vendor/autoload.php. Run composer install before Plugin Check.\n" );

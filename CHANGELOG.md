@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0 - 2026-05-27
+
+Mandate App Security now supports owner-managed scopes, administrator locks, and a clearer capability editor.
+
+### Added
+
+- Password owners can scope their own Application Passwords when WordPress allows it.
+- Administrators can lock a saved scope so the password owner can view it but not edit it.
+- Application Password profile tables now include a direct Restrict Scope shortcut.
+- The capability editor now groups capabilities by source, area, and action, with section-level select/deselect controls.
+
+### Changed
+
+- The selected password summary now separates password details from Mandate rules.
+
+### Security and Maintenance
+
+- Admin output filtering and WordPress.org compatibility were tightened.
+- Existing scope records load as unlocked unless they explicitly contain an administrator lock.
+
 ## 0.3.1 - 2026-05-26
 
 Mandate keeps existing GitHub-updater installs on built release packages, adds a direct Settings link from the WordPress Plugins page, and improves static site metadata.

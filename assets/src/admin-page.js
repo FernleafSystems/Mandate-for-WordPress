@@ -53,51 +53,285 @@ function enhanceSelectionForm( root ) {
 	}
 }
 
-function enhanceTabs( root ) {
-	const tabs = Array.from( root.querySelectorAll( '[data-wpm-tab]' ) );
-	const panels = Array.from( root.querySelectorAll( '[data-wpm-panel]' ) );
-	if ( !tabs.length || !panels.length ) {
-		return;
-	}
-
-	function activate( group ) {
-		tabs.forEach( ( tab ) => {
-			const active = tab.dataset.wpmTab === group;
-			tab.classList.toggle( 'nav-tab-active', active );
-			tab.setAttribute( 'aria-selected', active ? 'true' : 'false' );
-			tab.tabIndex = active ? 0 : -1;
-		} );
-
-		panels.forEach( ( panel ) => {
-			panel.hidden = panel.dataset.wpmPanel !== group;
-		} );
-	}
-
-	tabs.forEach( ( tab ) => {
-		tab.addEventListener( 'click', () => activate( tab.dataset.wpmTab ) );
-	} );
-
-	activate( tabs[ 0 ].dataset.wpmTab );
-}
-
 function enhanceBulkControls( root ) {
 	root.addEventListener( 'click', ( event ) => {
-		const button = event.target.closest( '[data-wpm-select-group]' );
-		if ( !button ) {
+		if ( !( event.target instanceof Element ) ) {
 			return;
 		}
 
-		const group = button.dataset.wpmSelectGroup;
-		const panel = root.querySelector( `[data-wpm-panel="${group}"]` );
+		const sectionButton = event.target.closest( '[data-wpm-select-section]' );
+		if ( sectionButton ) {
+			if ( sectionButton.disabled ) {
+				return;
+			}
+
+			const section = sectionButton.closest( '[data-wpm-capability-section]' );
+			if ( !section ) {
+				return;
+			}
+
+			setCheckedState( section, sectionButton.dataset.wpmSelectState === 'checked' );
+			return;
+		}
+
+		const panelButton = event.target.closest( '[data-wpm-select-panel]' );
+		if ( !panelButton || panelButton.disabled ) {
+			return;
+		}
+
+		const panel = panelButton.closest( '[data-wpm-capability-panel]' );
 		if ( !panel ) {
 			return;
 		}
 
-		const checked = button.dataset.wpmSelectState === 'checked';
-		panel.querySelectorAll( 'input[type="checkbox"][name="allowed_caps[]"], input[type="checkbox"][name="allowed_meta_caps[]"]' )
-			.forEach( ( input ) => {
-				input.checked = checked;
-			} );
+		setCheckedState( panel, panelButton.dataset.wpmSelectState === 'checked' );
+	} );
+}
+
+function setCheckedState( container, checked ) {
+	container.querySelectorAll( 'input[type="checkbox"][name="allowed_caps[]"], input[type="checkbox"][name="allowed_meta_caps[]"]' )
+		.forEach( ( input ) => {
+			input.checked = checked;
+		} );
+}
+
+function parseGroupingConfig( container ) {
+	const configValue = container.dataset.wpmCapabilityGroupingConfig;
+	if ( !configValue ) {
+		return null;
+	}
+
+	try {
+		return JSON.parse( configValue );
+	} catch ( error ) {
+		return null;
+	}
+}
+
+function createCapabilitySection( sectionConfig, items ) {
+	const section = document.createElement( 'fieldset' );
+	section.id = sectionConfig.id;
+	section.className = 'mandate-capability-section';
+	section.dataset.wpmCapabilitySection = '';
+
+	const legend = document.createElement( 'legend' );
+	const title = document.createElement( 'span' );
+	title.className = 'mandate-capability-section-title';
+
+	const label = document.createElement( 'span' );
+	label.textContent = sectionConfig.label;
+	title.appendChild( label );
+
+	const count = document.createElement( 'span' );
+	count.className = 'mandate-capability-section-count';
+	count.textContent = sectionConfig.count;
+	title.appendChild( count );
+	legend.appendChild( title );
+
+	const actions = document.createElement( 'span' );
+	actions.className = 'mandate-capability-section-actions';
+	actions.appendChild( createSectionBulkButton( sectionConfig.bulk_actions.select_all ) );
+	actions.appendChild( createSectionActionSeparator() );
+	actions.appendChild( createSectionBulkButton( sectionConfig.bulk_actions.deselect_all ) );
+	legend.appendChild( actions );
+	section.appendChild( legend );
+
+	const list = document.createElement( 'div' );
+	list.className = 'mandate-capability-list';
+	items.forEach( ( item ) => list.appendChild( item ) );
+	section.appendChild( list );
+
+	return section;
+}
+
+function createSectionActionSeparator() {
+	const separator = document.createElement( 'span' );
+	separator.className = 'mandate-capability-section-action-separator';
+	separator.setAttribute( 'aria-hidden', 'true' );
+	separator.textContent = '/';
+	return separator;
+}
+
+function createSectionBulkButton( actionConfig ) {
+	const button = document.createElement( 'button' );
+	button.type = 'button';
+	button.className = 'mandate-link-button';
+	button.dataset.wpmSelectState = actionConfig.state;
+	button.dataset.wpmSelectSection = '';
+	button.disabled = actionConfig.disabled;
+	button.textContent = actionConfig.label;
+	return button;
+}
+
+function createCapabilityIndexLink( sectionConfig ) {
+	const link = document.createElement( 'a' );
+	link.href = `#${ sectionConfig.id }`;
+	link.dataset.wpmCapabilityIndexLink = '';
+	link.dataset.wpmCapabilitySectionTarget = sectionConfig.id;
+
+	const label = document.createElement( 'span' );
+	label.textContent = sectionConfig.label;
+	link.appendChild( label );
+
+	const count = document.createElement( 'span' );
+	count.className = 'mandate-capability-section-count';
+	count.textContent = sectionConfig.count;
+	link.appendChild( count );
+
+	return link;
+}
+
+function createEmptyMessage( text ) {
+	const message = document.createElement( 'p' );
+	message.className = 'description';
+	message.textContent = text;
+	return message;
+}
+
+function sourcePanelFor( container, source ) {
+	return container.querySelector( `[data-wpm-capability-source-panel][data-wpm-capability-source="${ source.key }"]` );
+}
+
+function capabilityItemMap( container ) {
+	const items = new Map();
+	container.querySelectorAll( '[data-wpm-capability-item]' ).forEach( ( item ) => {
+		items.set( item.dataset.wpmCapabilityKey, item );
+	} );
+	return items;
+}
+
+function sectionItems( sectionConfig, items ) {
+	return sectionConfig.itemKeys.map( ( itemKey ) => items.get( itemKey ) );
+}
+
+function scrollCapabilitySectionIntoView( target ) {
+	const scroll = target.closest( '.mandate-capability-scroll' );
+	if ( !scroll ) {
+		return;
+	}
+
+	const scrollRect = scroll.getBoundingClientRect();
+	const targetRect = target.getBoundingClientRect();
+	const prefersReducedMotion = window.matchMedia
+		&& window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+	scroll.scrollTo( {
+		top: scroll.scrollTop + targetRect.top - scrollRect.top,
+		behavior: prefersReducedMotion ? 'auto' : 'smooth',
+	} );
+}
+
+function renderCapabilityIndex( panel, modeConfig ) {
+	const index = panel.querySelector( '[data-wpm-capability-section-index]' );
+	if ( !index ) {
+		return;
+	}
+
+	const fragment = document.createDocumentFragment();
+	modeConfig.sections.forEach( ( sectionConfig ) => {
+		fragment.appendChild( createCapabilityIndexLink( sectionConfig ) );
+	} );
+	index.replaceChildren( fragment );
+}
+
+function renderCapabilitySourcePanel( panel, source, mode, items ) {
+	const scroll = panel.querySelector( '.mandate-capability-scroll' );
+	const modeConfig = source.modes[ mode ];
+	if ( !scroll || !modeConfig ) {
+		return;
+	}
+
+	renderCapabilityIndex( panel, modeConfig );
+
+	const fragment = document.createDocumentFragment();
+	modeConfig.sections.forEach( ( sectionConfig ) => {
+		fragment.appendChild( createCapabilitySection( sectionConfig, sectionItems( sectionConfig, items ) ) );
+	} );
+
+	if ( !fragment.childNodes.length ) {
+		fragment.appendChild( createEmptyMessage( source.emptyText ) );
+	}
+
+	scroll.replaceChildren( fragment );
+}
+
+function renderCapabilityGroups( container, config, mode ) {
+	if ( !config.sources || !config.sources.length ) {
+		return;
+	}
+
+	container.dataset.wpmCapabilityMode = mode;
+	const items = capabilityItemMap( container );
+	config.sources.forEach( ( source ) => {
+		const panel = sourcePanelFor( container, source );
+		if ( panel ) {
+			renderCapabilitySourcePanel( panel, source, mode, items );
+		}
+	} );
+}
+
+function setActiveCapabilitySource( form, container, sourceKey ) {
+	container.dataset.wpmCapabilitySource = sourceKey;
+
+	form.querySelectorAll( '[data-wpm-capability-source-tab]' ).forEach( ( tab ) => {
+		const active = tab.dataset.wpmCapabilitySource === sourceKey;
+		tab.classList.toggle( 'is-active', active );
+		tab.setAttribute( 'aria-selected', active ? 'true' : 'false' );
+		tab.setAttribute( 'tabindex', active ? '0' : '-1' );
+	} );
+
+	container.querySelectorAll( '[data-wpm-capability-source-panel]' ).forEach( ( panel ) => {
+		panel.hidden = panel.dataset.wpmCapabilitySource !== sourceKey;
+	} );
+}
+
+function enhanceCapabilityGrouping( root ) {
+	const form = root.querySelector( '.mandate-scope-form' );
+	if ( !form ) {
+		return;
+	}
+
+	const container = form.querySelector( '[data-wpm-capability-groups]' );
+	const config = container ? parseGroupingConfig( container ) : null;
+	const controls = Array.from( form.querySelectorAll( '[data-wpm-capability-grouping-mode]' ) );
+	const sourceTabs = Array.from( form.querySelectorAll( '[data-wpm-capability-source-tab]' ) );
+	if ( !container || !config || !controls.length || !sourceTabs.length ) {
+		return;
+	}
+
+	renderCapabilityGroups( container, config, container.dataset.wpmCapabilityMode || config.defaultMode );
+	setActiveCapabilitySource( form, container, container.dataset.wpmCapabilitySource || config.defaultSource );
+
+	controls.forEach( ( control ) => {
+		control.addEventListener( 'change', () => {
+			if ( control.checked ) {
+				hideTooltip();
+				renderCapabilityGroups( container, config, control.value );
+			}
+		} );
+	} );
+
+	sourceTabs.forEach( ( tab ) => {
+		tab.addEventListener( 'click', () => {
+			hideTooltip();
+			setActiveCapabilitySource( form, container, tab.dataset.wpmCapabilitySource );
+		} );
+	} );
+
+	container.addEventListener( 'click', ( event ) => {
+		const link = event.target instanceof Element
+			? event.target.closest( '[data-wpm-capability-index-link]' )
+			: null;
+		if ( !link || !container.contains( link ) ) {
+			return;
+		}
+
+		const targetId = link.dataset.wpmCapabilitySectionTarget;
+		const target = targetId ? document.getElementById( targetId ) : null;
+		if ( target ) {
+			event.preventDefault();
+			hideTooltip();
+			scrollCapabilitySectionIntoView( target );
+		}
 	} );
 }
 
@@ -253,7 +487,7 @@ function enhanceTooltips( root ) {
 	} );
 
 	root.addEventListener( 'click', ( event ) => {
-		if ( event.target instanceof Element && event.target.closest( '[data-wpm-tab]' ) ) {
+		if ( event.target instanceof Element && event.target.closest( '[data-wpm-capability-grouping], [data-wpm-capability-source-tab], [data-wpm-select-panel], [data-wpm-select-section]' ) ) {
 			hideTooltip();
 		}
 	} );
@@ -263,8 +497,8 @@ document.addEventListener( 'DOMContentLoaded', () => {
 	document.querySelectorAll( '.mandate' ).forEach( ( root ) => {
 		root.classList.add( 'is-wpm-enhanced' );
 		enhanceSelectionForm( root );
-		enhanceTabs( root );
 		enhanceBulkControls( root );
+		enhanceCapabilityGrouping( root );
 		enhanceExpirationSummary( root );
 		enhanceTooltips( root );
 	} );

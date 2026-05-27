@@ -2,12 +2,11 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
 use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
 use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
 use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
 use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
+use FernleafSystems\Wordpress\Plugin\Mandate\PluginServices;
 
 abstract class MandateWordPressTestCase extends WP_UnitTestCase {
 
@@ -56,11 +55,11 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 	}
 
 	public function test_plugin_boot_registers_expected_hooks() :void {
-		$this->assertHookCallback( 'application_password_did_authenticate', CurrentApplicationPasswordContext::class, 'captureAuthenticatedPassword' );
-		$this->assertHookCallback( 'user_has_cap', CapabilityScopeEnforcer::class, 'filterUserCapabilities' );
-		$this->assertHookCallback( 'map_meta_cap', CapabilityScopeEnforcer::class, 'filterMetaCaps' );
-		$this->assertHookCallback( 'wp_delete_application_password', ScopeRepository::class, 'deleteForApplicationPassword' );
-		$this->assertHookCallback( ApplicationPasswordExpirationReaper::HOOK, ApplicationPasswordExpirationReaper::class, 'revokeExpiredApplicationPasswords' );
+		$this->assertHookCallable( 'application_password_did_authenticate' );
+		$this->assertHookCallable( 'user_has_cap' );
+		$this->assertHookCallable( 'map_meta_cap' );
+		$this->assertHookCallable( 'wp_delete_application_password' );
+		$this->assertHookCallable( ApplicationPasswordExpirationReaper::HOOK );
 		$this->assertNotFalse( wp_next_scheduled( ApplicationPasswordExpirationReaper::HOOK ) );
 	}
 
@@ -229,25 +228,17 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 	}
 
 	private function resetCapturedApplicationPasswordContext() :void {
-		$context = $this->hookCallbackObject(
-			'application_password_did_authenticate',
-			CurrentApplicationPasswordContext::class,
-			'captureAuthenticatedPassword'
-		);
-		if ( $context instanceof CurrentApplicationPasswordContext ) {
-			$context->setContext( 0, '' );
+		$services = $this->hookCallbackServices( 'application_password_did_authenticate' );
+		if ( $services instanceof PluginServices ) {
+			$services->currentApplicationPasswordContext()->setContext( 0, '' );
 		}
 	}
 
-	private function assertHookCallback( string $hook, string $class, string $method ) :void {
-		$this->assertInstanceOf(
-			$class,
-			$this->hookCallbackObject( $hook, $class, $method ),
-			$hook.' should include '.$class.'::'.$method.'().'
-		);
+	private function assertHookCallable( string $hook ) :void {
+		$this->assertTrue( $this->hasHookCallable( $hook ), $hook.' should include a callable callback.' );
 	}
 
-	private function hookCallbackObject( string $hook, string $class, string $method ) :?object {
+	private function hasHookCallable( string $hook ) :bool {
 		global $wp_filter;
 
 		$wpHook = $wp_filter[ $hook ] ?? null;
@@ -255,12 +246,30 @@ final class MandateIntegrationTest extends MandateWordPressTestCase {
 		foreach ( $callbacks as $priorityCallbacks ) {
 			foreach ( $priorityCallbacks as $callback ) {
 				$function = $callback[ 'function' ] ?? null;
-				if ( is_array( $function )
-					&& isset( $function[ 0 ], $function[ 1 ] )
-					&& $function[ 0 ] instanceof $class
-					&& $function[ 1 ] === $method
-				) {
-					return $function[ 0 ];
+				if ( is_callable( $function ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	private function hookCallbackServices( string $hook ) :?PluginServices {
+		global $wp_filter;
+
+		$wpHook = $wp_filter[ $hook ] ?? null;
+		$callbacks = $wpHook instanceof WP_Hook ? $wpHook->callbacks : [];
+		foreach ( $callbacks as $priorityCallbacks ) {
+			foreach ( $priorityCallbacks as $callback ) {
+				$function = $callback[ 'function' ] ?? null;
+				if ( !$function instanceof Closure ) {
+					continue;
+				}
+
+				$services = ( new ReflectionFunction( $function ) )->getStaticVariables()[ 'services' ] ?? null;
+				if ( $services instanceof PluginServices ) {
+					return $services;
 				}
 			}
 		}

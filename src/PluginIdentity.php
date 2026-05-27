@@ -2,7 +2,7 @@
 
 namespace FernleafSystems\Wordpress\Plugin\Mandate;
 
-if ( !defined( 'ABSPATH' ) && PHP_SAPI !== 'cli' ) {
+if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 

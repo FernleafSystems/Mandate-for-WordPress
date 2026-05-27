@@ -4,11 +4,11 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.3.1
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-WordPress Application Passwords carry the full access of the user behind them. Mandate App Security adds per-credential policies that limit what each one can do.
+WordPress Application Passwords carry the full access of their user. Mandate App Security adds per-credential policies to limit what each one may do.
 
 == Description ==
 
@@ -18,7 +18,7 @@ Today, REST clients, automation platforms, AI agents, management tools, and MCP 
 
 Mandate App Security adds the missing layer: a capability policy per Application Password. You define what each credential is allowed to do. Mandate App Security enforces it on every request. Normal wp-admin sessions and user roles are unaffected.
 
-Instead of treating every Application Password as equally trusted, Mandate App Security lets an administrator save a capability allowlist per password.
+Instead of treating every Application Password as equally trusted, Mandate App Security lets administrators and password owners save a capability allowlist per password.
 
 An administrator can choose:
 
@@ -26,6 +26,9 @@ An administrator can choose:
 * one of that user's Application Passwords
 * the capabilities that password should be allowed to use
 * an optional expiration date for that password
+* whether the scope is locked so the password owner can view it but not edit it
+
+Users can scope their own Application Passwords when WordPress allows Application Passwords for their account. Only administrators can edit another user's scope or lock a scope against owner edits.
 
 When a request is authenticated with that Application Password, Mandate App Security checks the saved allowlist and removes capabilities that are not allowed for that password.
 
@@ -59,7 +62,11 @@ No. Scope enforcement only applies to requests authenticated by a scoped applica
 
 = What happens when no scope is saved for an application password? =
 
-The application password keeps its normal WordPress behavior until an administrator saves a scope or expiration date for it.
+The application password keeps its normal WordPress behavior until an administrator or the password owner saves a scope or expiration date for it.
+
+= Can users scope their own application passwords? =
+
+Yes. Users can scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator has locked that scope. Administrators can edit any user's scope.
 
 = How do expiration dates work? =
 
@@ -84,6 +91,14 @@ Mandate App Security is available at https://wpmandate.com.
 The public development repository, release packages, and build documentation are at https://github.com/FernleafSystems/Mandate-for-WordPress.
 
 == Changelog ==
+
+= 0.4.0 =
+* Allows users to scope their own Application Passwords when WordPress allows Application Passwords for their account, unless an administrator locks the scope.
+* Adds administrator locks that make selected scopes read-only for password owners.
+* Adds a Restrict Scope shortcut to Application Password profile tables when the current user can manage that password.
+* Adds source tabs, area/action grouping, section select/deselect controls, and read/write/delete badges to the capability editor.
+* Splits selected password details from Mandate rule status in the admin summary.
+* Improves admin page output hardening.
 
 = 0.3.1 =
 * Adds a Plugins page Settings link that opens the Mandate admin tool.

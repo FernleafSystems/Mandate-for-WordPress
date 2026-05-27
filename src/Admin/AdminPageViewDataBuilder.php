@@ -18,6 +18,10 @@ if ( !defined( 'ABSPATH' ) ) {
 /**
  * @phpstan-import-type ApplicationPasswordRecord from ApplicationPasswordRepository
  * @phpstan-import-type CapabilityScopeRecord from ScopeRepository
+ * @phpstan-import-type CapabilityGroupingResult from CapabilityGroupProvider
+ * @phpstan-import-type CapabilityGroupItem from CapabilityGroupProvider
+ * @phpstan-import-type CapabilityGroupSection from CapabilityGroupProvider
+ * @phpstan-import-type CapabilitySourceGroup from CapabilityGroupProvider
  * @phpstan-import-type AdminPageRenderData from AdminPageRenderContracts
  * @phpstan-import-type AdminNoticeContract from AdminPageRenderContracts
  * @phpstan-import-type AdminCapabilityPanelContract from AdminPageRenderContracts
@@ -25,14 +29,18 @@ if ( !defined( 'ABSPATH' ) ) {
  * @phpstan-import-type AdminPageStringsContract from AdminPageRenderContracts
  * @phpstan-import-type AdminRoleSummaryContract from AdminPageRenderContracts
  * @phpstan-import-type AdminSelectionFormContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordSummaryContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordWarningContract from AdminPageRenderContracts
- * @phpstan-import-type AdminPasswordDetailExpirationContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryWarningContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryDetailTextContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryDetailExpirationContract from AdminPageRenderContracts
+ * @phpstan-import-type AdminSummaryDetailAdminLockContract from AdminPageRenderContracts
  * @phpstan-import-type AdminScopeFormContract from AdminPageRenderContracts
  */
 class AdminPageViewDataBuilder {
 
 	private const SCOPE_FORM_ID = 'mandate-scope-form';
+	private const DEFAULT_CAPABILITY_SOURCE = CapabilityGroupProvider::SOURCE_WORDPRESS;
+	private const DEFAULT_CAPABILITY_GROUPING = CapabilityGroupProvider::MODE_AREA;
 
 	private ScopeRepository $scopeRepository;
 
@@ -54,6 +62,8 @@ class AdminPageViewDataBuilder {
 
 	private AdminTrustedHtmlSanitizer $trustedHtmlSanitizer;
 
+	private AdminScopeAccessPolicy $accessPolicy;
+
 	public function __construct(
 		ScopeRepository $scopeRepository,
 		ApplicationPasswordRepository $passwordRepository,
@@ -64,7 +74,8 @@ class AdminPageViewDataBuilder {
 		ExpirationDatePolicy $expirationDatePolicy,
 		AdminUserRoleProvider $roleProvider,
 		AdminScopeFormSecurity $formSecurity,
-		AdminTrustedHtmlSanitizer $trustedHtmlSanitizer
+		AdminTrustedHtmlSanitizer $trustedHtmlSanitizer,
+		?AdminScopeAccessPolicy $accessPolicy = null
 	) {
 		$this->scopeRepository = $scopeRepository;
 		$this->passwordRepository = $passwordRepository;
@@ -76,6 +87,7 @@ class AdminPageViewDataBuilder {
 		$this->roleProvider = $roleProvider;
 		$this->formSecurity = $formSecurity;
 		$this->trustedHtmlSanitizer = $trustedHtmlSanitizer;
+		$this->accessPolicy = $accessPolicy ?? new AdminScopeAccessPolicy();
 	}
 
 	/**
@@ -97,6 +109,10 @@ class AdminPageViewDataBuilder {
 			: array_intersect_key( $scope[ 'allowed_meta_caps' ], $metaCaps );
 		$capabilityGroups = $this->groupProvider->group( $candidateCaps, $metaCaps );
 		$isSuperAdmin = $this->isSuperAdminUser( $selectedUserId );
+		$isReadOnly = $this->accessPolicy->isReadOnlyScope( $selectedUserId, $scope );
+		$canManageAnyScope = $this->accessPolicy->canManageAnyScope();
+		$canAdminLockScope = $this->accessPolicy->canAdminLockScopeForCaps( $candidateCaps );
+		$adminLocked = $scope !== null && $scope[ 'admin_locked' ] && $canAdminLockScope;
 
 		return [
 			'hrefs'   => [
@@ -119,12 +135,18 @@ class AdminPageViewDataBuilder {
 					$passwords,
 					$selectedUuid,
 					$scope,
-					$currentRoleSlugs
+					$currentRoleSlugs,
+					$adminLocked,
+					$isReadOnly,
+					$canManageAnyScope,
+					$isSuperAdmin || !$canAdminLockScope
 				),
 				'scope_form'     => $this->buildScopeForm(
 					$selectedUserId,
 					$selectedUuid,
 					$isSuperAdmin,
+					$adminLocked,
+					$isReadOnly,
 					$capabilityGroups,
 					$selectedCaps,
 					$selectedMetaCaps
@@ -158,11 +180,12 @@ class AdminPageViewDataBuilder {
 	 * @return AdminNoticeContract
 	 */
 	private function buildRequestMessage() :array {
-		$message = sanitize_key( $this->getScalar( 'mandate_message' ) );
+		$message = sanitize_key( $this->getScalar( AdminPage::MESSAGE_QUERY_KEY ) );
 		$messages = [
 			'saved'                   => [ 'success', __( 'Scope saved.', 'mandate-app-security' ) ],
 			'reset'                   => [ 'success', __( 'Scope reset to defaults.', 'mandate-app-security' ) ],
 			'invalid'                 => [ 'error', __( 'The selected application password could not be verified for that user.', 'mandate-app-security' ) ],
+			'locked'                  => [ 'error', __( 'This application password scope is locked by an administrator and cannot be edited by its user.', 'mandate-app-security' ) ],
 			'super_admin_unsupported' => [ 'warning', __( 'Scopes for multisite super admins are not supported.', 'mandate-app-security' ) ],
 		];
 		if ( !isset( $messages[ $message ] ) ) {
@@ -210,15 +233,30 @@ class AdminPageViewDataBuilder {
 		array $passwords,
 		string $selectedUuid,
 		?array $scope,
-		array $currentRoleSlugs
+		array $currentRoleSlugs,
+		bool $adminLocked,
+		bool $isReadOnly,
+		bool $canManageAnyScope,
+		bool $adminLockDisabled
 	) :array {
+		$selectedPassword = $this->selectedPassword( $passwords, $selectedUuid );
+
 		return [
 			'selected_user_id' => $selectedUserId,
 			'selected_uuid'    => $selectedUuid,
 			'page_slug'        => Plugin::MENU_SLUG,
 			'role_summary'     => $this->buildRoleSummary( $currentRoleSlugs ),
 			'password_options' => $this->buildPasswordOptions( $passwords, $selectedUuid ),
-			'password_summary' => $this->buildPasswordSummary( $passwords, $selectedUuid, $scope, $currentRoleSlugs ),
+			'password_info'    => $this->buildPasswordInfoSummary( $selectedPassword ),
+			'mandate_rules'    => $this->buildMandateRulesSummary(
+				$selectedPassword,
+				$scope,
+				$currentRoleSlugs,
+				$adminLocked,
+				$isReadOnly,
+				$canManageAnyScope,
+				$adminLockDisabled
+			),
 		];
 	}
 
@@ -255,54 +293,83 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @param list<ApplicationPasswordRecord> $passwords
-	 * @param CapabilityScopeRecord|null $scope
-	 * @param list<string> $currentRoleSlugs
-	 * @return AdminPasswordSummaryContract
+	 * @param ApplicationPasswordRecord|null $password
+	 * @return AdminSummaryContract
 	 */
-	private function buildPasswordSummary( array $passwords, string $selectedUuid, ?array $scope, array $currentRoleSlugs ) :array {
-		$password = $this->selectedPassword( $passwords, $selectedUuid );
+	private function buildPasswordInfoSummary( ?array $password ) :array {
 		if ( $password === null ) {
 			return [
-				'is_visible'   => false,
-				'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
-				'title_id'     => 'mandate-password-summary-title',
-				'container_id' => 'mandate-password-summary',
-				'sections'     => [],
-				'warnings'     => [],
+				'is_visible'      => false,
+				'title'           => __( 'Selected Password Info', 'mandate-app-security' ),
+				'title_id'        => 'mandate-password-info-title',
+				'title_placement' => 'inside',
+				'container_id'    => 'mandate-password-info',
+				'details'         => [],
+				'warnings'        => [],
+			];
+		}
+
+		return [
+			'is_visible'      => true,
+			'title'           => __( 'Selected Password Info', 'mandate-app-security' ),
+			'title_id'        => 'mandate-password-info-title',
+			'title_placement' => 'inside',
+			'container_id'    => 'mandate-password-info',
+			'details'         => [
+				$this->textDetail( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] ),
+				$this->textDetail( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) ),
+				$this->textDetail( __( 'Last Used', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'last_used' ] ) ),
+			],
+			'warnings'        => [],
+		];
+	}
+
+	/**
+	 * @param ApplicationPasswordRecord|null $password
+	 * @param CapabilityScopeRecord|null $scope
+	 * @param list<string> $currentRoleSlugs
+	 * @return AdminSummaryContract
+	 */
+	private function buildMandateRulesSummary(
+		?array $password,
+		?array $scope,
+		array $currentRoleSlugs,
+		bool $adminLocked,
+		bool $isReadOnly,
+		bool $canManageAnyScope,
+		bool $adminLockDisabled
+	) :array {
+		if ( $password === null ) {
+			return [
+				'is_visible'      => false,
+				'title'           => __( 'Mandate Rules', 'mandate-app-security' ),
+				'title_id'        => 'mandate-rules-summary-title',
+				'title_placement' => 'outside',
+				'container_id'    => 'mandate-rules-summary',
+				'details'         => [],
+				'warnings'        => [],
 			];
 		}
 
 		$expiresOn = $scope === null ? null : $scope[ 'expires_on' ];
-		$sections = [
-			[
-				'show_divider_before' => false,
-				'details'             => [
-					$this->textDetail( __( 'Name', 'mandate-app-security' ), $password[ 'name' ] ),
-					$this->textDetail( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] ),
-					$this->textDetail( __( 'App ID', 'mandate-app-security' ), $password[ 'app_id' ] ),
-					$this->textDetail( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) ),
-					$this->textDetail( __( 'Last Used', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'last_used' ] ) ),
-				],
-			],
-			[
-				'show_divider_before' => true,
-				'details'             => [
-					$this->textDetail(
-						__( 'Restricted Scope', 'mandate-app-security' ),
-						$this->formatRestrictedScope( $scope, $expiresOn )
-					),
-					$this->expirationDetail( $expiresOn ),
-				],
-			],
+		$details = [
+			$this->textDetail(
+				__( 'Restricted Scope', 'mandate-app-security' ),
+				$this->formatRestrictedScope( $scope, $expiresOn )
+			),
+			$this->expirationDetail( $expiresOn, $isReadOnly ),
 		];
+		$adminLockDetail = $this->adminLockDetail( $adminLocked, $canManageAnyScope, $adminLockDisabled );
+		if ( $adminLockDetail !== null ) {
+			$details[] = $adminLockDetail;
+		}
 
 		if ( $scope !== null ) {
-			$sections[ 1 ][ 'details' ][] = $this->textDetail(
+			$details[] = $this->textDetail(
 				__( 'Scope Last Saved', 'mandate-app-security' ),
 				$this->formatTimestamp( $scope[ 'updated_at' ] )
 			);
-			$sections[ 1 ][ 'details' ][] = $this->textDetail(
+			$details[] = $this->textDetail(
 				__( 'Roles When Saved', 'mandate-app-security' ),
 				$scope[ 'roles_at_update' ] === null
 					? __( 'Not recorded', 'mandate-app-security' )
@@ -316,17 +383,18 @@ class AdminPageViewDataBuilder {
 		}
 
 		return [
-			'is_visible'   => true,
-			'title'        => __( 'Selected Password Info', 'mandate-app-security' ),
-			'title_id'     => 'mandate-password-summary-title',
-			'container_id' => 'mandate-password-summary',
-			'sections'     => $sections,
-			'warnings'     => $warnings,
+			'is_visible'      => true,
+			'title'           => __( 'Mandate Rules', 'mandate-app-security' ),
+			'title_id'        => 'mandate-rules-summary-title',
+			'title_placement' => 'outside',
+			'container_id'    => 'mandate-rules-summary',
+			'details'         => $details,
+			'warnings'        => $warnings,
 		];
 	}
 
 	/**
-	 * @return AdminPasswordWarningContract
+	 * @return AdminSummaryWarningContract
 	 */
 	private function roleSnapshotWarning() :array {
 		return [
@@ -337,7 +405,32 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @return array{kind:'text',label:string,value:string}
+	 * @return AdminSummaryDetailAdminLockContract|AdminSummaryDetailTextContract|null
+	 */
+	private function adminLockDetail( bool $checked, bool $canManageAnyScope, bool $disabled ) :?array {
+		if ( !$canManageAnyScope ) {
+			return $checked
+				? $this->textDetail( __( 'Lock This Scope', 'mandate-app-security' ), __( 'Locked', 'mandate-app-security' ) )
+				: null;
+		}
+
+		return [
+			'kind'      => 'admin_lock',
+			'label'     => __( 'Lock This Scope', 'mandate-app-security' ),
+			'help_text' => __( 'Prevent the application password owner from editing or resetting this scope.', 'mandate-app-security' ),
+			'input'     => [
+				'id'       => 'mandate-admin-locked',
+				'name'     => 'admin_locked',
+				'value'    => '1',
+				'form'     => self::SCOPE_FORM_ID,
+				'checked'  => $checked,
+				'disabled' => $disabled,
+			],
+		];
+	}
+
+	/**
+	 * @return AdminSummaryDetailTextContract
 	 */
 	private function textDetail( string $label, string $value ) :array {
 		return [
@@ -348,9 +441,9 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @return AdminPasswordDetailExpirationContract
+	 * @return AdminSummaryDetailExpirationContract
 	 */
-	private function expirationDetail( ?string $expiresOn ) :array {
+	private function expirationDetail( ?string $expiresOn, bool $disabled ) :array {
 		$expired = $this->expirationDatePolicy->isExpired( $expiresOn );
 		$state = $expiresOn === null ? 'never' : ( $expired ? 'expired' : 'date' );
 		$value = $expiresOn === null
@@ -364,12 +457,14 @@ class AdminPageViewDataBuilder {
 			'value'   => $value,
 			'classes' => 'button-link mandate-expiration-summary'.( $expired ? ' is-expired' : '' ),
 			'state'   => $state,
+			'disabled' => $disabled,
 			'input'   => [
 				'id'         => 'mandate-expiration-date',
 				'name'       => 'expiration_date',
 				'value'      => $expiresOn ?? '',
 				'form'       => self::SCOPE_FORM_ID,
 				'aria_label' => __( 'Expiration Date', 'mandate-app-security' ),
+				'disabled'   => $disabled,
 			],
 		];
 	}
@@ -411,7 +506,7 @@ class AdminPageViewDataBuilder {
 	}
 
 	/**
-	 * @param array{wordpress:array{primitive:array<string,true>,meta:array<string,true>},other:array{primitive:array<string,true>,meta:array<string,true>}} $capabilityGroups
+	 * @param CapabilityGroupingResult $capabilityGroups
 	 * @param array<string,true> $selectedCaps
 	 * @param array<string,true> $selectedMetaCaps
 	 * @return AdminScopeFormContract
@@ -420,6 +515,8 @@ class AdminPageViewDataBuilder {
 		int $selectedUserId,
 		string $selectedUuid,
 		bool $isSuperAdmin,
+		bool $adminLocked,
+		bool $isReadOnly,
 		array $capabilityGroups,
 		array $selectedCaps,
 		array $selectedMetaCaps
@@ -429,124 +526,352 @@ class AdminPageViewDataBuilder {
 			'user_id'             => $selectedUserId,
 			'uuid'                => $selectedUuid,
 			'heading'             => __( 'Capability Scope', 'mandate-app-security' ),
-			'tablist_label'       => __( 'Capability groups', 'mandate-app-security' ),
+			'admin_lock_status'   => $adminLocked ? 'locked' : 'unlocked',
 			'super_admin_notice'  => $isSuperAdmin
 				? $this->notice( 'notice notice-warning', __( 'Scopes for multisite super admins are not supported.', 'mandate-app-security' ) )
 				: $this->hiddenNotice(),
-			'tabs'                => [
-				$this->tab( 'wordpress', __( 'WordPress Capabilities', 'mandate-app-security' ), true ),
-				$this->tab( 'other', __( 'Third-Party Capabilities', 'mandate-app-security' ), false ),
-			],
-			'panels'              => [
-				$this->capabilityPanel( 'wordpress', $capabilityGroups[ 'wordpress' ], $selectedCaps, $selectedMetaCaps ),
-				$this->capabilityPanel( 'other', $capabilityGroups[ 'other' ], $selectedCaps, $selectedMetaCaps ),
-			],
+			'lock_notice'         => $adminLocked
+				? $this->notice( 'notice notice-info', __( 'This application password scope is locked by an administrator.', 'mandate-app-security' ) )
+				: $this->hiddenNotice(),
+			'grouping'            => $this->capabilityGrouping( $capabilityGroups, $isReadOnly ),
+			'source_tabs'         => $this->capabilitySourceTabs( $capabilityGroups[ 'sources' ] ),
+			'source_panels'       => $this->capabilitySourcePanels(
+				$capabilityGroups[ 'sources' ],
+				$selectedCaps,
+				$selectedMetaCaps,
+				$isReadOnly,
+				self::DEFAULT_CAPABILITY_GROUPING
+			),
 			'actions'             => [
 				$this->scopeAction(
 					AdminScopeFormSecurity::ACTION_SAVE,
 					__( 'Save Scope', 'mandate-app-security' ),
 					'button button-primary',
-					$isSuperAdmin
+					$isSuperAdmin || $isReadOnly
 				),
 				$this->scopeAction(
 					AdminScopeFormSecurity::ACTION_CLEAR,
 					__( 'Reset to Defaults', 'mandate-app-security' ),
 					'button',
-					false
+					$isReadOnly
 				),
 			],
 		];
 	}
 
 	/**
-	 * @return array{key:string,id:string,panel_id:string,label:string,classes:string,aria_selected:string}
+	 * @param CapabilityGroupingResult $capabilityGroups
+	 * @return array{label:string,default_source:'wordpress',default_mode:'area',config_json:string,modes:list<array{key:'area'|'action',label:string,checked:bool}>}
 	 */
-	private function tab( string $key, string $label, bool $active ) :array {
+	private function capabilityGrouping( array $capabilityGroups, bool $isReadOnly ) :array {
 		return [
-			'key'           => $key,
-			'id'            => 'mandate-tab-'.$key,
-			'panel_id'      => 'mandate-panel-'.$key,
-			'label'         => $label,
-			'classes'       => 'nav-tab'.( $active ? ' nav-tab-active' : '' ),
-			'aria_selected' => $active ? 'true' : 'false',
+			'label'          => __( 'Group capabilities by', 'mandate-app-security' ),
+			'default_source' => self::DEFAULT_CAPABILITY_SOURCE,
+			'default_mode'   => self::DEFAULT_CAPABILITY_GROUPING,
+			'config_json'    => $this->capabilityGroupingConfigJson( $capabilityGroups, $isReadOnly ),
+			'modes'          => [
+				[
+					'key'     => CapabilityGroupProvider::MODE_AREA,
+					'label'   => __( 'Area', 'mandate-app-security' ),
+					'checked' => true,
+				],
+				[
+					'key'     => CapabilityGroupProvider::MODE_ACTION,
+					'label'   => __( 'Action', 'mandate-app-security' ),
+					'checked' => false,
+				],
+			],
 		];
 	}
 
 	/**
-	 * @param array{primitive:array<string,true>,meta:array<string,true>} $capabilities
+	 * @param CapabilityGroupingResult $capabilityGroups
+	 */
+	private function capabilityGroupingConfigJson( array $capabilityGroups, bool $isReadOnly ) :string {
+		return json_encode(
+			[
+				'defaultSource' => self::DEFAULT_CAPABILITY_SOURCE,
+				'defaultMode'   => self::DEFAULT_CAPABILITY_GROUPING,
+				'sources'       => $this->capabilitySourceConfig( $capabilityGroups[ 'sources' ], $isReadOnly ),
+			],
+			JSON_THROW_ON_ERROR
+		);
+	}
+
+	/**
+	 * @return array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}
+	 */
+	private function capabilityBulkActions( bool $isReadOnly ) :array {
+		return [
+			'select_all'   => [
+				'label'    => __( 'Select All', 'mandate-app-security' ),
+				'state'    => 'checked',
+				'disabled' => $isReadOnly,
+			],
+			'deselect_all' => [
+				'label'    => __( 'Deselect All', 'mandate-app-security' ),
+				'state'    => 'unchecked',
+				'disabled' => $isReadOnly,
+			],
+		];
+	}
+
+	/**
+	 * @param list<CapabilitySourceGroup> $sources
+	 * @return list<array{key:string,emptyText:string,modes:array{area:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>,bulk_actions:array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}}>},action:array{sections:list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>,bulk_actions:array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}>}}}>
+	 */
+	private function capabilitySourceConfig( array $sources, bool $isReadOnly ) :array {
+		$config = [];
+		foreach ( $sources as $source ) {
+			$config[] = [
+				'key'       => $source[ 'key' ],
+				'emptyText' => __( 'No capabilities are available in this source.', 'mandate-app-security' ),
+				'modes'     => [
+					CapabilityGroupProvider::MODE_AREA   => [
+						'sections' => $this->capabilitySectionConfig(
+							$source[ CapabilityGroupProvider::MODE_AREA ],
+							$source[ 'key' ],
+							CapabilityGroupProvider::MODE_AREA,
+							$isReadOnly
+						),
+					],
+					CapabilityGroupProvider::MODE_ACTION => [
+						'sections' => $this->capabilitySectionConfig(
+							$source[ CapabilityGroupProvider::MODE_ACTION ],
+							$source[ 'key' ],
+							CapabilityGroupProvider::MODE_ACTION,
+							$isReadOnly
+						),
+					],
+				],
+			];
+		}
+
+		return $config;
+	}
+
+	/**
+	 * @param list<CapabilityGroupSection> $sections
+	 * @return list<array{id:string,key:string,label:string,count:int,itemKeys:list<string>,bulk_actions:array{select_all:array{label:string,state:'checked',disabled:bool},deselect_all:array{label:string,state:'unchecked',disabled:bool}}}>
+	 */
+	private function capabilitySectionConfig( array $sections, string $sourceKey, string $mode, bool $isReadOnly ) :array {
+		$config = [];
+		foreach ( $sections as $section ) {
+			$config[] = [
+				'id'       => $this->capabilitySectionId( $sourceKey, $mode, $section[ 'key' ] ),
+				'key'      => $section[ 'key' ],
+				'label'    => $mode === CapabilityGroupProvider::MODE_AREA
+					? $this->areaLabel( $section[ 'key' ] )
+					: $this->actionLabel( $section[ 'key' ] ),
+				'count'    => count( $section[ 'items' ] ),
+				'itemKeys' => array_map(
+					fn( array $item ) :string => $this->capabilityItemKey( $item[ 'type' ], $item[ 'name' ] ),
+					$section[ 'items' ]
+				),
+				'bulk_actions' => $this->capabilityBulkActions( $isReadOnly ),
+			];
+		}
+
+		return $config;
+	}
+
+	/**
+	 * @param list<CapabilitySourceGroup> $sources
+	 * @return list<array{key:string,id:string,panel_id:string,label:string,count:int,selected:bool}>
+	 */
+	private function capabilitySourceTabs( array $sources ) :array {
+		$tabs = [];
+		foreach ( $sources as $source ) {
+			$tabs[] = [
+				'key'      => $source[ 'key' ],
+				'id'       => $this->capabilitySourceTabId( $source[ 'key' ] ),
+				'panel_id' => $this->capabilitySourcePanelId( $source[ 'key' ] ),
+				'label'    => $this->sourceLabel( $source[ 'key' ] ),
+				'count'    => count( $source[ 'items' ] ),
+				'selected' => $source[ 'key' ] === self::DEFAULT_CAPABILITY_SOURCE,
+			];
+		}
+
+		return $tabs;
+	}
+
+	/**
+	 * @param list<CapabilitySourceGroup> $sources
 	 * @param array<string,true> $selectedCaps
 	 * @param array<string,true> $selectedMetaCaps
-	 * @return AdminCapabilityPanelContract
+	 * @return list<AdminCapabilityPanelContract>
 	 */
-	private function capabilityPanel( string $groupKey, array $capabilities, array $selectedCaps, array $selectedMetaCaps ) :array {
-		return [
-			'key'          => $groupKey,
-			'id'           => 'mandate-panel-'.$groupKey,
-			'tab_id'       => 'mandate-tab-'.$groupKey,
-			'sections'     => [
-				$this->capabilitySection(
-					$groupKey,
-					'primitive',
-					__( 'Role-Derived Primitive Capabilities', 'mandate-app-security' ),
-					'allowed_caps',
-					$capabilities[ 'primitive' ],
-					$selectedCaps
-				),
-				$this->capabilitySection(
-					$groupKey,
-					'meta',
-					__( 'Registered Meta Capabilities', 'mandate-app-security' ),
-					'allowed_meta_caps',
-					$capabilities[ 'meta' ],
-					$selectedMetaCaps
-				),
-			],
-			'bulk_actions' => [
-				'select_all'   => [
-					'label' => __( 'Select All', 'mandate-app-security' ),
-					'state' => 'checked',
-				],
-				'deselect_all' => [
-					'label' => __( 'Deselect All', 'mandate-app-security' ),
-					'state' => 'unchecked',
-				],
-			],
-		];
+	private function capabilitySourcePanels(
+		array $sources,
+		array $selectedCaps,
+		array $selectedMetaCaps,
+		bool $isReadOnly,
+		string $mode
+	) :array {
+		$panels = [];
+		foreach ( $sources as $source ) {
+			$sections = [];
+			foreach ( $source[ $mode ] as $section ) {
+				$sections[] = $this->capabilitySection(
+					$source[ 'key' ],
+					$mode,
+					$section[ 'key' ],
+					$mode === CapabilityGroupProvider::MODE_AREA
+						? $this->areaLabel( $section[ 'key' ] )
+						: $this->actionLabel( $section[ 'key' ] ),
+					$section[ 'items' ],
+					$selectedCaps,
+					$selectedMetaCaps,
+					$isReadOnly
+				);
+			}
+
+			$panels[] = [
+				'key'          => $source[ 'key' ],
+				'id'           => $this->capabilitySourcePanelId( $source[ 'key' ] ),
+				'tab_id'       => $this->capabilitySourceTabId( $source[ 'key' ] ),
+				'empty_text'   => __( 'No capabilities are available in this source.', 'mandate-app-security' ),
+				'is_empty'     => $source[ 'items' ] === [],
+				'section_index' => $this->capabilitySectionIndex( $sections ),
+				'sections'     => $sections,
+				'bulk_actions' => $this->capabilityBulkActions( $isReadOnly ),
+			];
+		}
+
+		return $panels;
 	}
 
 	/**
-	 * @param array<string,true> $capabilities
-	 * @param array<string,true> $selected
+	 * @param list<CapabilityGroupItem> $capabilities
+	 * @param array<string,true> $selectedCaps
+	 * @param array<string,true> $selectedMetaCaps
 	 * @return AdminCapabilitySectionContract
 	 */
 	private function capabilitySection(
-		string $groupKey,
-		string $type,
+		string $sourceKey,
+		string $mode,
+		string $sectionKey,
 		string $label,
-		string $fieldName,
 		array $capabilities,
-		array $selected
+		array $selectedCaps,
+		array $selectedMetaCaps,
+		bool $isReadOnly
 	) :array {
 		$items = [];
-		foreach ( array_keys( $capabilities ) as $capability ) {
-			$description = $this->descriptionProvider->descriptionFor( $capability );
-			$checked = isset( $selected[ $capability ] );
+		foreach ( $capabilities as $capability ) {
+			$name = $capability[ 'name' ];
+			$itemKey = $this->capabilityItemKey( $capability[ 'type' ], $name );
+			$description = $this->descriptionProvider->descriptionFor( $name );
+			$checked = $capability[ 'type' ] === 'primitive'
+				? isset( $selectedCaps[ $name ] )
+				: isset( $selectedMetaCaps[ $name ] );
 			$items[] = [
-				'name'         => $capability,
-				'field_name'   => $fieldName,
-				'checked'      => $checked,
-				'has_tooltip'  => $description !== '',
-				'tooltip_text' => $description,
+				'item_key'            => $itemKey,
+				'input_id'            => $this->capabilityInputId( $itemKey ),
+				'name'                => $name,
+				'type'                => $capability[ 'type' ],
+				'field_name'          => $capability[ 'type' ] === 'primitive' ? 'allowed_caps' : 'allowed_meta_caps',
+				'checked'             => $checked,
+				'disabled'            => $isReadOnly,
+				'source'              => $capability[ 'source' ],
+				'area'                => $capability[ 'area' ],
+				'action'              => $capability[ 'action' ],
+				'action_label'        => $this->actionLabel( $capability[ 'action' ] ),
+				'action_abbreviation' => $this->actionAbbreviation( $capability[ 'action' ] ),
+				'has_tooltip'         => $description !== '',
+				'tooltip_text'        => $description,
+				'tooltip_aria_label'  => sprintf(
+					/* translators: %s: capability name. */
+					__( 'More information about %s', 'mandate-app-security' ),
+					$name
+				),
 			];
 		}
 
 		return [
-			'id'         => 'mandate-'.$groupKey.'-'.$type.'-capabilities',
-			'label'      => $label,
-			'empty_text' => __( 'No capabilities are available for this group.', 'mandate-app-security' ),
-			'is_empty'   => $items === [],
-			'items'      => $items,
+			'id'           => $this->capabilitySectionId( $sourceKey, $mode, $sectionKey ),
+			'label'        => $label,
+			'count'        => count( $items ),
+			'items'        => $items,
+			'bulk_actions' => $this->capabilityBulkActions( $isReadOnly ),
 		];
+	}
+
+	/**
+	 * @param list<AdminCapabilitySectionContract> $sections
+	 * @return list<array{target_id:string,label:string,count:int}>
+	 */
+	private function capabilitySectionIndex( array $sections ) :array {
+		return array_map(
+			static fn( array $section ) :array => [
+				'target_id' => $section[ 'id' ],
+				'label'     => $section[ 'label' ],
+				'count'     => $section[ 'count' ],
+			],
+			$sections
+		);
+	}
+
+	private function capabilitySectionId( string $source, string $mode, string $section ) :string {
+		return 'mandate-'.$source.'-'.$mode.'-'.$section.'-capabilities';
+	}
+
+	private function capabilityItemKey( string $type, string $name ) :string {
+		return $type.':'.$name;
+	}
+
+	private function capabilityInputId( string $itemKey ) :string {
+		return 'mandate-capability-'.str_replace( ':', '-', $itemKey );
+	}
+
+	private function capabilitySourcePanelId( string $source ) :string {
+		return 'mandate-capability-source-'.$source;
+	}
+
+	private function capabilitySourceTabId( string $source ) :string {
+		return 'mandate-capability-source-tab-'.$source;
+	}
+
+	private function sourceLabel( string $source ) :string {
+		return match ( $source ) {
+			CapabilityGroupProvider::SOURCE_WORDPRESS   => __( 'WordPress', 'mandate-app-security' ),
+			CapabilityGroupProvider::SOURCE_THIRD_PARTY => __( 'Third-party', 'mandate-app-security' ),
+		};
+	}
+
+	private function areaLabel( string $area ) :string {
+		return match ( $area ) {
+			CapabilityGroupProvider::AREA_POSTS       => __( 'Posts', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_PAGES       => __( 'Pages', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_MEDIA       => __( 'Media', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_TAXONOMY    => __( 'Taxonomy', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_COMMENTS    => __( 'Comments', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_USERS       => __( 'Users', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_PLUGINS     => __( 'Plugins', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_THEMES      => __( 'Themes', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_GENERAL     => __( 'General', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_NETWORK     => __( 'Network / Sites', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_PRIVACY     => __( 'Privacy', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_UPDATES     => __( 'Core / Updates', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_LEGACY      => __( 'Legacy', 'mandate-app-security' ),
+			CapabilityGroupProvider::AREA_THIRD_PARTY => __( 'Third-party / Other', 'mandate-app-security' ),
+		};
+	}
+
+	private function actionLabel( string $action ) :string {
+		return match ( $action ) {
+			CapabilityGroupProvider::ACTION_READ   => __( 'Read', 'mandate-app-security' ),
+			CapabilityGroupProvider::ACTION_WRITE  => __( 'Write', 'mandate-app-security' ),
+			CapabilityGroupProvider::ACTION_DELETE => __( 'Delete', 'mandate-app-security' ),
+		};
+	}
+
+	private function actionAbbreviation( string $action ) :string {
+		return match ( $action ) {
+			CapabilityGroupProvider::ACTION_READ   => 'R',
+			CapabilityGroupProvider::ACTION_WRITE  => 'W',
+			CapabilityGroupProvider::ACTION_DELETE => 'D',
+		};
 	}
 
 	/**
@@ -554,7 +879,7 @@ class AdminPageViewDataBuilder {
 	 */
 	private function scopeAction( string $value, string $label, string $classes, bool $disabled ) :array {
 		return [
-			'name'     => 'mandate_action',
+			'name'     => AdminScopeFormSecurity::ACTION_FIELD,
 			'value'    => $value,
 			'label'    => $label,
 			'classes'  => $classes,
@@ -563,12 +888,7 @@ class AdminPageViewDataBuilder {
 	}
 
 	private function selectedUserId() :int {
-		$userId = absint( $this->getScalar( 'user_id' ) );
-		if ( $userId > 0 && get_userdata( $userId ) ) {
-			return $userId;
-		}
-
-		return (int)get_current_user_id();
+		return $this->accessPolicy->selectedUserId( $this->getScalar( 'user_id' ) );
 	}
 
 	/**
@@ -590,6 +910,16 @@ class AdminPageViewDataBuilder {
 	}
 
 	private function buildUserDropdown( int $selectedUserId ) :string {
+		if ( $this->accessPolicy->shouldRestrictUserSelection() ) {
+			return $this->trustedHtmlSanitizer->dropdown(
+				sprintf(
+					'<select name="user_id" id="mandate-user" disabled="disabled"><option value="%1$s" selected="selected">%2$s</option></select>',
+					esc_attr( (string)$selectedUserId ),
+					esc_html( $this->userOptionLabel( $selectedUserId ) )
+				)
+			);
+		}
+
 		return $this->trustedHtmlSanitizer->dropdown( (string)wp_dropdown_users(
 			[
 				'name'     => 'user_id',
@@ -599,6 +929,19 @@ class AdminPageViewDataBuilder {
 				'echo'     => false,
 			]
 		) );
+	}
+
+	private function userOptionLabel( int $userId ) :string {
+		$user = $userId > 0 ? get_userdata( $userId ) : false;
+		if ( is_object( $user ) ) {
+			foreach ( [ 'display_name', 'user_login', 'user_nicename' ] as $property ) {
+				if ( isset( $user->$property ) && is_scalar( $user->$property ) && (string)$user->$property !== '' ) {
+					return (string)$user->$property;
+				}
+			}
+		}
+
+		return (string)$userId;
 	}
 
 	private function formatTimestamp( int $timestamp ) :string {

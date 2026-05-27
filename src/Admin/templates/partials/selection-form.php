@@ -12,17 +12,15 @@ if ( !defined( 'ABSPATH' ) ) {
 			<div class="mandate-field">
 				<label class="mandate-field-title" for="mandate-user"><?php echo esc_html( $strings[ 'user_label' ] ); ?></label>
 				<?php
-				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Sanitized trusted user dropdown HTML produced by the view-data builder.
-				echo $trustedHtml[ 'user_dropdown' ];
+				echo wp_kses( $trustedHtml[ 'user_dropdown' ], $this->allowedAdminHtml() );
 				?>
 			</div>
 			<?php
-			$mandateRoleSummaryHtml = $this->render( 'partials/role-summary.php', [
+			$mandate_app_security_role_summary_html = $this->render( 'partials/role-summary.php', [
 				'roleSummary' => $selectionForm[ 'role_summary' ],
 				'strings'     => $strings,
 			] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandateRoleSummaryHtml;
+			echo wp_kses( $mandate_app_security_role_summary_html, $this->allowedAdminHtml() );
 			?>
 		</div>
 
@@ -34,9 +32,9 @@ if ( !defined( 'ABSPATH' ) ) {
 					?>
 					<select id="mandate-password" name="app_password_uuid">
 						<?php
-						foreach ( $selectionForm[ 'password_options' ] as $mandateOption ) {
+						foreach ( $selectionForm[ 'password_options' ] as $mandate_app_security_option ) {
 							?>
-							<option value="<?php echo esc_attr( $mandateOption[ 'uuid' ] ); ?>"<?php if ( $mandateOption[ 'selected' ] ) { ?> selected="selected"<?php } ?>><?php echo esc_html( $mandateOption[ 'name' ] ); ?></option>
+							<option value="<?php echo esc_attr( $mandate_app_security_option[ 'uuid' ] ); ?>"<?php if ( $mandate_app_security_option[ 'selected' ] ) { ?> selected="selected"<?php } ?>><?php echo esc_html( $mandate_app_security_option[ 'name' ] ); ?></option>
 							<?php
 						}
 						?>
@@ -50,13 +48,16 @@ if ( !defined( 'ABSPATH' ) ) {
 				}
 				?>
 			</div>
+			<?php
+			$mandate_app_security_password_info_html = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'password_info' ] ] );
+			echo wp_kses( $mandate_app_security_password_info_html, $this->allowedAdminHtml() );
+			?>
 		</div>
 
 		<div class="mandate-selection-column">
 			<?php
-			$mandatePasswordSummaryHtml = $this->render( 'partials/password-summary.php', [ 'summary' => $selectionForm[ 'password_summary' ] ] );
-			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered partial templates escape their own scalar output.
-			echo $mandatePasswordSummaryHtml;
+			$mandate_app_security_rules_html = $this->render( 'partials/summary.php', [ 'summary' => $selectionForm[ 'mandate_rules' ] ] );
+			echo wp_kses( $mandate_app_security_rules_html, $this->allowedAdminHtml() );
 			?>
 		</div>
 	</div>

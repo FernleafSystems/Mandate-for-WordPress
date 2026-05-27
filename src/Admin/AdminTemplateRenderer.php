@@ -14,11 +14,11 @@ class AdminTemplateRenderer {
 		'partials/capability-panel.php' => true,
 		'partials/capability-section.php' => true,
 		'partials/notice.php' => true,
-		'partials/password-detail.php' => true,
-		'partials/password-summary.php' => true,
 		'partials/role-summary.php' => true,
 		'partials/scope-form.php' => true,
 		'partials/selection-form.php' => true,
+		'partials/summary-detail.php' => true,
+		'partials/summary.php' => true,
 	];
 
 	private const RESERVED_DATA_KEYS = [
@@ -62,6 +62,110 @@ class AdminTemplateRenderer {
 			ob_end_clean();
 			throw $throwable;
 		}
+	}
+
+	/**
+	 * @return array<string,array<string,bool>>
+	 */
+	public function allowedAdminHtml() :array {
+		$globalAttributes = [
+			'id'                             => true,
+			'class'                          => true,
+			'hidden'                         => true,
+			'tabindex'                       => true,
+			'role'                           => true,
+			'aria-label'                     => true,
+			'aria-hidden'                    => true,
+			'aria-labelledby'                => true,
+			'aria-selected'                  => true,
+			'aria-controls'                  => true,
+			'data-wpm-admin-lock-input'      => true,
+			'data-wpm-admin-lock-status'     => true,
+			'data-wpm-capability-action'     => true,
+			'data-wpm-capability-area'       => true,
+			'data-wpm-capability-groups'     => true,
+			'data-wpm-capability-grouping'   => true,
+			'data-wpm-capability-grouping-config' => true,
+			'data-wpm-capability-grouping-mode'   => true,
+			'data-wpm-capability-index-link' => true,
+			'data-wpm-capability-item'       => true,
+			'data-wpm-capability-key'        => true,
+			'data-wpm-capability-mode'       => true,
+			'data-wpm-capability-name'       => true,
+			'data-wpm-capability-panel'      => true,
+			'data-wpm-capability-section-index'  => true,
+			'data-wpm-capability-section'    => true,
+			'data-wpm-capability-section-target' => true,
+			'data-wpm-capability-source'     => true,
+			'data-wpm-capability-source-panel' => true,
+			'data-wpm-capability-source-tab' => true,
+			'data-wpm-capability-source-tabs' => true,
+			'data-wpm-capability-type'       => true,
+			'data-wpm-expiration-input'      => true,
+			'data-wpm-expiration-state'      => true,
+			'data-wpm-expiration-summary'    => true,
+			'data-wpm-role-snapshot-status'  => true,
+			'data-wpm-select-panel'          => true,
+			'data-wpm-select-section'        => true,
+			'data-wpm-select-state'          => true,
+			'data-wpm-selection-form'        => true,
+			'data-wpm-selection-status'      => true,
+			'data-wpm-tooltip'               => true,
+			'data-wpm-tooltip-text'          => true,
+		];
+
+		$tags = [
+			'a'        => [ 'href' => true ],
+			'button'   => [
+				'disabled' => true,
+				'name'     => true,
+				'type'     => true,
+				'value'    => true,
+			],
+			'code'     => [],
+			'dd'       => [],
+			'div'      => [],
+			'dl'       => [],
+			'dt'       => [],
+			'fieldset' => [],
+			'form'     => [
+				'action' => true,
+				'method' => true,
+			],
+			'h1'       => [],
+			'h2'       => [],
+			'input'    => [
+				'checked'  => true,
+				'disabled' => true,
+				'form'     => true,
+				'name'     => true,
+				'type'     => true,
+				'value'    => true,
+			],
+			'label'    => [ 'for' => true ],
+			'legend'   => [],
+			'li'       => [],
+			'nav'      => [],
+			'noscript' => [],
+			'option'   => [
+				'disabled' => true,
+				'selected' => true,
+				'value'    => true,
+			],
+			'p'        => [],
+			'section'  => [],
+			'select'   => [
+				'disabled' => true,
+				'name'     => true,
+			],
+			'span'     => [],
+			'ul'       => [],
+		];
+
+		return array_map(
+			static fn( array $attributes ) :array => $attributes + $globalAttributes,
+			$tags
+		);
 	}
 
 	private function resolveTemplatePath( string $template ) :string {
