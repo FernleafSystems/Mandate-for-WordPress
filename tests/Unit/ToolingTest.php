@@ -4,6 +4,7 @@ declare( strict_types=1 );
 
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
 use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ReleasePackageIdentity;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
 use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ZipBuilder;
@@ -238,7 +239,7 @@ final class ToolingTest extends Wpm_Test_Case {
 	public function testGithubPackageInjectsUpdaterOnlyForGithubVariant() :void {
 		$filesystem = new Filesystem();
 		$projectRoot = \dirname( __DIR__, 2 );
-		$packageRoot = Path::join( \sys_get_temp_dir(), PluginIdentity::GITHUB_ASSET_PREFIX.'-package-'.\bin2hex( \random_bytes( 4 ) ) );
+		$packageRoot = Path::join( \sys_get_temp_dir(), ReleasePackageIdentity::GITHUB_ASSET_PREFIX.'-package-'.\bin2hex( \random_bytes( 4 ) ) );
 		$packageDir = Path::join( $packageRoot, RuntimePackageBuilder::PLUGIN_SLUG );
 
 		try {
@@ -254,7 +255,9 @@ final class ToolingTest extends Wpm_Test_Case {
 
 			$updater = $this->readPackageFile( $packageDir, 'github-updater.php' );
 			$this->assertStringContainsString( 'https://github.com/FernleafSystems/Mandate-for-WordPress/', $updater );
-			$this->assertStringContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIXES', $updater );
+			$this->assertStringContainsString( '/'.ReleasePackageIdentity::GITHUB_ASSET_PREFIX.'-', $updater );
+			$this->assertStringNotContainsString( '{{MANDATE_GITHUB_ASSET_PREFIX}}', $updater );
+			$this->assertStringNotContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIX', $updater );
 			$this->assertStringContainsString( "YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory", $updater );
 		}
 		finally {
@@ -262,18 +265,14 @@ final class ToolingTest extends Wpm_Test_Case {
 		}
 	}
 
-	public function testGithubUpdaterReleaseAssetMatcherKeepsCurrentAndLegacyPrefixes() :void {
+	public function testGithubUpdaterReleaseAssetMatcherUsesCurrentPrefix() :void {
 		$githubUpdater = $this->readProjectFile( 'infrastructure/templates/github-updater.php' );
 
-		$this->assertSame(
-			[
-				PluginIdentity::GITHUB_ASSET_PREFIX,
-				PluginIdentity::LEGACY_GITHUB_ASSET_PREFIX,
-			],
-			PluginIdentity::GITHUB_ASSET_PREFIXES
-		);
-		$this->assertStringContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIXES', $githubUpdater );
-		$this->assertStringContainsString( 'preg_quote', $githubUpdater );
+		$this->assertSame( 'mandate-app-security-github', ReleasePackageIdentity::GITHUB_ASSET_PREFIX );
+		$this->assertStringContainsString( '{{MANDATE_GITHUB_ASSET_PREFIX}}-', $githubUpdater );
+		$this->assertStringNotContainsString( ReleasePackageIdentity::GITHUB_ASSET_PREFIX, $githubUpdater );
+		$this->assertStringNotContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIX', $githubUpdater );
+		$this->assertStringNotContainsString( 'preg_quote', $githubUpdater );
 		$this->assertStringContainsString( 'enableReleaseAssets', $githubUpdater );
 	}
 
@@ -294,34 +293,20 @@ final class ToolingTest extends Wpm_Test_Case {
 				$projectRoot,
 				$packageRoot,
 				RuntimePackageBuilder::VARIANT_GITHUB,
-				PluginIdentity::GITHUB_ASSET_PREFIX.'-test.zip',
-				$filesystem
-			);
-			$legacyGithubZip = $this->buildProjectPackageZip(
-				$projectRoot,
-				$packageRoot,
-				RuntimePackageBuilder::VARIANT_GITHUB,
-				PluginIdentity::LEGACY_GITHUB_ASSET_PREFIX.'-test.zip',
+				ReleasePackageIdentity::GITHUB_ASSET_PREFIX.'-test.zip',
 				$filesystem
 			);
 
 			$this->assertPackageZipHasEntry( $wordpressOrgZip, PluginIdentity::PACKAGE_ROOT.'vendor/autoload.php' );
 			$this->assertPackageZipHasEntry( $currentGithubZip, PluginIdentity::PACKAGE_ROOT.'vendor/autoload.php' );
-			$this->assertPackageZipHasEntry( $legacyGithubZip, PluginIdentity::PACKAGE_ROOT.'vendor/autoload.php' );
 			$this->assertPackageZipHasEntry( $currentGithubZip, PluginIdentity::PACKAGE_ROOT.'github-updater.php' );
-			$this->assertPackageZipHasEntry( $legacyGithubZip, PluginIdentity::PACKAGE_ROOT.'github-updater.php' );
 			$this->assertPackageZipHasEntry(
 				$currentGithubZip,
-				PluginIdentity::PACKAGE_ROOT.'vendor/yahnis-elsts/plugin-update-checker/plugin-update-checker.php'
-			);
-			$this->assertPackageZipHasEntry(
-				$legacyGithubZip,
 				PluginIdentity::PACKAGE_ROOT.'vendor/yahnis-elsts/plugin-update-checker/plugin-update-checker.php'
 			);
 
 			$this->assertPackageVerifierPasses( RuntimePackageBuilder::VARIANT_WORDPRESS_ORG, $wordpressOrgZip );
 			$this->assertPackageVerifierPasses( RuntimePackageBuilder::VARIANT_GITHUB, $currentGithubZip );
-			$this->assertPackageVerifierPasses( RuntimePackageBuilder::VARIANT_GITHUB, $legacyGithubZip );
 		}
 		finally {
 			$filesystem->remove( $packageRoot );
@@ -360,6 +345,38 @@ final class ToolingTest extends Wpm_Test_Case {
 		}
 	}
 
+	public function testPackageVerifierRejectsWordpressOrgPackageWithUpdaterTokenInEntryPath() :void {
+		$filesystem = new Filesystem();
+		$packageRoot = Path::join( \sys_get_temp_dir(), 'mandate-updater-entry-'.\bin2hex( \random_bytes( 4 ) ) );
+		$zipPath = Path::join( $packageRoot, 'updater-entry.zip' );
+
+		try {
+			$filesystem->mkdir( $packageRoot );
+			$zip = new ZipArchive();
+			$this->assertSame( true, $zip->open( $zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE ) );
+			try {
+				$zip->addFromString( PluginIdentity::PACKAGE_ROOT.PluginIdentity::MAIN_FILE, $this->readProjectFile( PluginIdentity::MAIN_FILE ) );
+				$zip->addFromString( PluginIdentity::PACKAGE_ROOT.'init.php', $this->readProjectFile( 'init.php' ) );
+				$zip->addFromString( PluginIdentity::PACKAGE_ROOT.'composer.json', "{\"require\":{\"php\":\">=8.2\"}}\n" );
+				$zip->addFromString( PluginIdentity::PACKAGE_ROOT.'src/PluginIdentity.php', $this->readProjectFile( 'src/PluginIdentity.php' ) );
+				$zip->addFromString( PluginIdentity::PACKAGE_ROOT.'vendor/autoload.php', "<?php\n" );
+				$zip->addFromString( PluginIdentity::PACKAGE_ROOT.'vendor/yahnis-elsts/plugin-update-checker/README.md', "fixture\n" );
+			}
+			finally {
+				$zip->close();
+			}
+
+			$result = $this->runPackageVerifier( RuntimePackageBuilder::VARIANT_WORDPRESS_ORG, $zipPath );
+
+			$this->assertNotSame( 0, $result[ 'exit_code' ] );
+			$this->assertStringContainsString( 'entry path', $result[ 'output' ] );
+			$this->assertStringContainsString( 'plugin-update-checker', $result[ 'output' ] );
+		}
+		finally {
+			$filesystem->remove( $packageRoot );
+		}
+	}
+
 	public function testRuntimePackageBuilderRejectsUnknownPackageVariant() :void {
 		$filesystem = new Filesystem();
 		$projectRoot = \dirname( __DIR__, 2 );
@@ -381,10 +398,18 @@ final class ToolingTest extends Wpm_Test_Case {
 	public function testRuntimeIdentityConstantsMatchPluginIdentity() :void {
 		$this->assertSame( 'mandate-app-security', PluginIdentity::SLUG );
 		$this->assertSame( 'mandate-app-security/', PluginIdentity::PACKAGE_ROOT );
-		$this->assertSame( 'mandate-app-security-github', PluginIdentity::GITHUB_ASSET_PREFIX );
-		$this->assertSame( 'mandate-github', PluginIdentity::LEGACY_GITHUB_ASSET_PREFIX );
 		$this->assertSame( PluginIdentity::SLUG, RuntimePackageBuilder::PLUGIN_SLUG );
 		$this->assertSame( PluginIdentity::MAIN_FILE, RuntimePackageBuilder::MAIN_PLUGIN_FILE );
+	}
+
+	public function testReleasePackageIdentityKeepsGithubAssetPrefixOutOfRuntimeIdentity() :void {
+		$this->assertSame( 'mandate-app-security-github', ReleasePackageIdentity::GITHUB_ASSET_PREFIX );
+		$this->assertSame( 'mandate-app-security-1.2.3.zip', ReleasePackageIdentity::zipName( RuntimePackageBuilder::VARIANT_WORDPRESS_ORG, '1.2.3' ) );
+		$this->assertSame( 'mandate-app-security-github-1.2.3.zip', ReleasePackageIdentity::zipName( RuntimePackageBuilder::VARIANT_GITHUB, '1.2.3' ) );
+
+		$pluginIdentity = $this->readProjectFile( 'src/PluginIdentity.php' );
+		$this->assertStringNotContainsString( 'GITHUB_ASSET_PREFIX', $pluginIdentity );
+		$this->assertStringNotContainsString( ReleasePackageIdentity::GITHUB_ASSET_PREFIX, $pluginIdentity );
 	}
 
 	public function testStaticWordPressIdentityFilesMatchPluginIdentity() :void {
@@ -405,17 +430,17 @@ final class ToolingTest extends Wpm_Test_Case {
 
 	public function testStaticToolingIdentityFilesMatchPluginIdentity() :void {
 		$releaseWorkflow = $this->readProjectFile( '.github/workflows/release.yml' );
-		$this->assertStringContainsString( 'WORDPRESS_ORG_ZIP_NAME="'.PluginIdentity::SLUG.'-${GITHUB_REF_NAME}.zip"', $releaseWorkflow );
-		$this->assertStringContainsString( 'GITHUB_ZIP_NAME="'.PluginIdentity::GITHUB_ASSET_PREFIX.'-${GITHUB_REF_NAME}.zip"', $releaseWorkflow );
-		$this->assertStringContainsString( 'LEGACY_GITHUB_ZIP_NAME="'.PluginIdentity::LEGACY_GITHUB_ASSET_PREFIX.'-${GITHUB_REF_NAME}.zip"', $releaseWorkflow );
+		$this->assertStringContainsString( 'WORDPRESS_ORG_ZIP_NAME="$(php bin/release-zip-name.php --variant=wordpress-org --tag="$GITHUB_REF_NAME")"', $releaseWorkflow );
+		$this->assertStringContainsString( 'GITHUB_ZIP_NAME="$(php bin/release-zip-name.php --variant=github --tag="$GITHUB_REF_NAME")"', $releaseWorkflow );
+		$this->assertStringNotContainsString( ReleasePackageIdentity::GITHUB_ASSET_PREFIX.'-${GITHUB_REF_NAME}.zip', $releaseWorkflow );
 		$this->assertStringContainsString( 'composer build-zip -- --variant=github --skip-assets --output="$GITHUB_ZIP_NAME"', $releaseWorkflow );
-		$this->assertStringContainsString( 'composer build-zip -- --variant=github --skip-assets --output="$LEGACY_GITHUB_ZIP_NAME"', $releaseWorkflow );
 		$this->assertStringContainsString( 'php bin/verify-package.php --variant=wordpress-org --zip="${GITHUB_WORKSPACE}/build/${WORDPRESS_ORG_ZIP_NAME}"', $releaseWorkflow );
 		$this->assertStringContainsString( 'php bin/verify-package.php --variant=github --zip="${GITHUB_WORKSPACE}/build/${GITHUB_ZIP_NAME}"', $releaseWorkflow );
-		$this->assertStringContainsString( 'php bin/verify-package.php --variant=github --zip="${GITHUB_WORKSPACE}/build/${LEGACY_GITHUB_ZIP_NAME}"', $releaseWorkflow );
 		$this->assertStringContainsString( '${{ github.workspace }}/build/${{ env.WORDPRESS_ORG_ZIP_NAME }}', $releaseWorkflow );
 		$this->assertStringContainsString( '${{ github.workspace }}/build/${{ env.GITHUB_ZIP_NAME }}', $releaseWorkflow );
-		$this->assertStringContainsString( '${{ github.workspace }}/build/${{ env.LEGACY_GITHUB_ZIP_NAME }}', $releaseWorkflow );
+		$this->assertSame( 2, \substr_count( $releaseWorkflow, 'composer build-zip --' ) );
+		$this->assertSame( 2, \substr_count( $releaseWorkflow, 'php bin/verify-package.php --variant=' ) );
+		$this->assertSame( 2, \substr_count( $releaseWorkflow, '${{ github.workspace }}/build/${{ env.' ) );
 
 		$browserCompose = $this->readProjectFile( 'tests/docker/docker-compose.browser.yml' );
 		$this->assertStringContainsString( '/wp-content/plugins/'.PluginIdentity::SLUG, $browserCompose );
@@ -440,7 +465,27 @@ final class ToolingTest extends Wpm_Test_Case {
 		$githubUpdater = $this->readProjectFile( 'infrastructure/templates/github-updater.php' );
 		$this->assertStringContainsString( 'PluginIdentity::MAIN_FILE', $githubUpdater );
 		$this->assertStringContainsString( 'PluginIdentity::SLUG', $githubUpdater );
-		$this->assertStringContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIXES', $githubUpdater );
+		$this->assertStringContainsString( '{{MANDATE_GITHUB_ASSET_PREFIX}}-', $githubUpdater );
+		$this->assertStringNotContainsString( 'PluginIdentity::GITHUB_ASSET_PREFIX', $githubUpdater );
+	}
+
+	public function testReleaseZipNameScriptUsesReleasePackageIdentity() :void {
+		$projectRoot = \dirname( __DIR__, 2 );
+		$wordpressOrg = new Process(
+			[ PHP_BINARY, 'bin/release-zip-name.php', '--variant='.RuntimePackageBuilder::VARIANT_WORDPRESS_ORG, '--tag=1.2.3' ],
+			$projectRoot
+		);
+		$wordpressOrg->run();
+		$this->assertSame( 0, $wordpressOrg->getExitCode(), $wordpressOrg->getErrorOutput() );
+		$this->assertSame( 'mandate-app-security-1.2.3.zip', \trim( $wordpressOrg->getOutput() ) );
+
+		$github = new Process(
+			[ PHP_BINARY, 'bin/release-zip-name.php', '--variant='.RuntimePackageBuilder::VARIANT_GITHUB, '--tag=1.2.3' ],
+			$projectRoot
+		);
+		$github->run();
+		$this->assertSame( 0, $github->getExitCode(), $github->getErrorOutput() );
+		$this->assertSame( 'mandate-app-security-github-1.2.3.zip', \trim( $github->getOutput() ) );
 	}
 
 	private function buildProjectPackageZip(
@@ -587,10 +632,8 @@ final class ToolingTest extends Wpm_Test_Case {
 			'PluginUpdateChecker',
 			'PucFactory',
 			'plugin-update-checker',
-			...array_map(
-				static fn( string $assetPrefix ) :string => $assetPrefix.'-',
-				PluginIdentity::GITHUB_ASSET_PREFIXES
-			),
+			'GITHUB_ASSET_PREFIX',
+			ReleasePackageIdentity::GITHUB_ASSET_PREFIX.'-',
 		];
 
 		$iterator = new RecursiveIteratorIterator(
@@ -603,6 +646,15 @@ final class ToolingTest extends Wpm_Test_Case {
 				continue;
 			}
 
+			$relativePath = Path::makeRelative( $item->getPathname(), $packageDir );
+			foreach ( $tokens as $token ) {
+				$this->assertStringNotContainsString(
+					$token,
+					$relativePath,
+					'Unexpected GitHub updater token in package path '.$relativePath
+				);
+			}
+
 			$content = \file_get_contents( $item->getPathname() );
 			if ( !\is_string( $content ) ) {
 				throw new RuntimeException( 'Failed to read package file: '.$item->getPathname() );
@@ -612,7 +664,7 @@ final class ToolingTest extends Wpm_Test_Case {
 				$this->assertStringNotContainsString(
 					$token,
 					$content,
-					'Unexpected GitHub updater token in '.Path::makeRelative( $item->getPathname(), $packageDir )
+					'Unexpected GitHub updater token in package content '.$relativePath
 				);
 			}
 		}
@@ -628,7 +680,7 @@ final class ToolingTest extends Wpm_Test_Case {
 
 		$filesystem->dumpFile( Path::join( $fixtureRoot, RuntimePackageBuilder::MAIN_PLUGIN_FILE ), "<?php\n/*\n * Plugin Name: Fixture\n * Plugin URI: https://example.test\n * Version: 1.0.0\n */\n" );
 		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\\call_user_func( function () {\n\t\$mandate_app_security_autoload = __DIR__.'/vendor/autoload.php';\n\tif ( \\is_file( \$mandate_app_security_autoload ) ) {\n\t\trequire_once \$mandate_app_security_autoload;\n\t\tPlugin::boot( __DIR__.'/".RuntimePackageBuilder::MAIN_PLUGIN_FILE."' );\n\t}\n} );\n" );
-		$filesystem->dumpFile( Path::join( $fixtureRoot, 'infrastructure/templates/github-updater.php' ), "<?php\nuse YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory;\n" );
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'infrastructure/templates/github-updater.php' ), "<?php\nuse YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory;\n// {{MANDATE_GITHUB_ASSET_PREFIX}}\n" );
 
 		foreach ( [
 			'unsupported.php',
