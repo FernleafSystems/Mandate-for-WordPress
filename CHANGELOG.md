@@ -1,8 +1,30 @@
 # Changelog
 
-## 0.4.2 - 2026-05-27
+## 0.6.0 - Unreleased
 
-- Cleaned runtime identifiers, admin request handling, template rendering, and WordPress.org review prefixes.
+## 0.5.0 - 2026-05-28
+
+Mandate App Security tightens the submitted runtime for WordPress.org review while preserving the core Application Password scoping behavior.
+
+### Changed
+
+- Runtime namespace and machine identifiers now use the WordPress.org review prefix `mdpsc`.
+- Admin CSS classes, JavaScript behavior hooks, option storage, hooks, nonces, cron hook, and asset handles now use the approved runtime prefix.
+- The admin summary contract now uses Scope Summary naming throughout the rendered UI and data payload.
+- Admin request reads now flow through a single request adapter, with profile shortcut context resolved explicitly.
+- Admin templates now receive one explicit data array instead of extracted variables.
+- Nonce fields are built directly from action-specific nonce names and actions.
+- Package root and release ZIP naming now use `mandate-app-security`.
+- Version metadata is aligned for the 0.5.0 release.
+
+### Compatibility
+
+- Existing pre-0.5.0 internal option names are not migrated; the plugin now reads and writes `mdpsc_options`.
+- Existing plugin slug, main file, text domain, visible product name, and Application Password scoping behavior remain unchanged.
+
+### Tooling
+
+- Local Plugin Check now runs stricter `new` and `update` profiles with experimental and low-severity findings enabled.
 
 ## 0.4.1 - 2026-05-27
 

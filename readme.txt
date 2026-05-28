@@ -4,7 +4,7 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.4.2
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -92,8 +92,10 @@ The public development repository, release packages, and build documentation are
 
 == Changelog ==
 
-= 0.4.2 =
-* Cleaned runtime identifiers, admin request handling, template rendering, and WordPress.org review prefixes.
+= 0.5.0 =
+* Improves WordPress.org compatibility for plugin storage, hooks, nonces, admin selectors, and runtime identifiers.
+* Hardens admin request handling, profile shortcuts, nonce generation, and template rendering.
+* Uses the new `mdpsc_options` storage key; earlier pre-0.5.0 internal option data is not migrated.
 
 = 0.4.1 =
 * Publishes only the WordPress.org ZIP and current GitHub updater ZIP for releases.
