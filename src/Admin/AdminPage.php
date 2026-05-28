@@ -1,14 +1,15 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityName;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
-use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityName;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -16,8 +17,8 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class AdminPage {
 
-	private const ASSET_HANDLE = 'mandate-admin-page';
-	public const MESSAGE_QUERY_KEY = 'mandate_app_security_message';
+	private const ASSET_HANDLE = PluginIdentity::HTML_PREFIX.'admin-page';
+	public const MESSAGE_QUERY_KEY = PluginIdentity::MACHINE_PREFIX.'message';
 
 	private ScopeRepository $scopeRepository;
 
@@ -30,6 +31,8 @@ class AdminPage {
 	private string $pluginFile;
 
 	private ExpirationDatePolicy $expirationDatePolicy;
+
+	private AdminRequest $request;
 
 	private AdminUserRoleProvider $roleProvider;
 
@@ -48,6 +51,7 @@ class AdminPage {
 		MetaCapabilityRegistry $metaRegistry,
 		string $pluginFile,
 		ExpirationDatePolicy $expirationDatePolicy,
+		AdminRequest $request,
 		AdminUserRoleProvider $roleProvider,
 		AdminScopeFormSecurity $formSecurity,
 		AdminPageViewDataBuilder $viewDataBuilder,
@@ -60,6 +64,7 @@ class AdminPage {
 		$this->metaRegistry = $metaRegistry;
 		$this->pluginFile = $pluginFile;
 		$this->expirationDatePolicy = $expirationDatePolicy;
+		$this->request = $request;
 		$this->roleProvider = $roleProvider;
 		$this->formSecurity = $formSecurity;
 		$this->viewDataBuilder = $viewDataBuilder;
@@ -94,21 +99,19 @@ class AdminPage {
 	}
 
 	public function handlePost() :void {
-		if ( $this->requestMethod() !== 'POST' ) {
+		if ( $this->request->method() !== 'POST' ) {
 			return;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Only detects whether this plugin form was submitted before verifying the nonce.
-		$hasFormAction = isset( $_POST[ AdminScopeFormSecurity::ACTION_FIELD ] );
-		if ( !$hasFormAction ) {
+		if ( !$this->request->hasPostKey( AdminScopeFormSecurity::ACTION_FIELD ) ) {
 			return;
 		}
 
 		$this->requirePageAccess();
 
-		$userId = absint( $this->postScalar( 'user_id' ) );
-		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->postScalar( 'app_password_uuid' ) );
-		$action = sanitize_key( $this->postScalar( AdminScopeFormSecurity::ACTION_FIELD ) );
+		$userId = absint( $this->request->postScalar( 'user_id' ) );
+		$uuid = ApplicationPasswordRepository::normalizeUuid( $this->request->postScalar( 'app_password_uuid' ) );
+		$action = sanitize_key( $this->request->postScalar( AdminScopeFormSecurity::ACTION_FIELD ) );
 		$message = 'invalid';
 
 		if ( !$this->formSecurity->isSupportedAction( $action ) ) {
@@ -148,8 +151,8 @@ class AdminPage {
 		}
 
 		$candidates = $this->candidateProvider->forUser( $userId );
-		$submittedCaps = $this->verifiedPostScalarList( 'allowed_caps' );
-		$submittedMetaCaps = $this->verifiedPostScalarList( 'allowed_meta_caps' );
+		$submittedCaps = $this->request->postScalarList( 'allowed_caps' );
+		$submittedMetaCaps = $this->request->postScalarList( 'allowed_meta_caps' );
 		$expiresOn = $this->postedExpirationDate();
 
 		if ( $expiresOn === false ) {
@@ -211,27 +214,11 @@ class AdminPage {
 	}
 
 	private function isSuperAdminUser( int $userId ) :bool {
-		return function_exists( 'is_multisite' )
-			&& is_multisite()
-			&& function_exists( 'is_super_admin' )
-			&& is_super_admin( $userId );
-	}
-
-	private function postScalar( string $key ) :string {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Sanitized action context is needed to select the scoped nonce before verification.
-		return $this->requestScalar( $_POST, $key );
-	}
-
-	private function requestMethod() :string {
-		$method = isset( $_SERVER[ 'REQUEST_METHOD' ] )
-			? sanitize_key( wp_unslash( $_SERVER[ 'REQUEST_METHOD' ] ) )
-			: '';
-
-		return strtoupper( $method );
+		return is_multisite() && is_super_admin( $userId );
 	}
 
 	private function postedExpirationDate() :string|null|false {
-		$submitted = $this->postScalar( 'expiration_date' );
+		$submitted = $this->request->postScalar( 'expiration_date' );
 		if ( $submitted === '' ) {
 			return null;
 		}
@@ -240,34 +227,6 @@ class AdminPage {
 	}
 
 	private function postedCheckbox( string $key ) :bool {
-		return $this->postScalar( $key ) !== '';
-	}
-
-	/**
-	 * @return string[]
-	 */
-	private function verifiedPostScalarList( string $key ) :array {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce is verified in handlePost(); each list item is sanitized below.
-		$value = isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : [];
-		if ( !is_array( $value ) ) {
-			return [];
-		}
-
-		$items = [];
-		foreach ( $value as $item ) {
-			if ( is_scalar( $item ) ) {
-				$items[] = sanitize_text_field( $item );
-			}
-		}
-
-		return $items;
-	}
-
-	/**
-	 * @param array<string,mixed> $source
-	 */
-	private function requestScalar( array $source, string $key ) :string {
-		$value = $source[ $key ] ?? '';
-		return is_scalar( $value ) ? sanitize_text_field( wp_unslash( $value ) ) : '';
+		return $this->request->postScalar( $key ) !== '';
 	}
 }

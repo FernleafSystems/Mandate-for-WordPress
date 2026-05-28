@@ -3,7 +3,7 @@
 declare( strict_types=1 );
 
 use Symfony\Component\Filesystem\Path;
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 $rootDir = dirname( __DIR__, 2 );
 $autoload = $rootDir.'/vendor/autoload.php';

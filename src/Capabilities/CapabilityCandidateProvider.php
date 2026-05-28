@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -12,7 +12,7 @@ class CapabilityCandidateProvider {
 	 * @return array<string,true>
 	 */
 	public function forUser( int $userId ) :array {
-		if ( $userId < 1 || !function_exists( 'get_userdata' ) ) {
+		if ( $userId < 1 ) {
 			return [];
 		}
 
@@ -38,14 +38,10 @@ class CapabilityCandidateProvider {
 	 * @return array<string,true>
 	 */
 	public function forRoles( array $roles ) :array {
-		if ( !function_exists( 'wp_roles' ) ) {
-			return [];
-		}
-
 		$wpRoles = wp_roles();
 		$roleCapabilities = [];
 		foreach ( $roles as $roleName ) {
-			$role = is_object( $wpRoles ) && method_exists( $wpRoles, 'get_role' ) ? $wpRoles->get_role( $roleName ) : null;
+			$role = is_object( $wpRoles ) ? $wpRoles->get_role( $roleName ) : null;
 			if ( is_object( $role ) && isset( $role->capabilities ) && is_array( $role->capabilities ) ) {
 				$roleCapabilities[ $roleName ] = $role->capabilities;
 			}

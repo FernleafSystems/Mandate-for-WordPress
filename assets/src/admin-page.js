@@ -1,6 +1,6 @@
 import './admin-page.css';
 
-const TOOLTIP_ID = 'mandate-capability-tooltip';
+const TOOLTIP_ID = 'mdpsc-capability-tooltip';
 
 let tooltipElement = null;
 let tooltipTarget = null;
@@ -16,23 +16,23 @@ function submitForm( form ) {
 }
 
 function setSelectionLoading( form ) {
-	form.classList.add( 'is-wpm-loading' );
+	form.classList.add( 'is-mdpsc-loading' );
 	form.setAttribute( 'aria-busy', 'true' );
 
-	const status = form.querySelector( '[data-wpm-selection-status]' );
+	const status = form.querySelector( '[data-mdpsc-selection-status]' );
 	if ( status ) {
 		status.hidden = false;
 	}
 }
 
 function enhanceSelectionForm( root ) {
-	const form = root.querySelector( '[data-wpm-selection-form]' );
+	const form = root.querySelector( '[data-mdpsc-selection-form]' );
 	if ( !form ) {
 		return;
 	}
 
-	const userSelect = form.querySelector( '#mandate-user' );
-	const passwordSelect = form.querySelector( '#mandate-password' );
+	const userSelect = form.querySelector( '#mdpsc-user' );
+	const passwordSelect = form.querySelector( '#mdpsc-password' );
 
 	if ( userSelect ) {
 		userSelect.addEventListener( 'change', () => {
@@ -59,32 +59,32 @@ function enhanceBulkControls( root ) {
 			return;
 		}
 
-		const sectionButton = event.target.closest( '[data-wpm-select-section]' );
+		const sectionButton = event.target.closest( '[data-mdpsc-select-section]' );
 		if ( sectionButton ) {
 			if ( sectionButton.disabled ) {
 				return;
 			}
 
-			const section = sectionButton.closest( '[data-wpm-capability-section]' );
+			const section = sectionButton.closest( '[data-mdpsc-capability-section]' );
 			if ( !section ) {
 				return;
 			}
 
-			setCheckedState( section, sectionButton.dataset.wpmSelectState === 'checked' );
+			setCheckedState( section, sectionButton.dataset.mdpscSelectState === 'checked' );
 			return;
 		}
 
-		const panelButton = event.target.closest( '[data-wpm-select-panel]' );
+		const panelButton = event.target.closest( '[data-mdpsc-select-panel]' );
 		if ( !panelButton || panelButton.disabled ) {
 			return;
 		}
 
-		const panel = panelButton.closest( '[data-wpm-capability-panel]' );
+		const panel = panelButton.closest( '[data-mdpsc-capability-panel]' );
 		if ( !panel ) {
 			return;
 		}
 
-		setCheckedState( panel, panelButton.dataset.wpmSelectState === 'checked' );
+		setCheckedState( panel, panelButton.dataset.mdpscSelectState === 'checked' );
 	} );
 }
 
@@ -96,7 +96,7 @@ function setCheckedState( container, checked ) {
 }
 
 function parseGroupingConfig( container ) {
-	const configValue = container.dataset.wpmCapabilityGroupingConfig;
+	const configValue = container.dataset.mdpscCapabilityGroupingConfig;
 	if ( !configValue ) {
 		return null;
 	}
@@ -111,25 +111,25 @@ function parseGroupingConfig( container ) {
 function createCapabilitySection( sectionConfig, items ) {
 	const section = document.createElement( 'fieldset' );
 	section.id = sectionConfig.id;
-	section.className = 'mandate-capability-section';
-	section.dataset.wpmCapabilitySection = '';
+	section.className = 'mdpsc-capability-section';
+	section.dataset.mdpscCapabilitySection = '';
 
 	const legend = document.createElement( 'legend' );
 	const title = document.createElement( 'span' );
-	title.className = 'mandate-capability-section-title';
+	title.className = 'mdpsc-capability-section-title';
 
 	const label = document.createElement( 'span' );
 	label.textContent = sectionConfig.label;
 	title.appendChild( label );
 
 	const count = document.createElement( 'span' );
-	count.className = 'mandate-capability-section-count';
+	count.className = 'mdpsc-capability-section-count';
 	count.textContent = sectionConfig.count;
 	title.appendChild( count );
 	legend.appendChild( title );
 
 	const actions = document.createElement( 'span' );
-	actions.className = 'mandate-capability-section-actions';
+	actions.className = 'mdpsc-capability-section-actions';
 	actions.appendChild( createSectionBulkButton( sectionConfig.bulk_actions.select_all ) );
 	actions.appendChild( createSectionActionSeparator() );
 	actions.appendChild( createSectionBulkButton( sectionConfig.bulk_actions.deselect_all ) );
@@ -137,7 +137,7 @@ function createCapabilitySection( sectionConfig, items ) {
 	section.appendChild( legend );
 
 	const list = document.createElement( 'div' );
-	list.className = 'mandate-capability-list';
+	list.className = 'mdpsc-capability-list';
 	items.forEach( ( item ) => list.appendChild( item ) );
 	section.appendChild( list );
 
@@ -146,7 +146,7 @@ function createCapabilitySection( sectionConfig, items ) {
 
 function createSectionActionSeparator() {
 	const separator = document.createElement( 'span' );
-	separator.className = 'mandate-capability-section-action-separator';
+	separator.className = 'mdpsc-capability-section-action-separator';
 	separator.setAttribute( 'aria-hidden', 'true' );
 	separator.textContent = '/';
 	return separator;
@@ -155,9 +155,9 @@ function createSectionActionSeparator() {
 function createSectionBulkButton( actionConfig ) {
 	const button = document.createElement( 'button' );
 	button.type = 'button';
-	button.className = 'mandate-link-button';
-	button.dataset.wpmSelectState = actionConfig.state;
-	button.dataset.wpmSelectSection = '';
+	button.className = 'mdpsc-link-button';
+	button.dataset.mdpscSelectState = actionConfig.state;
+	button.dataset.mdpscSelectSection = '';
 	button.disabled = actionConfig.disabled;
 	button.textContent = actionConfig.label;
 	return button;
@@ -166,15 +166,15 @@ function createSectionBulkButton( actionConfig ) {
 function createCapabilityIndexLink( sectionConfig ) {
 	const link = document.createElement( 'a' );
 	link.href = `#${ sectionConfig.id }`;
-	link.dataset.wpmCapabilityIndexLink = '';
-	link.dataset.wpmCapabilitySectionTarget = sectionConfig.id;
+	link.dataset.mdpscCapabilityIndexLink = '';
+	link.dataset.mdpscCapabilitySectionTarget = sectionConfig.id;
 
 	const label = document.createElement( 'span' );
 	label.textContent = sectionConfig.label;
 	link.appendChild( label );
 
 	const count = document.createElement( 'span' );
-	count.className = 'mandate-capability-section-count';
+	count.className = 'mdpsc-capability-section-count';
 	count.textContent = sectionConfig.count;
 	link.appendChild( count );
 
@@ -189,13 +189,13 @@ function createEmptyMessage( text ) {
 }
 
 function sourcePanelFor( container, source ) {
-	return container.querySelector( `[data-wpm-capability-source-panel][data-wpm-capability-source="${ source.key }"]` );
+	return container.querySelector( `[data-mdpsc-capability-source-panel][data-mdpsc-capability-source="${ source.key }"]` );
 }
 
 function capabilityItemMap( container ) {
 	const items = new Map();
-	container.querySelectorAll( '[data-wpm-capability-item]' ).forEach( ( item ) => {
-		items.set( item.dataset.wpmCapabilityKey, item );
+	container.querySelectorAll( '[data-mdpsc-capability-item]' ).forEach( ( item ) => {
+		items.set( item.dataset.mdpscCapabilityKey, item );
 	} );
 	return items;
 }
@@ -205,7 +205,7 @@ function sectionItems( sectionConfig, items ) {
 }
 
 function scrollCapabilitySectionIntoView( target ) {
-	const scroll = target.closest( '.mandate-capability-scroll' );
+	const scroll = target.closest( '.mdpsc-capability-scroll' );
 	if ( !scroll ) {
 		return;
 	}
@@ -221,7 +221,7 @@ function scrollCapabilitySectionIntoView( target ) {
 }
 
 function renderCapabilityIndex( panel, modeConfig ) {
-	const index = panel.querySelector( '[data-wpm-capability-section-index]' );
+	const index = panel.querySelector( '[data-mdpsc-capability-section-index]' );
 	if ( !index ) {
 		return;
 	}
@@ -234,7 +234,7 @@ function renderCapabilityIndex( panel, modeConfig ) {
 }
 
 function renderCapabilitySourcePanel( panel, source, mode, items ) {
-	const scroll = panel.querySelector( '.mandate-capability-scroll' );
+	const scroll = panel.querySelector( '.mdpsc-capability-scroll' );
 	const modeConfig = source.modes[ mode ];
 	if ( !scroll || !modeConfig ) {
 		return;
@@ -259,7 +259,7 @@ function renderCapabilityGroups( container, config, mode ) {
 		return;
 	}
 
-	container.dataset.wpmCapabilityMode = mode;
+	container.dataset.mdpscCapabilityMode = mode;
 	const items = capabilityItemMap( container );
 	config.sources.forEach( ( source ) => {
 		const panel = sourcePanelFor( container, source );
@@ -270,36 +270,36 @@ function renderCapabilityGroups( container, config, mode ) {
 }
 
 function setActiveCapabilitySource( form, container, sourceKey ) {
-	container.dataset.wpmCapabilitySource = sourceKey;
+	container.dataset.mdpscCapabilitySource = sourceKey;
 
-	form.querySelectorAll( '[data-wpm-capability-source-tab]' ).forEach( ( tab ) => {
-		const active = tab.dataset.wpmCapabilitySource === sourceKey;
+	form.querySelectorAll( '[data-mdpsc-capability-source-tab]' ).forEach( ( tab ) => {
+		const active = tab.dataset.mdpscCapabilitySource === sourceKey;
 		tab.classList.toggle( 'is-active', active );
 		tab.setAttribute( 'aria-selected', active ? 'true' : 'false' );
 		tab.setAttribute( 'tabindex', active ? '0' : '-1' );
 	} );
 
-	container.querySelectorAll( '[data-wpm-capability-source-panel]' ).forEach( ( panel ) => {
-		panel.hidden = panel.dataset.wpmCapabilitySource !== sourceKey;
+	container.querySelectorAll( '[data-mdpsc-capability-source-panel]' ).forEach( ( panel ) => {
+		panel.hidden = panel.dataset.mdpscCapabilitySource !== sourceKey;
 	} );
 }
 
 function enhanceCapabilityGrouping( root ) {
-	const form = root.querySelector( '.mandate-scope-form' );
+	const form = root.querySelector( '.mdpsc-scope-form' );
 	if ( !form ) {
 		return;
 	}
 
-	const container = form.querySelector( '[data-wpm-capability-groups]' );
+	const container = form.querySelector( '[data-mdpsc-capability-groups]' );
 	const config = container ? parseGroupingConfig( container ) : null;
-	const controls = Array.from( form.querySelectorAll( '[data-wpm-capability-grouping-mode]' ) );
-	const sourceTabs = Array.from( form.querySelectorAll( '[data-wpm-capability-source-tab]' ) );
+	const controls = Array.from( form.querySelectorAll( '[data-mdpsc-capability-grouping-mode]' ) );
+	const sourceTabs = Array.from( form.querySelectorAll( '[data-mdpsc-capability-source-tab]' ) );
 	if ( !container || !config || !controls.length || !sourceTabs.length ) {
 		return;
 	}
 
-	renderCapabilityGroups( container, config, container.dataset.wpmCapabilityMode || config.defaultMode );
-	setActiveCapabilitySource( form, container, container.dataset.wpmCapabilitySource || config.defaultSource );
+	renderCapabilityGroups( container, config, container.dataset.mdpscCapabilityMode || config.defaultMode );
+	setActiveCapabilitySource( form, container, container.dataset.mdpscCapabilitySource || config.defaultSource );
 
 	controls.forEach( ( control ) => {
 		control.addEventListener( 'change', () => {
@@ -313,19 +313,19 @@ function enhanceCapabilityGrouping( root ) {
 	sourceTabs.forEach( ( tab ) => {
 		tab.addEventListener( 'click', () => {
 			hideTooltip();
-			setActiveCapabilitySource( form, container, tab.dataset.wpmCapabilitySource );
+			setActiveCapabilitySource( form, container, tab.dataset.mdpscCapabilitySource );
 		} );
 	} );
 
 	container.addEventListener( 'click', ( event ) => {
 		const link = event.target instanceof Element
-			? event.target.closest( '[data-wpm-capability-index-link]' )
+			? event.target.closest( '[data-mdpsc-capability-index-link]' )
 			: null;
 		if ( !link || !container.contains( link ) ) {
 			return;
 		}
 
-		const targetId = link.dataset.wpmCapabilitySectionTarget;
+		const targetId = link.dataset.mdpscCapabilitySectionTarget;
 		const target = targetId ? document.getElementById( targetId ) : null;
 		if ( target ) {
 			event.preventDefault();
@@ -336,7 +336,7 @@ function enhanceCapabilityGrouping( root ) {
 }
 
 function enhanceExpirationSummary( root ) {
-	root.querySelectorAll( '[data-wpm-expiration-summary]' ).forEach( ( summary ) => {
+	root.querySelectorAll( '[data-mdpsc-expiration-summary]' ).forEach( ( summary ) => {
 		const inputId = summary.getAttribute( 'aria-controls' );
 		const input = inputId ? document.getElementById( inputId ) : null;
 		if ( !input || !root.contains( input ) ) {
@@ -371,7 +371,7 @@ function getTooltipElement() {
 
 	tooltipElement = document.createElement( 'div' );
 	tooltipElement.id = TOOLTIP_ID;
-	tooltipElement.className = 'mandate-tooltip';
+	tooltipElement.className = 'mdpsc-tooltip';
 	tooltipElement.setAttribute( 'role', 'tooltip' );
 	tooltipElement.hidden = true;
 	document.body.appendChild( tooltipElement );
@@ -413,7 +413,7 @@ function hideTooltip() {
 }
 
 function showTooltip( target ) {
-	const text = target.dataset.wpmTooltipText;
+	const text = target.dataset.mdpscTooltipText;
 	if ( !text ) {
 		hideTooltip();
 		return;
@@ -451,7 +451,7 @@ function closestTooltipTarget( event ) {
 		return null;
 	}
 
-	return event.target.closest( '[data-wpm-tooltip]' );
+	return event.target.closest( '[data-mdpsc-tooltip]' );
 }
 
 function enhanceTooltips( root ) {
@@ -487,15 +487,15 @@ function enhanceTooltips( root ) {
 	} );
 
 	root.addEventListener( 'click', ( event ) => {
-		if ( event.target instanceof Element && event.target.closest( '[data-wpm-capability-grouping], [data-wpm-capability-source-tab], [data-wpm-select-panel], [data-wpm-select-section]' ) ) {
+		if ( event.target instanceof Element && event.target.closest( '[data-mdpsc-capability-grouping], [data-mdpsc-capability-source-tab], [data-mdpsc-select-panel], [data-mdpsc-select-section]' ) ) {
 			hideTooltip();
 		}
 	} );
 }
 
 document.addEventListener( 'DOMContentLoaded', () => {
-	document.querySelectorAll( '.mandate' ).forEach( ( root ) => {
-		root.classList.add( 'is-wpm-enhanced' );
+	document.querySelectorAll( '.mdpsc' ).forEach( ( root ) => {
+		root.classList.add( 'is-mdpsc-enhanced' );
 		enhanceSelectionForm( root );
 		enhanceBulkControls( root );
 		enhanceCapabilityGrouping( root );

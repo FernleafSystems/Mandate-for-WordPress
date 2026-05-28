@@ -1,8 +1,8 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ApplicationPasswordExpirationReaper;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -10,7 +10,7 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class Plugin {
 
-	public const VERSION = '0.4.1';
+	public const VERSION = '0.5.0';
 	public const MENU_SLUG = PluginIdentity::SLUG;
 
 	public static function boot( string $pluginFile ) :void {
@@ -20,7 +20,7 @@ class Plugin {
 	private function register( string $pluginFile ) :void {
 		$services = new PluginServices( $pluginFile );
 		$this->registerGlobalHooks( $services, $pluginFile );
-		if ( function_exists( 'is_admin' ) && is_admin() ) {
+		if ( is_admin() ) {
 			$this->registerAdminHooks( $services, $pluginFile );
 		}
 	}
@@ -63,9 +63,7 @@ class Plugin {
 			}
 		);
 		ApplicationPasswordExpirationReaper::ensureScheduledHook();
-		if ( function_exists( 'register_deactivation_hook' ) ) {
-			register_deactivation_hook( $pluginFile, [ ApplicationPasswordExpirationReaper::class, 'clearScheduledHook' ] );
-		}
+		register_deactivation_hook( $pluginFile, [ ApplicationPasswordExpirationReaper::class, 'clearScheduledHook' ] );
 	}
 
 	private function registerAdminHooks( PluginServices $services, string $pluginFile ) :void {

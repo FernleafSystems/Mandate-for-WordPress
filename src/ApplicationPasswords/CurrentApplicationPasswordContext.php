@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -39,12 +39,8 @@ class CurrentApplicationPasswordContext {
 			return $this->userId;
 		}
 
-		if ( function_exists( 'get_current_user_id' ) ) {
-			$userId = (int)get_current_user_id();
-			return $userId > 0 ? $userId : null;
-		}
-
-		return null;
+		$userId = (int)get_current_user_id();
+		return $userId > 0 ? $userId : null;
 	}
 
 	public function uuid() :?string {
@@ -52,12 +48,10 @@ class CurrentApplicationPasswordContext {
 			return $this->uuid;
 		}
 
-		if ( function_exists( 'rest_get_authenticated_app_password' ) ) {
-			$uuid = rest_get_authenticated_app_password();
-			if ( is_string( $uuid ) ) {
-				$uuid = ApplicationPasswordRepository::normalizeUuid( $uuid );
-				return $uuid !== '' ? $uuid : null;
-			}
+		$uuid = rest_get_authenticated_app_password();
+		if ( is_string( $uuid ) ) {
+			$uuid = ApplicationPasswordRepository::normalizeUuid( $uuid );
+			return $uuid !== '' ? $uuid : null;
 		}
 
 		return null;

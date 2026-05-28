@@ -1,8 +1,9 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Options;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -14,7 +15,7 @@ if ( !defined( 'ABSPATH' ) ) {
  */
 class PluginOptionsRepository {
 
-	public const OPTION_NAME = 'mandate_app_security_options';
+	public const OPTION_NAME = PluginIdentity::MACHINE_PREFIX.'options';
 	public const CURRENT_SCHEMA_VERSION = 3;
 
 	/**
@@ -50,19 +51,15 @@ class PluginOptionsRepository {
 			'scopes'   => $scopes,
 		];
 
-		if ( function_exists( 'update_option' ) ) {
-			$updated = update_option( self::OPTION_NAME, $updatedDocument, false );
-			return (bool)$updated || get_option( self::OPTION_NAME, [] ) === $updatedDocument;
-		}
-
-		return false;
+		$updated = update_option( self::OPTION_NAME, $updatedDocument, false );
+		return (bool)$updated || get_option( self::OPTION_NAME, [] ) === $updatedDocument;
 	}
 
 	/**
 	 * @return PluginOptionsDocument|null
 	 */
 	private function readDocument() :?array {
-		$raw = function_exists( 'get_option' ) ? get_option( self::OPTION_NAME, [] ) : [];
+		$raw = get_option( self::OPTION_NAME, [] );
 		return is_array( $raw ) ? $this->normalizeDocument( $raw ) : null;
 	}
 

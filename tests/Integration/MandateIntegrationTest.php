@@ -2,11 +2,11 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginServices;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ApplicationPasswordExpirationReaper;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options\PluginOptionsRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginServices;
 
 abstract class MandateWordPressTestCase extends WP_UnitTestCase {
 

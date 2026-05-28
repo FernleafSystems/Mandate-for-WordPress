@@ -1,10 +1,10 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options\PluginOptionsRepository;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -199,9 +199,7 @@ class ScopeRepository {
 				continue;
 			}
 
-			$slug = function_exists( 'sanitize_key' )
-				? sanitize_key( $slug )
-				: strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $slug ) ?? '' );
+			$slug = sanitize_key( $slug );
 			if ( $slug !== '' ) {
 				$normalized[ $slug ] = $slug;
 			}

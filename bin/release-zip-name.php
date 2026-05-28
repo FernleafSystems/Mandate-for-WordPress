@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ReleasePackageIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ReleasePackageIdentity;
 
 $projectRoot = dirname( __DIR__ );
 if ( !\defined( 'ABSPATH' ) ) {

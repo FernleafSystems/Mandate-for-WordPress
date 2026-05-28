@@ -1,8 +1,9 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -16,21 +17,17 @@ class AdminScopeFormSecurity {
 		self::ACTION_SAVE  => true,
 		self::ACTION_CLEAR => true,
 	];
-	public const ACTION_FIELD = 'mandate_app_security_action';
+	public const ACTION_FIELD = PluginIdentity::MACHINE_PREFIX.'action';
 
-	private const NONCE_ACTION_PREFIX = 'mandate_app_security_scope';
-
-	private AdminTrustedHtmlSanitizer $trustedHtmlSanitizer;
-
-	public function __construct( AdminTrustedHtmlSanitizer $trustedHtmlSanitizer ) {
-		$this->trustedHtmlSanitizer = $trustedHtmlSanitizer;
-	}
+	private const NONCE_ACTION_PREFIX = PluginIdentity::MACHINE_PREFIX.'scope';
 
 	public function isSupportedAction( string $action ) :bool {
 		return isset( self::FORM_ACTIONS[ $action ] );
 	}
 
 	public function nonceAction( string $action, int $userId, string $uuid ) :string {
+		$this->assertSupportedAction( $action );
+
 		return implode(
 			':',
 			[
@@ -43,20 +40,27 @@ class AdminScopeFormSecurity {
 	}
 
 	public function nonceName( string $action ) :string {
-		return 'mandate_app_security_'.$action.'_nonce';
+		$this->assertSupportedAction( $action );
+
+		return match ( $action ) {
+			self::ACTION_SAVE => PluginIdentity::MACHINE_PREFIX.'save_scope_nonce',
+			self::ACTION_CLEAR => PluginIdentity::MACHINE_PREFIX.'clear_scope_nonce',
+		};
 	}
 
 	public function nonceFields( int $userId, string $uuid ) :string {
-		return $this->trustedHtmlSanitizer->nonceFields( wp_nonce_field(
-			$this->nonceAction( self::ACTION_SAVE, $userId, $uuid ),
-			$this->nonceName( self::ACTION_SAVE ),
-			false,
-			false
-		).wp_nonce_field(
-			$this->nonceAction( self::ACTION_CLEAR, $userId, $uuid ),
-			$this->nonceName( self::ACTION_CLEAR ),
-			false,
-			false
-		) );
+		return sprintf(
+			'<input type="hidden" name="%1$s" value="%2$s" /><input type="hidden" name="%3$s" value="%4$s" />',
+			esc_attr( $this->nonceName( self::ACTION_SAVE ) ),
+			esc_attr( wp_create_nonce( $this->nonceAction( self::ACTION_SAVE, $userId, $uuid ) ) ),
+			esc_attr( $this->nonceName( self::ACTION_CLEAR ) ),
+			esc_attr( wp_create_nonce( $this->nonceAction( self::ACTION_CLEAR, $userId, $uuid ) ) )
+		);
+	}
+
+	private function assertSupportedAction( string $action ) :void {
+		if ( !$this->isSupportedAction( $action ) ) {
+			throw new \InvalidArgumentException( 'Unsupported scope form action.' );
+		}
 	}
 }

@@ -1,9 +1,10 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -11,15 +12,21 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class ApplicationPasswordScopeColumn {
 
-	public const COLUMN_KEY = 'mandate_app_security_scope';
+	public const COLUMN_KEY = PluginIdentity::MACHINE_PREFIX.'scope';
 
 	private const JS_TEMPLATE_UUID = '{{ data.uuid }}';
-	private const JS_URL_PLACEHOLDER = 'MANDATE_APPLICATION_PASSWORD_UUID';
+	private const JS_URL_PLACEHOLDER = PluginIdentity::RUNTIME_PREFIX_UPPER.'_APPLICATION_PASSWORD_UUID';
 
 	private AdminScopeAccessPolicy $accessPolicy;
 
-	public function __construct( ?AdminScopeAccessPolicy $accessPolicy = null ) {
+	private AdminProfileContext $profileContext;
+
+	public function __construct(
+		?AdminScopeAccessPolicy $accessPolicy = null,
+		?AdminProfileContext $profileContext = null
+	) {
 		$this->accessPolicy = $accessPolicy ?? new AdminScopeAccessPolicy();
+		$this->profileContext = $profileContext ?? new AdminProfileContext( new AdminRequest(), $this->accessPolicy );
 	}
 
 	/**
@@ -101,9 +108,7 @@ class ApplicationPasswordScopeColumn {
 	}
 
 	private function profileUserId() :int {
-		global $user_id;
-
-		return isset( $user_id ) ? absint( $user_id ) : 0;
+		return $this->profileContext->profileUserId();
 	}
 
 	/**

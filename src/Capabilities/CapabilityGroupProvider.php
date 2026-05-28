@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;

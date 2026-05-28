@@ -1,11 +1,11 @@
 #!/usr/bin/env php
 <?php declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ReleasePackageIdentity;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ZipBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ReleasePackageIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ZipBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -61,7 +61,7 @@ $exitCode = 0;
 try {
 	$variant = resolve_package_variant( $options[ 'variant' ] ?? null );
 	$outputZip = resolve_output_zip( $options[ 'output' ] ?? null, $projectRoot, $buildDir, $variant );
-	$commandRunner = new CommandRunner( $projectRoot, $logger );
+	$commandRunner = new CommandRunner( $projectRoot );
 	$packageBuilder = new RuntimePackageBuilder( $projectRoot, $commandRunner, $filesystem, $logger );
 	$zipBuilder = new ZipBuilder( $filesystem, $logger );
 

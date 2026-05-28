@@ -2,27 +2,30 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeAccessPolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\ApplicationPasswordScopeColumn;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
-use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminProfileContext;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminRequest;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminScopeAccessPolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminScopeFormSecurity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminTrustedHtmlSanitizer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminUserRoleProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\ApplicationPasswordScopeColumn;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityDescriptionProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityGroupProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityScopeEnforcer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ApplicationPasswordExpirationReaper;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options\PluginOptionsRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Runtime\RuntimeRequirements;
 
 final class MandateTest extends Wpm_Test_Case {
 
@@ -159,11 +162,26 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testPluginOptionsRepositoryUsesWordPressOrgPrefixedOptionName() :void {
-		$this->assertSame( 'mandate_app_security_options', PluginOptionsRepository::OPTION_NAME );
+		$this->assertSame( 'mdpsc_options', PluginOptionsRepository::OPTION_NAME );
 	}
 
-	public function testPluginOptionsRepositoryIgnoresOldAptowebOptionWithoutMigration() :void {
-		$oldOptionName = 'aptoweb_mandate_application_password_scoper_options';
+	public function testPluginIdentityOwnsRuntimePrefixVariants() :void {
+		$this->assertSame( 'mdpsc', PluginIdentity::RUNTIME_PREFIX );
+		$this->assertSame( 'MDPSC', PluginIdentity::RUNTIME_PREFIX_UPPER );
+		$this->assertSame( 'mdpsc_', PluginIdentity::MACHINE_PREFIX );
+		$this->assertSame( 'mdpsc-', PluginIdentity::HTML_PREFIX );
+		$this->assertSame( 'mdpsc_scope', PluginIdentity::machineIdentifier( 'scope' ) );
+		$this->assertSame( 'mdpsc-scope-summary', PluginIdentity::htmlIdentifier( 'scope-summary' ) );
+		$this->assertSame( 'MDPSC_APPLICATION_PASSWORD_UUID', PluginIdentity::upperMachineIdentifier( 'APPLICATION_PASSWORD_UUID' ) );
+		$this->assertSame( 'mdpsc_ scope ', PluginIdentity::machineIdentifier( ' scope ' ) );
+	}
+
+	public function testRuntimeRequirementsPassInSupportedWordPressRuntime() :void {
+		$this->assertSame( '', RuntimeRequirements::unsupportedReason() );
+	}
+
+	public function testPluginOptionsRepositoryIgnoresOldMandateAppSecurityOptionWithoutMigration() :void {
+		$oldOptionName = 'mandate_app_security_options';
 		$oldDocument = [
 			'metadata' => [
 				'schema_version' => PluginOptionsRepository::CURRENT_SCHEMA_VERSION,
@@ -698,9 +716,11 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 	}
 
-	public function testMetaCapabilityRegistryUsesMandateFilter() :void {
+	public function testMetaCapabilityRegistryUsesMdpscFilter() :void {
+		$this->assertSame( 'mdpsc_meta_capabilities', MetaCapabilityRegistry::FILTER_META_CAPABILITIES );
+
 		add_filter(
-			'mandate_app_security_meta_capabilities',
+			MetaCapabilityRegistry::FILTER_META_CAPABILITIES,
 			static function ( array $capabilities ) :array {
 				$capabilities[] = 'wpm_manage_widget';
 				return $capabilities;
@@ -725,6 +745,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		Plugin::boot( $this->pluginFile() );
 
+		$this->assertSame( 'mdpsc_revoke_expired_application_passwords', ApplicationPasswordExpirationReaper::HOOK );
 		$this->assertHookRegistered( 'application_password_did_authenticate', 'action', 20, 2 );
 		$this->assertHookRegistered( 'user_has_cap', 'filter', PHP_INT_MAX, 4 );
 		$this->assertHookRegistered( 'map_meta_cap', 'filter', PHP_INT_MAX, 4 );
@@ -743,18 +764,16 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testUnsupportedNoticeRegistersFullPrefixedCallback() :void {
-		require dirname( __DIR__, 2 ).'/unsupported.php';
+		$registerUnsupportedNotice = require dirname( __DIR__, 2 ).'/unsupported.php';
+		$this->assertIsCallable( $registerUnsupportedNotice );
+
+		$registerUnsupportedNotice( PluginIdentity::MAIN_FILE, 'php' );
 
 		$this->assertHookRegistered( 'admin_notices', 'action', 10, 1 );
 		$this->assertHookRegistered( 'network_admin_notices', 'action', 10, 1 );
-		$this->assertSame(
-			'mandate_app_security_unsupported_notice',
-			$GLOBALS[ 'wpm_test_actions' ][ 'admin_notices' ][ 10 ][ 0 ][ 'callback' ]
-		);
-		$this->assertSame(
-			'mandate_app_security_unsupported_notice',
-			$GLOBALS[ 'wpm_test_actions' ][ 'network_admin_notices' ][ 10 ][ 0 ][ 'callback' ]
-		);
+		$this->assertIsCallable( $GLOBALS[ 'wpm_test_actions' ][ 'admin_notices' ][ 10 ][ 0 ][ 'callback' ] );
+		$this->assertIsCallable( $GLOBALS[ 'wpm_test_actions' ][ 'network_admin_notices' ][ 10 ][ 0 ][ 'callback' ] );
+		$this->assertFalse( is_string( $GLOBALS[ 'wpm_test_actions' ][ 'admin_notices' ][ 10 ][ 0 ][ 'callback' ] ) );
 	}
 
 	public function testPluginBootRegistersAdminHooksOnlyInsideAdmin() :void {
@@ -826,9 +845,15 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testApplicationPasswordScopeColumnOrdersScopeBeforeRevoke() :void {
+		$this->seedAdminFixture();
+		$_GET[ 'user_id' ] = '5';
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
-		$this->assertSame( 'mandate_app_security_scope', ApplicationPasswordScopeColumn::COLUMN_KEY );
+		$this->assertSame( 'mdpsc_scope', ApplicationPasswordScopeColumn::COLUMN_KEY );
+		$reflectionConstant = ( new ReflectionClass( ApplicationPasswordScopeColumn::class ) )
+			->getReflectionConstant( 'JS_URL_PLACEHOLDER' );
+		$this->assertNotFalse( $reflectionConstant );
+		$this->assertSame( 'MDPSC_APPLICATION_PASSWORD_UUID', $reflectionConstant->getValue() );
 
 		$columns = $scopeColumn->addColumn(
 			[
@@ -845,12 +870,12 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testApplicationPasswordScopeColumnRequiresShortcutAccess() :void {
+		$this->seedAdminFixture();
 		$GLOBALS[ 'wpm_test_current_user_caps' ] = [];
+		$_GET[ 'user_id' ] = '5';
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
 		$this->assertSame( [ 'revoke' => 'Revoke' ], $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] ) );
-		$GLOBALS[ 'user_id' ] = 5;
-
 		$html = $this->captureOutput(
 			fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] )
 		);
@@ -862,7 +887,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->seedAdminFixture();
 		$GLOBALS[ 'wpm_test_current_user_id' ] = 5;
 		$GLOBALS[ 'wpm_test_current_user_caps' ] = [ 'read' => true ];
-		$GLOBALS[ 'user_id' ] = 5;
+		$_SERVER[ 'SCRIPT_NAME' ] = '/wp-admin/profile.php';
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
 		$columns = $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] );
@@ -872,7 +897,8 @@ final class MandateTest extends Wpm_Test_Case {
 		);
 		$this->assertSame( self::UUID, $this->queryParamFromHref( $this->actionLinkHref( $html ), 'app_password_uuid' ) );
 
-		$GLOBALS[ 'user_id' ] = 9;
+		$_SERVER[ 'SCRIPT_NAME' ] = '/wp-admin/user-edit.php';
+		$_GET[ 'user_id' ] = '9';
 		$this->assertSame( [ 'revoke' => 'Revoke' ], $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] ) );
 		$this->assertSame(
 			'',
@@ -884,7 +910,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->seedAdminFixture();
 		$this->actAsUser( 5 );
 		$this->setApplicationPasswordsAvailableForUser( 5, false );
-		$GLOBALS[ 'user_id' ] = 5;
+		$_SERVER[ 'SCRIPT_NAME' ] = '/wp-admin/profile.php';
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
 		$this->assertSame( [ 'revoke' => 'Revoke' ], $scopeColumn->addColumn( [ 'revoke' => 'Revoke' ] ) );
@@ -899,7 +925,8 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testApplicationPasswordScopeColumnRendersSanitizedDeepLink() :void {
-		$GLOBALS[ 'user_id' ] = 5;
+		$this->seedAdminFixture();
+		$_GET[ 'user_id' ] = '5';
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
 		$html = $this->captureOutput(
@@ -937,13 +964,13 @@ final class MandateTest extends Wpm_Test_Case {
 	public function testApplicationPasswordScopeColumnRendersNoActiveLinkForInvalidReferences() :void {
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
-		unset( $GLOBALS[ 'user_id' ] );
 		$html = $this->captureOutput(
 			fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => self::UUID ] )
 		);
-		$this->assertSame( '&mdash;', $html );
+		$this->assertSame( '', $html );
 
-		$GLOBALS[ 'user_id' ] = 5;
+		$this->seedAdminFixture();
+		$_GET[ 'user_id' ] = '5';
 		$html = $this->captureOutput(
 			fn() => $scopeColumn->renderColumn( ApplicationPasswordScopeColumn::COLUMN_KEY, [ 'uuid' => 'not-a-uuid' ] )
 		);
@@ -951,7 +978,8 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testApplicationPasswordScopeColumnRendersJsTemplateDeepLink() :void {
-		$GLOBALS[ 'user_id' ] = 5;
+		$this->seedAdminFixture();
+		$_GET[ 'user_id' ] = '5';
 		$scopeColumn = new ApplicationPasswordScopeColumn();
 
 		$this->assertSame(
@@ -970,9 +998,9 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertStringNotContainsString( 'data.name', $html );
 		$this->assertStringNotContainsString( 'plain-secret', $html );
 
-		unset( $GLOBALS[ 'user_id' ] );
+		$_GET = [];
 		$this->assertSame(
-			'&mdash;',
+			'',
 			$this->captureOutput( fn() => $scopeColumn->renderColumnJsTemplate( ApplicationPasswordScopeColumn::COLUMN_KEY ) )
 		);
 	}
@@ -1001,7 +1029,7 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testPluginAdminAssetsEnqueueOnlyForLoadedPageHookAndExistingDistFiles() :void {
-		$root = sys_get_temp_dir().'/mandate-admin-assets-'.bin2hex( random_bytes( 4 ) );
+		$root = sys_get_temp_dir().'/mdpsc-admin-assets-'.bin2hex( random_bytes( 4 ) );
 		$dist = $root.'/assets/dist';
 		$pluginFile = $root.'/'.PluginIdentity::MAIN_FILE;
 		if ( !mkdir( $dist, 0777, true ) && !is_dir( $dist ) ) {
@@ -1022,11 +1050,11 @@ final class MandateTest extends Wpm_Test_Case {
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
 
 			do_action( 'admin_enqueue_scripts', $pageHook );
-			$this->assertArrayHasKey( 'mandate-admin-page', $GLOBALS[ 'wpm_test_enqueued_styles' ] );
+			$this->assertArrayHasKey( 'mdpsc-admin-page', $GLOBALS[ 'wpm_test_enqueued_styles' ] );
 			$this->assertSame( [], $GLOBALS[ 'wpm_test_enqueued_scripts' ] );
 			$this->assertSame(
 				'https://example.test/wp-content/plugins/'.basename( $root ).'/assets/dist/admin-page.css',
-				$GLOBALS[ 'wpm_test_enqueued_styles' ][ 'mandate-admin-page' ][ 'src' ]
+				$GLOBALS[ 'wpm_test_enqueued_styles' ][ 'mdpsc-admin-page' ][ 'src' ]
 			);
 		}
 		finally {
@@ -1323,7 +1351,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$html = $this->renderAdminPage( $repository );
 
-		$this->assertTrue( str_contains( $html, 'data-wpm-role-snapshot-status="changed"' ) );
+		$this->assertTrue( str_contains( $html, 'data-mdpsc-role-snapshot-status="changed"' ) );
 	}
 
 	public function testAdminRenderDoesNotFlagMatchingRoleSnapshot() :void {
@@ -1333,7 +1361,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$html = $this->renderAdminPage( $repository );
 
-		$this->assertFalse( str_contains( $html, 'data-wpm-role-snapshot-status="changed"' ) );
+		$this->assertFalse( str_contains( $html, 'data-mdpsc-role-snapshot-status="changed"' ) );
 	}
 
 	public function testAdminRenderDoesNotFlagLegacyUnknownRoleSnapshot() :void {
@@ -1354,7 +1382,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$html = $this->renderAdminPage( $repository );
 
-		$this->assertFalse( str_contains( $html, 'data-wpm-role-snapshot-status="changed"' ) );
+		$this->assertFalse( str_contains( $html, 'data-mdpsc-role-snapshot-status="changed"' ) );
 	}
 
 	public function testAdminRenderMovesCapabilityDescriptionTooltipsToInfoIcons() :void {
@@ -1364,19 +1392,19 @@ final class MandateTest extends Wpm_Test_Case {
 		$html = $this->renderAdminPage( $this->scopeRepository() );
 
 		$describedCode = $this->capabilityCodeAttributes( $html, 'upload_files' );
-		$this->assertArrayNotHasKey( 'data-wpm-tooltip', $describedCode );
-		$this->assertArrayNotHasKey( 'data-wpm-tooltip-text', $describedCode );
+		$this->assertArrayNotHasKey( 'data-mdpsc-tooltip', $describedCode );
+		$this->assertArrayNotHasKey( 'data-mdpsc-tooltip-text', $describedCode );
 		$this->assertArrayNotHasKey( 'tabindex', $describedCode );
 
 		$describedInfo = $this->capabilityInfoAttributes( $html, 'upload_files' );
-		$this->assertArrayHasKey( 'data-wpm-tooltip', $describedInfo );
-		$this->assertArrayHasKey( 'data-wpm-tooltip-text', $describedInfo );
-		$this->assertNotSame( '', $describedInfo[ 'data-wpm-tooltip-text' ] );
+		$this->assertArrayHasKey( 'data-mdpsc-tooltip', $describedInfo );
+		$this->assertArrayHasKey( 'data-mdpsc-tooltip-text', $describedInfo );
+		$this->assertNotSame( '', $describedInfo[ 'data-mdpsc-tooltip-text' ] );
 		$this->assertNotSame( '', $describedInfo[ 'aria-label' ] );
 
 		$custom = $this->capabilityCodeAttributes( $html, 'wpm_manage_widget' );
-		$this->assertArrayNotHasKey( 'data-wpm-tooltip', $custom );
-		$this->assertArrayNotHasKey( 'data-wpm-tooltip-text', $custom );
+		$this->assertArrayNotHasKey( 'data-mdpsc-tooltip', $custom );
+		$this->assertArrayNotHasKey( 'data-mdpsc-tooltip-text', $custom );
 		$this->assertArrayNotHasKey( 'tabindex', $custom );
 		$this->assertSame( 0, $this->capabilityInfoCount( $html, 'wpm_manage_widget' ) );
 	}
@@ -1395,7 +1423,7 @@ final class MandateTest extends Wpm_Test_Case {
 			$this->assertArrayHasKey( $topLevelKey, $data );
 		}
 		$this->assertArrayNotHasKey( 'content', $data );
-		$this->assertSame( 'wrap mandate', $data[ 'classes' ][ 'root' ] );
+		$this->assertSame( 'wrap mdpsc', $data[ 'classes' ][ 'root' ] );
 		$this->assertTrue( $data[ 'flags' ][ 'has_passwords' ] );
 		$this->assertTrue( $data[ 'flags' ][ 'show_scope_form' ] );
 		$this->assertIsString( $data[ 'hrefs' ][ 'selection_form_action' ] );
@@ -1412,25 +1440,28 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( self::UUID, $selectionForm[ 'password_options' ][ 0 ][ 'uuid' ] );
 		$this->assertTrue( $selectionForm[ 'password_options' ][ 0 ][ 'selected' ] );
 		$this->assertArrayNotHasKey( 'password_summary', $selectionForm );
-		$this->assertSame( 'mandate-password-info', $selectionForm[ 'password_info' ][ 'container_id' ] );
+		$this->assertSame( 'mdpsc-password-info', $selectionForm[ 'password_info' ][ 'container_id' ] );
 		$this->assertSame( 'inside', $selectionForm[ 'password_info' ][ 'title_placement' ] );
 		$this->assertSame( [ 'UUID', 'Created', 'Last Used' ], array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ) );
 		$this->assertFalse( in_array( 'Name', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
 		$this->assertFalse( in_array( 'App ID', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
 		$this->assertFalse( in_array( 'Restricted Scope', array_column( $selectionForm[ 'password_info' ][ 'details' ], 'label' ), true ) );
-		$this->assertSame( 'mandate-rules-summary', $selectionForm[ 'mandate_rules' ][ 'container_id' ] );
-		$this->assertSame( 'outside', $selectionForm[ 'mandate_rules' ][ 'title_placement' ] );
-		$this->assertSame( [ 'Restricted Scope', 'Expiration Date', 'Lock This Scope' ], array_slice( array_column( $selectionForm[ 'mandate_rules' ][ 'details' ], 'label' ), 0, 3 ) );
-		$adminLockDetail = $selectionForm[ 'mandate_rules' ][ 'details' ][ 2 ];
+		$this->assertArrayHasKey( 'scope_summary', $selectionForm );
+		$this->assertArrayNotHasKey( 'mandate_rules', $selectionForm );
+		$this->assertSame( 'Scope Summary', $selectionForm[ 'scope_summary' ][ 'title' ] );
+		$this->assertSame( 'mdpsc-scope-summary', $selectionForm[ 'scope_summary' ][ 'container_id' ] );
+		$this->assertSame( 'outside', $selectionForm[ 'scope_summary' ][ 'title_placement' ] );
+		$this->assertSame( [ 'Restricted Scope', 'Expiration Date', 'Lock This Scope' ], array_slice( array_column( $selectionForm[ 'scope_summary' ][ 'details' ], 'label' ), 0, 3 ) );
+		$adminLockDetail = $selectionForm[ 'scope_summary' ][ 'details' ][ 2 ];
 		$this->assertSame( 'admin_lock', $adminLockDetail[ 'kind' ] );
 		$this->assertSame( 'Lock This Scope', $adminLockDetail[ 'label' ] );
 		$this->assertSame( 'admin_locked', $adminLockDetail[ 'input' ][ 'name' ] );
-		$this->assertSame( 'mandate-scope-form', $adminLockDetail[ 'input' ][ 'form' ] );
+		$this->assertSame( 'mdpsc-scope-form', $adminLockDetail[ 'input' ][ 'form' ] );
 		$this->assertFalse( $adminLockDetail[ 'input' ][ 'checked' ] );
 		$this->assertFalse( $adminLockDetail[ 'input' ][ 'disabled' ] );
 
 		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
-		$this->assertSame( 'mandate-scope-form', $scopeForm[ 'id' ] );
+		$this->assertSame( 'mdpsc-scope-form', $scopeForm[ 'id' ] );
 		$this->assertSame( self::UUID, $scopeForm[ 'uuid' ] );
 		$this->assertArrayNotHasKey( 'admin_lock', $scopeForm );
 		$this->assertArrayNotHasKey( 'tabs', $scopeForm );
@@ -1446,12 +1477,12 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertArrayNotHasKey( 'count', $scopeForm[ 'source_panels' ][ 0 ] );
 		$this->assertSame(
 			[
-				'mandate-wordpress-area-posts-capabilities',
-				'mandate-wordpress-area-pages-capabilities',
-				'mandate-wordpress-area-taxonomy-capabilities',
-				'mandate-wordpress-area-users-capabilities',
-				'mandate-wordpress-area-media-capabilities',
-				'mandate-wordpress-area-general-capabilities',
+				'mdpsc-wordpress-area-posts-capabilities',
+				'mdpsc-wordpress-area-pages-capabilities',
+				'mdpsc-wordpress-area-taxonomy-capabilities',
+				'mdpsc-wordpress-area-users-capabilities',
+				'mdpsc-wordpress-area-media-capabilities',
+				'mdpsc-wordpress-area-general-capabilities',
 			],
 			array_column( $scopeForm[ 'source_panels' ][ 0 ][ 'section_index' ], 'target_id' )
 		);
@@ -1477,7 +1508,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$uploadFiles = $this->capabilityItemFromViewData( $data, 'upload_files' );
 		$this->assertSame( 'primitive:upload_files', $uploadFiles[ 'item_key' ] );
-		$this->assertSame( 'mandate-capability-primitive-upload_files', $uploadFiles[ 'input_id' ] );
+		$this->assertSame( 'mdpsc-capability-primitive-upload_files', $uploadFiles[ 'input_id' ] );
 		$this->assertSame( 'allowed_caps', $uploadFiles[ 'field_name' ] );
 		$this->assertSame( 'primitive', $uploadFiles[ 'type' ] );
 		$this->assertSame( 'wordpress', $uploadFiles[ 'source' ] );
@@ -1492,8 +1523,8 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertIsString( $uploadFiles[ 'tooltip_aria_label' ] );
 
 		$sourceSections = array_column( $scopeForm[ 'source_panels' ][ 0 ][ 'sections' ], null, 'id' );
-		$this->assertSame( 'checked', $sourceSections[ 'mandate-wordpress-area-posts-capabilities' ][ 'bulk_actions' ][ 'select_all' ][ 'state' ] );
-		$this->assertFalse( $sourceSections[ 'mandate-wordpress-area-posts-capabilities' ][ 'bulk_actions' ][ 'select_all' ][ 'disabled' ] );
+		$this->assertSame( 'checked', $sourceSections[ 'mdpsc-wordpress-area-posts-capabilities' ][ 'bulk_actions' ][ 'select_all' ][ 'state' ] );
+		$this->assertFalse( $sourceSections[ 'mdpsc-wordpress-area-posts-capabilities' ][ 'bulk_actions' ][ 'select_all' ][ 'disabled' ] );
 	}
 
 	public function testAdminPageViewDataBuilderRestrictsNonAdminSelectionToCurrentUser() :void {
@@ -1511,7 +1542,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$this->assertSame( 5, $data[ 'vars' ][ 'selection_form' ][ 'selected_user_id' ] );
 		$this->assertSame( self::UUID, $data[ 'vars' ][ 'selection_form' ][ 'selected_uuid' ] );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//select[@id="mandate-user" and @name="user_id" and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//select[@id="mdpsc-user" and @name="user_id" and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//option[@value="5" and @selected="selected"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//option[@value="9"]' ) );
 	}
@@ -1524,15 +1555,15 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$xpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
 
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mdpsc-scope-form" and @data-mdpsc-admin-lock-status="locked"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@name="allowed_caps[]" and @value="read" and @disabled="disabled"]' ) );
-		$this->assertSame( 4, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @disabled="disabled"]' ) );
-		$this->assertSame( 12, $this->nodeCount( $xpath, '//*[@data-wpm-select-section and @disabled="disabled"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-input and @disabled="disabled"]' ) );
+		$this->assertSame( 4, $this->nodeCount( $xpath, '//*[@data-mdpsc-select-panel and @disabled="disabled"]' ) );
+		$this->assertSame( 12, $this->nodeCount( $xpath, '//*[@data-mdpsc-select-section and @disabled="disabled"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-mdpsc-expiration-input and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="'.AdminScopeFormSecurity::ACTION_FIELD.'" and @value="save_scope" and @disabled="disabled"]' ) );
 		$this->assertSame( 1, $this->nodeCount( $xpath, '//button[@name="'.AdminScopeFormSecurity::ACTION_FIELD.'" and @value="clear_scope" and @disabled="disabled"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//input[@name="admin_locked"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-rules-summary"]//dt[normalize-space(.) = "Lock This Scope"]/following-sibling::dd[1][not(.//input)]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mdpsc-scope-summary"]//dt[normalize-space(.) = "Lock This Scope"]/following-sibling::dd[1][not(.//input)]' ) );
 	}
 
 	public function testAdminPageRenderShowsAdminLockControlForAdminsOnly() :void {
@@ -1541,9 +1572,9 @@ final class MandateTest extends Wpm_Test_Case {
 		$repository->save( self::UUID, 5, [], [], [ 'wpm_editor' ], 1, null, false, true );
 
 		$adminXpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $repository ) ) );
-		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-scope-form" and @data-wpm-admin-lock-status="locked"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mandate-rules-summary"]//input[@data-wpm-admin-lock-input and @name="admin_locked" and @value="1" and @form="mandate-scope-form" and @checked="checked"]' ) );
-		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//*[@id="mandate-scope-form"]//input[@name="admin_locked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mdpsc-scope-form" and @data-mdpsc-admin-lock-status="locked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $adminXpath, '//*[@id="mdpsc-scope-summary"]//input[@data-mdpsc-admin-lock-input and @name="admin_locked" and @value="1" and @form="mdpsc-scope-form" and @checked="checked"]' ) );
+		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//*[@id="mdpsc-scope-form"]//input[@name="admin_locked"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $adminXpath, '//input[@name="admin_locked" and @disabled="disabled"]' ) );
 
 		$this->actAsUser( 5 );
@@ -1564,7 +1595,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$data = $this->adminPageViewDataBuilder( $repository )->build();
 		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
-		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'mandate_rules' ][ 'details' ][ 2 ];
+		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'scope_summary' ][ 'details' ][ 2 ];
 
 		$this->assertSame( 'unlocked', $scopeForm[ 'admin_lock_status' ] );
 		$this->assertSame( 'admin_lock', $adminLockDetail[ 'kind' ] );
@@ -1572,14 +1603,14 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertTrue( $adminLockDetail[ 'input' ][ 'disabled' ] );
 	}
 
-	public function testAdminPageRenderPlacesMandateRulesTitleOutsideSummaryCard() :void {
+	public function testAdminPageRenderPlacesScopeSummaryTitleOutsideSummaryCard() :void {
 		$this->seedAdminFixture();
 
 		$xpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $this->scopeRepository() ) ) );
 
-		$this->assertSame( 3, $this->nodeCount( $xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " mandate-field-title ")]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mandate-rules-summary-title" and contains(concat(" ", normalize-space(@class), " "), " mandate-field-title ")]' ) );
-		$this->assertSame( 0, $this->nodeCount( $xpath, '//*[@id="mandate-rules-summary"]//*[@id="mandate-rules-summary-title"]' ) );
+		$this->assertSame( 3, $this->nodeCount( $xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " mdpsc-field-title ")]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@id="mdpsc-scope-summary-title" and contains(concat(" ", normalize-space(@class), " "), " mdpsc-field-title ")]' ) );
+		$this->assertSame( 0, $this->nodeCount( $xpath, '//*[@id="mdpsc-scope-summary"]//*[@id="mdpsc-scope-summary-title"]' ) );
 	}
 
 	public function testAdminPageViewDataBuilderEmitsSuperAdminUnsupportedState() :void {
@@ -1594,7 +1625,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$data = $this->adminPageViewDataBuilder( $this->scopeRepository() )->build();
 		$scopeForm = $data[ 'vars' ][ 'scope_form' ];
-		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'mandate_rules' ][ 'details' ][ 2 ];
+		$adminLockDetail = $data[ 'vars' ][ 'selection_form' ][ 'scope_summary' ][ 'details' ][ 2 ];
 
 		$this->assertTrue( $scopeForm[ 'super_admin_notice' ][ 'is_visible' ] );
 		$this->assertTrue( $scopeForm[ 'actions' ][ 0 ][ 'disabled' ] );
@@ -1614,7 +1645,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$repository->save( self::UUID, 5, [], [], [], 1, '2026-05-24', false );
 
 		$data = $this->adminPageViewDataBuilder( $repository )->build();
-		$summary = $data[ 'vars' ][ 'selection_form' ][ 'mandate_rules' ];
+		$summary = $data[ 'vars' ][ 'selection_form' ][ 'scope_summary' ];
 		$scopeDetails = $summary[ 'details' ];
 
 		$this->assertCount( 1, $summary[ 'warnings' ] );
@@ -1660,7 +1691,7 @@ final class MandateTest extends Wpm_Test_Case {
 		}
 	}
 
-	public function testAdminTemplateRendererRejectsUnsafeDataKeys() :void {
+	public function testAdminTemplateRendererProvidesSingleExplicitDataArray() :void {
 		$renderer = new AdminTemplateRenderer();
 		$notice = [
 			'is_visible' => true,
@@ -1668,21 +1699,25 @@ final class MandateTest extends Wpm_Test_Case {
 			'text'       => 'Rendered fixture',
 		];
 
-		foreach ( [ 'this', 'GLOBALS', '_POST', 'bad-key', '1bad' ] as $key ) {
-			$this->assertThrowsRuntimeException(
-				static fn() => $renderer->render( 'partials/notice.php', [ 'notice' => $notice, $key => 'bad' ] ),
-				$key
-			);
-		}
-
-		$this->assertThrowsRuntimeException(
-			static fn() => $renderer->render( 'partials/notice.php', [ 'notice' => $notice, 0 => 'bad' ] )
+		$html = $renderer->render(
+			'partials/notice.php',
+			[
+				'notice'  => $notice,
+				'this'    => 'ignored',
+				'GLOBALS' => 'ignored',
+				'_POST'   => 'ignored',
+				'bad-key' => 'ignored',
+				0         => 'ignored',
+			]
 		);
+
+		$this->assertStringContainsString( 'Rendered fixture', $html );
+		$this->assertStringNotContainsString( 'ignored', $html );
 	}
 
 	public function testAdminTrustedHtmlSanitizerStripsDropdownMarkupOutsideAllowlist() :void {
 		$html = ( new AdminTrustedHtmlSanitizer() )->dropdown(
-			'<select name="user_id" id="mandate-user" class="wide" onchange="evil()">'
+			'<select name="user_id" id="mdpsc-user" class="wide" onchange="evil()">'
 			.'<option value="5" selected="selected" onclick="evil()">User<script>alert(1)</script></option>'
 			.'</select><input type="text" name="bad" value="bad" />'
 		);
@@ -1690,7 +1725,7 @@ final class MandateTest extends Wpm_Test_Case {
 
 		$select = $this->firstElement( $xpath, '//select' );
 		$this->assertSame( 'user_id', $select->getAttribute( 'name' ) );
-		$this->assertSame( 'mandate-user', $select->getAttribute( 'id' ) );
+		$this->assertSame( 'mdpsc-user', $select->getAttribute( 'id' ) );
 		$this->assertSame( 'wide', $select->getAttribute( 'class' ) );
 		$this->assertSame( '', $select->getAttribute( 'onchange' ) );
 
@@ -1701,43 +1736,102 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//script|//input' ) );
 	}
 
-	public function testAdminTrustedHtmlSanitizerKeepsOnlyHiddenNonceInputs() :void {
-		$html = ( new AdminTrustedHtmlSanitizer() )->nonceFields(
-			'<input type="hidden" id="custom-save-nonce" name="custom_save_nonce" value="abc" onclick="evil()" />'
-			.'<input type="text" name="bad" value="bad" />'
-			.'<select name="bad"><option value="bad">Bad</option></select>'
-		);
-		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
-
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//input' ) );
-		$input = $this->firstElement( $xpath, '//input' );
-		$this->assertSame( 'hidden', $input->getAttribute( 'type' ) );
-		$this->assertSame( 'custom-save-nonce', $input->getAttribute( 'id' ) );
-		$this->assertSame( 'custom_save_nonce', $input->getAttribute( 'name' ) );
-		$this->assertSame( 'abc', $input->getAttribute( 'value' ) );
-		$this->assertSame( '', $input->getAttribute( 'onclick' ) );
-		$this->assertSame( 0, $this->nodeCount( $xpath, '//select|//option' ) );
-		$this->assertFalse( str_contains( $html, 'Bad' ) );
-	}
-
-	public function testAdminScopeFormSecurityEmitsOnlyActionNonceFields() :void {
-		$formSecurity = new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() );
+	public function testAdminScopeFormSecurityBuildsDirectActionNonceFields() :void {
+		$formSecurity = new AdminScopeFormSecurity();
 		$html = $formSecurity->nonceFields( 5, self::UUID );
 		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
 
-		$this->assertSame( 'mandate_app_security_action', AdminScopeFormSecurity::ACTION_FIELD );
+		$this->assertSame( 'mdpsc_action', AdminScopeFormSecurity::ACTION_FIELD );
 		$this->assertSame(
-			'mandate_app_security_scope:save_scope:5:'.self::UUID,
+			'mdpsc_scope:save_scope:5:'.self::UUID,
 			$formSecurity->nonceAction( AdminScopeFormSecurity::ACTION_SAVE, 5, self::UUID )
 		);
 		$this->assertSame(
-			'mandate_app_security_save_scope_nonce',
+			'mdpsc_save_scope_nonce',
 			$formSecurity->nonceName( AdminScopeFormSecurity::ACTION_SAVE )
 		);
+		$this->assertSame(
+			'mdpsc_clear_scope_nonce',
+			$formSecurity->nonceName( AdminScopeFormSecurity::ACTION_CLEAR )
+		);
 		$this->assertSame( 2, $this->nodeCount( $xpath, '//input' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @id="mandate_app_security_save_scope_nonce" and @name="mandate_app_security_save_scope_nonce"]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @id="mandate_app_security_clear_scope_nonce" and @name="mandate_app_security_clear_scope_nonce"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @name="mdpsc_save_scope_nonce" and @value="nonce:mdpsc_scope:save_scope:5:'.self::UUID.'"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @name="mdpsc_clear_scope_nonce" and @value="nonce:mdpsc_scope:clear_scope:5:'.self::UUID.'"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//input[@name="_wp_http_referer"]' ) );
+	}
+
+	public function testAdminScopeFormSecurityRejectsUnsupportedNonceNameAction() :void {
+		$this->expectException( \InvalidArgumentException::class );
+
+		( new AdminScopeFormSecurity() )->nonceName( 'bad_action' );
+	}
+
+	public function testAdminScopeFormSecurityRejectsUnsupportedNonceAction() :void {
+		$this->expectException( \InvalidArgumentException::class );
+
+		( new AdminScopeFormSecurity() )->nonceAction( 'bad_action', 5, self::UUID );
+	}
+
+	public function testSubmittedRuntimeSourceKeepsWordPressOrgBoundaries() :void {
+		$runtimeFiles = $this->runtimeSourceFiles();
+		$this->assertNotSame( [], $runtimeFiles );
+
+		$allowedRequestFiles = [
+			$this->normalizePath( dirname( __DIR__, 2 ).'/src/Admin/AdminRequest.php' ) => true,
+		];
+		$allowedRuntimeCheckFiles = [
+			$this->normalizePath( dirname( __DIR__, 2 ).'/src/Runtime/RuntimeRequirements.php' ) => true,
+		];
+
+		foreach ( $runtimeFiles as $file => $contents ) {
+			$this->assertStringNotContainsString( 'global $', $contents, $file );
+			$this->assertStringNotContainsString( '$GLOBALS', $contents, $file );
+			$this->assertStringNotContainsString( 'extract(', $contents, $file );
+			$this->assertStringNotContainsString( 'mandate_app_security', $contents, $file );
+			$this->assertStringNotContainsString( 'mandate_rules', $contents, $file );
+			$this->assertStringNotContainsString( 'buildMandate', $contents, $file );
+			$this->assertStringNotContainsString( 'MANDATE_APPLICATION_PASSWORD_UUID', $contents, $file );
+			$this->assertStringNotContainsString( 'mandate_meta_capabilities', $contents, $file );
+			$this->assertStringNotContainsString( 'manas_', $contents, $file );
+			$this->assertStringNotContainsString( 'data-wpm-', $contents, $file );
+			$this->assertStringNotContainsString( 'is-wpm-', $contents, $file );
+			$this->assertSame( 0, preg_match( '/MANDATE_[A-Z0-9_]+/', $contents ), $file );
+			preg_match_all( '/mandate-[a-z0-9_-]+/', $contents, $matches );
+			foreach ( $matches[ 0 ] as $token ) {
+				$this->assertSame( 'mandate-app-security', $token, $file );
+			}
+
+			if ( !$this->allowsRawMdpscRuntimeLiteral( $file ) ) {
+				$this->assertSame(
+					[],
+					$this->rawMdpscRuntimeLiterals( $contents ),
+					$file
+				);
+			}
+
+			if ( !isset( $allowedRequestFiles[ $file ] ) ) {
+				$this->assertStringNotContainsString( '$_GET', $contents, $file );
+				$this->assertStringNotContainsString( '$_POST', $contents, $file );
+				$this->assertStringNotContainsString( '$_SERVER', $contents, $file );
+			}
+
+			if ( !isset( $allowedRuntimeCheckFiles[ $file ] ) ) {
+				$this->assertStringNotContainsString( 'function_exists(', $contents, $file );
+				$this->assertStringNotContainsString( 'class_exists(', $contents, $file );
+				$this->assertStringNotContainsString( 'method_exists(', $contents, $file );
+			}
+		}
+	}
+
+	public function testRuntimeFormAndSanitizerPathsDoNotParseHtmlWithRegex() :void {
+		foreach ( [
+			dirname( __DIR__, 2 ).'/src/Admin/AdminScopeFormSecurity.php',
+			dirname( __DIR__, 2 ).'/src/Admin/AdminTrustedHtmlSanitizer.php',
+		] as $file ) {
+			$contents = file_get_contents( $file );
+			$this->assertIsString( $contents );
+			$this->assertStringNotContainsString( 'preg_match', $contents, $file );
+		}
 	}
 
 	public function testAdminRenderEscapesMaliciousPasswordAndRoleDisplayData() :void {
@@ -1767,9 +1861,9 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->seedAdminFixture();
 
 		$xpath = new DOMXPath( $this->documentFromHtml( $this->renderAdminPage( $this->scopeRepository() ) ) );
-		$groups = $this->firstElement( $xpath, '//*[@data-wpm-capability-groups]' );
+		$groups = $this->firstElement( $xpath, '//*[@data-mdpsc-capability-groups]' );
 		$config = json_decode(
-			$groups->getAttribute( 'data-wpm-capability-grouping-config' ),
+			$groups->getAttribute( 'data-mdpsc-capability-grouping-config' ),
 			true,
 			512,
 			JSON_THROW_ON_ERROR
@@ -1779,25 +1873,25 @@ final class MandateTest extends Wpm_Test_Case {
 		$this->assertSame( 'area', $config[ 'defaultMode' ] );
 		$this->assertIsArray( $config[ 'sources' ] );
 		$this->assertNotSame( [], $config[ 'sources' ] );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-selection-form]' ) );
-		$this->assertGreaterThan( 0, $this->nodeCount( $xpath, '//*[@data-wpm-capability-item]' ) );
-		$this->assertGreaterThan( 0, $this->nodeCount( $xpath, '//*[@data-wpm-select-panel and @data-wpm-select-state]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-wpm-expiration-summary and @aria-controls]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-mdpsc-selection-form]' ) );
+		$this->assertGreaterThan( 0, $this->nodeCount( $xpath, '//*[@data-mdpsc-capability-item]' ) );
+		$this->assertGreaterThan( 0, $this->nodeCount( $xpath, '//*[@data-mdpsc-select-panel and @data-mdpsc-select-state]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//*[@data-mdpsc-expiration-summary and @aria-controls]' ) );
 	}
 
 	public function testAdminTemplateAllowedHtmlStripsDisallowedMarkupAndPreservesAllowedControls() :void {
 		$html = wp_kses(
-			'<form method="post" action="https://example.test" data-wpm-selection-form onclick="evil()">'
-			.'<input type="hidden" name="'.AdminScopeFormSecurity::ACTION_FIELD.'" value="save_scope" data-wpm-admin-lock-input />'
-			.'<script>alert(1)</script><span data-wpm-select-panel data-wpm-select-state="checked">ok</span>'
+			'<form method="post" action="https://example.test" data-mdpsc-selection-form onclick="evil()">'
+			.'<input type="hidden" name="'.AdminScopeFormSecurity::ACTION_FIELD.'" value="save_scope" data-mdpsc-admin-lock-input />'
+			.'<script>alert(1)</script><span data-mdpsc-select-panel data-mdpsc-select-state="checked">ok</span>'
 			.'</form>',
 			( new AdminTemplateRenderer() )->allowedAdminHtml()
 		);
 		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
 
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//form[@method="post" and @data-wpm-selection-form]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @name="'.AdminScopeFormSecurity::ACTION_FIELD.'" and @data-wpm-admin-lock-input]' ) );
-		$this->assertSame( 1, $this->nodeCount( $xpath, '//span[@data-wpm-select-panel and @data-wpm-select-state="checked"]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//form[@method="post" and @data-mdpsc-selection-form]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//input[@type="hidden" and @name="'.AdminScopeFormSecurity::ACTION_FIELD.'" and @data-mdpsc-admin-lock-input]' ) );
+		$this->assertSame( 1, $this->nodeCount( $xpath, '//span[@data-mdpsc-select-panel and @data-mdpsc-select-state="checked"]' ) );
 		$this->assertSame( 0, $this->nodeCount( $xpath, '//script|//@onclick' ) );
 	}
 
@@ -1882,8 +1976,9 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	public function testPluginBootAdminTableHooksUseScopeColumnBehavior() :void {
+		$this->seedAdminFixture();
 		$GLOBALS[ 'wpm_test_is_admin' ] = true;
-		$GLOBALS[ 'user_id' ] = 5;
+		$_GET[ 'user_id' ] = '5';
 
 		Plugin::boot( $this->pluginFile() );
 
@@ -1908,10 +2003,12 @@ final class MandateTest extends Wpm_Test_Case {
 		$metaRegistry = new MetaCapabilityRegistry();
 		$groupProvider = new CapabilityGroupProvider();
 		$expirationDatePolicy = new ExpirationDatePolicy();
+		$request = new AdminRequest();
 		$roleProvider = new AdminUserRoleProvider();
 		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
-		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
+		$formSecurity = new AdminScopeFormSecurity();
 		$viewDataBuilder = new AdminPageViewDataBuilder(
+			$request,
 			$repository,
 			$passwordRepository,
 			$candidateProvider,
@@ -1931,6 +2028,7 @@ final class MandateTest extends Wpm_Test_Case {
 			$metaRegistry,
 			$this->pluginFile(),
 			$expirationDatePolicy,
+			$request,
 			$roleProvider,
 			$formSecurity,
 			$viewDataBuilder,
@@ -1939,11 +2037,13 @@ final class MandateTest extends Wpm_Test_Case {
 	}
 
 	private function adminPageViewDataBuilder( ScopeRepository $repository ) :AdminPageViewDataBuilder {
+		$request = new AdminRequest();
 		$roleProvider = new AdminUserRoleProvider();
 		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
-		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
+		$formSecurity = new AdminScopeFormSecurity();
 
 		return new AdminPageViewDataBuilder(
+			$request,
 			$repository,
 			new ApplicationPasswordRepository(),
 			new CapabilityCandidateProvider(),
@@ -1955,6 +2055,60 @@ final class MandateTest extends Wpm_Test_Case {
 			$formSecurity,
 			$trustedHtmlSanitizer
 		);
+	}
+
+	/**
+	 * @return array<string,string>
+	 */
+	private function rawMdpscRuntimeLiterals( string $contents ) :array {
+		preg_match_all( '/([\'"])(?:mdpsc_|mdpsc-|MDPSC_)[^\'"]*\1/', $contents, $matches );
+		return $matches[ 0 ];
+	}
+
+	private function allowsRawMdpscRuntimeLiteral( string $file ) :bool {
+		$root = $this->normalizePath( dirname( __DIR__, 2 ) );
+		$allowedFiles = [
+			$root.'/src/PluginIdentity.php' => true,
+			$root.'/src/Admin/AdminTemplateRenderer.php' => true,
+		];
+
+		return isset( $allowedFiles[ $file ] )
+			|| str_starts_with( $file, $root.'/src/Admin/templates/' );
+	}
+
+	/**
+	 * @return array<string,string>
+	 */
+	private function runtimeSourceFiles() :array {
+		$root = dirname( __DIR__, 2 );
+		$files = [
+			$root.'/mandate-app-security.php',
+			$root.'/init.php',
+			$root.'/unsupported.php',
+		];
+
+		$iterator = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $root.'/src', FilesystemIterator::SKIP_DOTS )
+		);
+		foreach ( $iterator as $file ) {
+			if ( $file instanceof SplFileInfo && $file->isFile() && $file->getExtension() === 'php' ) {
+				$files[] = $file->getPathname();
+			}
+		}
+
+		$contentsByFile = [];
+		foreach ( $files as $file ) {
+			$contents = file_get_contents( $file );
+			$this->assertIsString( $contents, $file );
+			$contentsByFile[ $this->normalizePath( $file ) ] = $contents;
+		}
+
+		ksort( $contentsByFile, SORT_NATURAL );
+		return $contentsByFile;
+	}
+
+	private function normalizePath( string $path ) :string {
+		return str_replace( '\\', '/', $path );
 	}
 
 	private function pluginFile() :string {
@@ -2056,7 +2210,7 @@ final class MandateTest extends Wpm_Test_Case {
 			$_POST[ 'admin_locked' ] = $adminLocked ? '1' : '';
 		}
 		if ( $withNonce ) {
-			$formSecurity = new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() );
+			$formSecurity = new AdminScopeFormSecurity();
 			$nonceName = $formSecurity->nonceName( $action );
 			$_POST[ $nonceName ] = wpm_test_set_valid_nonce(
 				$nonceName,
@@ -2259,7 +2413,7 @@ final class MandateTest extends Wpm_Test_Case {
 	private function capabilityInfoAttributes( string $html, string $capability ) :array {
 		$xpath = new DOMXPath( $this->documentFromHtml( $html ) );
 		$capabilityLiteral = json_encode( $capability, JSON_THROW_ON_ERROR );
-		$nodes = $xpath->query( '//*[@data-wpm-capability-item and @data-wpm-capability-name = '.$capabilityLiteral.']//button[contains(concat(" ", normalize-space(@class), " "), " mandate-capability-info ")]' );
+		$nodes = $xpath->query( '//*[@data-mdpsc-capability-item and @data-mdpsc-capability-name = '.$capabilityLiteral.']//button[contains(concat(" ", normalize-space(@class), " "), " mdpsc-capability-info ")]' );
 		if ( !$nodes instanceof DOMNodeList || $nodes->length < 1 ) {
 			throw new RuntimeException( 'Expected rendered capability info button for '.$capability.'.' );
 		}
@@ -2282,7 +2436,7 @@ final class MandateTest extends Wpm_Test_Case {
 		$capabilityLiteral = json_encode( $capability, JSON_THROW_ON_ERROR );
 		return $this->nodeCount(
 			$xpath,
-			'//*[@data-wpm-capability-item and @data-wpm-capability-name = '.$capabilityLiteral.']//button[contains(concat(" ", normalize-space(@class), " "), " mandate-capability-info ")]'
+			'//*[@data-mdpsc-capability-item and @data-mdpsc-capability-name = '.$capabilityLiteral.']//button[contains(concat(" ", normalize-space(@class), " "), " mdpsc-capability-info ")]'
 		);
 	}
 

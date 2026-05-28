@@ -2,9 +2,10 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ProcessRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\TemporaryDirectoryManager;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -92,48 +93,44 @@ try {
 		$composeEnv
 	);
 
-	$result = wpm_plugin_check_run_capture(
-		array_merge(
-			$compose,
-			[
-				'run',
-				'--rm',
-				'-T',
-				'wp-cli',
-				'wp',
-				'plugin',
-				'check',
-				'mandate-app-security',
-				'--format=json',
-				'--require=./wp-content/plugins/plugin-check/cli.php',
-				'--slug=mandate-app-security',
-				'--allow-root',
-			]
-		),
-		$rootDir,
-		$composeEnv
-	);
+	$findings = [];
+	foreach ( [
+		'new',
+		'update',
+	] as $pluginCheckMode ) {
+		echo 'Running Plugin Check strict profile for mode: '.$pluginCheckMode.PHP_EOL;
+		$result = wpm_plugin_check_run_capture(
+			wpm_plugin_check_command( $compose, $pluginCheckMode ),
+			$rootDir,
+			$composeEnv
+		);
 
-	if ( $result[ 'exit_code' ] !== 0 ) {
-		echo $result[ 'stdout' ];
-		fwrite( STDERR, $result[ 'stderr' ] );
-		throw new RuntimeException( 'Plugin Check command failed with exit code '.$result[ 'exit_code' ].'.' );
+		if ( $result[ 'exit_code' ] !== 0 ) {
+			echo $result[ 'stdout' ];
+			fwrite( STDERR, $result[ 'stderr' ] );
+			throw new RuntimeException( 'Plugin Check command failed with exit code '.$result[ 'exit_code' ].' for mode '.$pluginCheckMode.'.' );
+		}
+
+		$profileFindings = wpm_plugin_check_parse_findings( $result[ 'stdout' ], $pluginCheckMode );
+		wpm_plugin_check_print_findings( $profileFindings );
+		$findings = [ ...$findings, ...$profileFindings ];
 	}
 
-	$findings = wpm_plugin_check_parse_findings( $result[ 'stdout' ] );
 	$errorCount = wpm_plugin_check_count_type( $findings, 'ERROR' );
 	$warningCount = wpm_plugin_check_count_type( $findings, 'WARNING' );
+	$otherCount = max( 0, count( $findings ) - $errorCount - $warningCount );
 
-	wpm_plugin_check_print_findings( $findings );
 	echo sprintf(
-		"Plugin Check completed with %d error%s and %d warning%s.\n",
+		"Plugin Check strict profiles completed with %d error%s, %d warning%s, and %d other finding%s.\n",
 		$errorCount,
 		$errorCount === 1 ? '' : 's',
 		$warningCount,
-		$warningCount === 1 ? '' : 's'
+		$warningCount === 1 ? '' : 's',
+		$otherCount,
+		$otherCount === 1 ? '' : 's'
 	);
 
-	$exitCode = $errorCount > 0 ? 1 : 0;
+	$exitCode = count( $findings ) > 0 ? 1 : 0;
 }
 catch ( Throwable $throwable ) {
 	fwrite( STDERR, 'Plugin Check failed: '.$throwable->getMessage().PHP_EOL );
@@ -165,10 +162,38 @@ function wpm_plugin_check_build_package( string $rootDir, string $temporaryRoot,
 
 	( new RuntimePackageBuilder(
 		$rootDir,
-		new CommandRunner( $rootDir, $logger ),
+		new CommandRunner( $rootDir ),
 		new Filesystem(),
 		$logger
 	) )->build( $packageDir, $temporaryRoot, false );
+}
+
+/**
+ * @param string[] $compose
+ * @return string[]
+ */
+function wpm_plugin_check_command( array $compose, string $pluginCheckMode ) :array {
+	return array_merge(
+		$compose,
+		[
+			'run',
+			'--rm',
+			'-T',
+			'wp-cli',
+			'wp',
+			'plugin',
+			'check',
+			'mandate-app-security',
+			'--format=json',
+			'--require=./wp-content/plugins/plugin-check/cli.php',
+			'--slug=mandate-app-security',
+			'--include-experimental',
+			'--include-low-severity-errors',
+			'--include-low-severity-warnings',
+			'--mode='.$pluginCheckMode,
+			'--allow-root',
+		]
+	);
 }
 
 /**
@@ -176,9 +201,14 @@ function wpm_plugin_check_build_package( string $rootDir, string $temporaryRoot,
  * @param array<string,string> $env
  */
 function wpm_plugin_check_run( array $command, string $cwd, array $env = [] ) :void {
-	$result = wpm_plugin_check_run_capture( $command, $cwd, $env, true );
-	if ( $result[ 'exit_code' ] !== 0 ) {
-		throw new RuntimeException( 'Command failed with exit code '.$result[ 'exit_code' ].': '.implode( ' ', $command ) );
+	$exitCode = wpm_plugin_check_process_runner()->runForExitCode(
+		$command,
+		$cwd,
+		null,
+		array_merge( $env, [ 'COMPOSE_PROGRESS' => 'quiet' ] )
+	);
+	if ( $exitCode !== 0 ) {
+		throw new RuntimeException( 'Command failed with exit code '.$exitCode.': '.implode( ' ', $command ) );
 	}
 }
 
@@ -187,50 +217,18 @@ function wpm_plugin_check_run( array $command, string $cwd, array $env = [] ) :v
  * @param array<string,string> $env
  * @return array{exit_code:int,stdout:string,stderr:string}
  */
-function wpm_plugin_check_run_capture( array $command, string $cwd, array $env = [], bool $stream = false ) :array {
-	echo '> '.implode( ' ', array_map( 'wpm_plugin_check_quote_arg', $command ) ).PHP_EOL;
-	$descriptorSpec = [
-		0 => [ 'file', 'php://stdin', 'r' ],
-		1 => [ 'pipe', 'w' ],
-		2 => [ 'pipe', 'w' ],
-	];
-	$baseEnv = getenv();
-	if ( !is_array( $baseEnv ) ) {
-		$baseEnv = [];
-	}
-	$process = proc_open(
+function wpm_plugin_check_run_capture( array $command, string $cwd, array $env = [] ) :array {
+	return wpm_plugin_check_process_runner()->runAndCapture(
 		$command,
-		$descriptorSpec,
-		$pipes,
 		$cwd,
-		array_merge( $baseEnv, $env, [ 'COMPOSE_PROGRESS' => 'quiet' ] )
+		array_merge( $env, [ 'COMPOSE_PROGRESS' => 'quiet' ] )
 	);
-	if ( !is_resource( $process ) ) {
-		throw new RuntimeException( 'Failed to start command.' );
-	}
-
-	$stdout = stream_get_contents( $pipes[ 1 ] );
-	$stderr = stream_get_contents( $pipes[ 2 ] );
-	fclose( $pipes[ 1 ] );
-	fclose( $pipes[ 2 ] );
-	$exitCode = proc_close( $process );
-
-	if ( $stream ) {
-		echo $stdout;
-		fwrite( STDERR, $stderr );
-	}
-
-	return [
-		'exit_code' => $exitCode,
-		'stdout'    => $stdout,
-		'stderr'    => $stderr,
-	];
 }
 
 /**
- * @return array<int,array{file:string,line:int,column:int,type:string,code:string,message:string,docs:string}>
+ * @return array<int,array{profile:string,file:string,line:int,column:int,type:string,code:string,message:string,docs:string}>
  */
-function wpm_plugin_check_parse_findings( string $output ) :array {
+function wpm_plugin_check_parse_findings( string $output, string $profile ) :array {
 	$findings = [];
 	$currentFile = 'unknown';
 	foreach ( preg_split( '/\R/', $output ) ?: [] as $line ) {
@@ -255,6 +253,7 @@ function wpm_plugin_check_parse_findings( string $output ) :array {
 			}
 
 			$findings[] = [
+				'profile' => $profile,
 				'file'    => $currentFile,
 				'line'    => isset( $item[ 'line' ] ) ? (int)$item[ 'line' ] : 0,
 				'column'  => isset( $item[ 'column' ] ) ? (int)$item[ 'column' ] : 0,
@@ -282,7 +281,7 @@ function wpm_plugin_check_count_type( array $findings, string $type ) :int {
 }
 
 /**
- * @param array<int,array{file:string,line:int,column:int,type:string,code:string,message:string,docs:string}> $findings
+ * @param array<int,array{profile:string,file:string,line:int,column:int,type:string,code:string,message:string,docs:string}> $findings
  */
 function wpm_plugin_check_print_findings( array $findings ) :void {
 	foreach ( $findings as $finding ) {
@@ -295,7 +294,8 @@ function wpm_plugin_check_print_findings( array $findings ) :void {
 		}
 
 		echo sprintf(
-			"[%s] %s %s - %s\n",
+			"[%s:%s] %s %s - %s\n",
+			$finding[ 'profile' ],
 			strtoupper( $finding[ 'type' ] ),
 			$location,
 			$finding[ 'code' ],
@@ -307,6 +307,11 @@ function wpm_plugin_check_print_findings( array $findings ) :void {
 	}
 }
 
-function wpm_plugin_check_quote_arg( string $arg ) :string {
-	return preg_match( '/\s/', $arg ) === 1 ? '"'.$arg.'"' : $arg;
+function wpm_plugin_check_process_runner() :ProcessRunner {
+	static $runner = null;
+	if ( !$runner instanceof ProcessRunner ) {
+		$runner = new ProcessRunner();
+	}
+
+	return $runner;
 }

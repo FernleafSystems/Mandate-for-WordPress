@@ -1,7 +1,7 @@
 <?php declare( strict_types=1 );
 
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;

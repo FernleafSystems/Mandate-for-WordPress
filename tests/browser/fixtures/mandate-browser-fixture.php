@@ -83,7 +83,7 @@ function wpm_browser_fixture_reset() :array {
 	$secondaryPassword = wpm_browser_fixture_password( (int)$primaryUser->ID, 'WPM Browser Secondary' );
 	$otherPassword = wpm_browser_fixture_password( (int)$otherUser->ID, 'WPM Browser Other' );
 
-	( new \FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository() )->replaceScopes( [] );
+	( new \FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options\PluginOptionsRepository() )->replaceScopes( [] );
 	$fixture = [
 		'primary'          => [
 			'user_id'    => (int)$primaryUser->ID,
@@ -162,9 +162,9 @@ add_action(
 					$userId = absint( $request->get_param( 'user_id' ) );
 					$uuid = is_scalar( $request->get_param( 'uuid' ) ) ? (string)$request->get_param( 'uuid' ) : '';
 					$expiresOn = is_scalar( $request->get_param( 'expires_on' ) ) ? (string)$request->get_param( 'expires_on' ) : '';
-					$repository = new \FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository(
-						new \FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository(),
-						new \FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy()
+					$repository = new \FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\ScopeRepository(
+						new \FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options\PluginOptionsRepository(),
+						new \FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy()
 					);
 
 					return rest_ensure_response(
@@ -183,7 +183,7 @@ add_action(
 				'methods'             => 'POST',
 				'permission_callback' => '__return_true',
 				'callback'            => static function ( WP_REST_Request $request ) {
-					do_action( \FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper::HOOK );
+					do_action( \FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ApplicationPasswordExpirationReaper::HOOK );
 					$userId = absint( $request->get_param( 'user_id' ) );
 					$uuid = is_scalar( $request->get_param( 'uuid' ) ) ? (string)$request->get_param( 'uuid' ) : '';
 					$passwordExists = null;

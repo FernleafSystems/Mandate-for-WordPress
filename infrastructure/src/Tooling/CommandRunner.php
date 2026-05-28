@@ -1,23 +1,18 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Tooling;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling;
 
 use Symfony\Component\Filesystem\Path;
-use Symfony\Component\Process\Process;
 
 class CommandRunner {
 
 	private string $projectRoot;
 
-	/** @var callable(string):void */
-	private $logger;
+	private ProcessRunner $processRunner;
 
-	/**
-	 * @param callable(string):void $logger
-	 */
-	public function __construct( string $projectRoot, callable $logger ) {
+	public function __construct( string $projectRoot ) {
 		$this->projectRoot = Path::normalize( $projectRoot );
-		$this->logger = $logger;
+		$this->processRunner = new ProcessRunner();
 	}
 
 	/**
@@ -29,39 +24,7 @@ class CommandRunner {
 			throw new \RuntimeException( 'Working directory does not exist: '.$cwd );
 		}
 
-		$this->log( '> '.\implode( ' ', $command ) );
-
-		$process = new Process(
-			$command,
-			$cwd,
-			null,
-			null,
-			null
-		);
-		$process->setTimeout( null );
-		$process->run( function ( string $type, string $buffer ) :void {
-			if ( $type === Process::ERR ) {
-				\fwrite( \STDERR, $buffer );
-			}
-			else {
-				echo $buffer;
-			}
-		} );
-
-		$exitCode = $process->getExitCode() ?? 1;
-		if ( $exitCode !== 0 ) {
-			$error = \trim( $process->getErrorOutput() );
-			$message = \sprintf(
-				'Command failed with exit code %d: %s',
-				$exitCode,
-				\implode( ' ', $command )
-			);
-			if ( $error !== '' ) {
-				$message .= PHP_EOL.'Error output: '.$error;
-			}
-
-			throw new \RuntimeException( $message );
-		}
+		$this->processRunner->runOrThrow( $command, $cwd );
 	}
 
 	/**
@@ -104,9 +67,5 @@ class CommandRunner {
 		}
 
 		return $binary;
-	}
-
-	private function log( string $message ) :void {
-		( $this->logger )( $message );
 	}
 }
