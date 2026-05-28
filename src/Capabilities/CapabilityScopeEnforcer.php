@@ -1,10 +1,10 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\MetaCaps\MetaCapabilityRegistry;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -161,9 +161,6 @@ class CapabilityScopeEnforcer {
 	}
 
 	private function isScopedSuperAdmin( int $userId ) :bool {
-		return function_exists( 'is_multisite' )
-			&& is_multisite()
-			&& function_exists( 'is_super_admin' )
-			&& is_super_admin( $userId );
+		return is_multisite() && is_super_admin( $userId );
 	}
 }

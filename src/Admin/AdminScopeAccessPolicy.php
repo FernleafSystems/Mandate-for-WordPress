@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -81,11 +81,12 @@ class AdminScopeAccessPolicy {
 	}
 
 	public function canUseScopeShortcutForProfileUser( int $profileUserId ) :bool {
-		return $this->canManageAnyScope() || $this->canSelfManageOwnScope( $profileUserId );
+		return $profileUserId > 0
+			&& ( $this->canManageAnyScope() || $this->canSelfManageOwnScope( $profileUserId ) );
 	}
 
 	public function currentUserId() :int {
-		return function_exists( 'get_current_user_id' ) ? (int)get_current_user_id() : 0;
+		return (int)get_current_user_id();
 	}
 
 	private function existingUserId( int $userId ) :int {
@@ -101,7 +102,6 @@ class AdminScopeAccessPolicy {
 	}
 
 	private function applicationPasswordsAvailableForUser( int $userId ) :bool {
-		return function_exists( 'wp_is_application_passwords_available_for_user' )
-			&& wp_is_application_passwords_available_for_user( $userId );
+		return wp_is_application_passwords_available_for_user( $userId );
 	}
 }

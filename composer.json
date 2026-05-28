@@ -1,7 +1,7 @@
 {
   "name":              "fernleafsystems/mandate",
   "description":       "Scoping AI access for WordPress by controlling Application Password capabilities.",
-  "version":           "0.4.1",
+  "version":           "0.4.2",
   "type":              "wordpress-plugin",
   "license":           "GPL-2.0-or-later",
   "require":           {
@@ -24,12 +24,12 @@
   },
   "autoload":          {
     "psr-4": {
-      "FernleafSystems\\Wordpress\\Plugin\\Mandate\\": "src/"
+      "FernleafSystems\\Wordpress\\Plugin\\MandateAppSecurity\\": "src/"
     }
   },
   "autoload-dev":      {
     "psr-4": {
-      "FernleafSystems\\Wordpress\\Plugin\\Mandate\\Tooling\\": "infrastructure/src/Tooling/"
+      "FernleafSystems\\Wordpress\\Plugin\\MandateAppSecurity\\Tooling\\": "infrastructure/src/Tooling/"
     }
   },
   "scripts":           {

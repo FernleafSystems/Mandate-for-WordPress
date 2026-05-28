@@ -2,9 +2,9 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityName;
-use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityName;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\MetaCaps\MetaCapabilityRegistry;
 
 final class CapabilityContractsTest extends Wpm_Test_Case {
 
@@ -54,7 +54,7 @@ final class CapabilityContractsTest extends Wpm_Test_Case {
 
 	public function testMetaCapabilityRegistryNormalizesFilteredCaps() :void {
 		add_filter(
-			'mandate_app_security_meta_capabilities',
+			'mdpsc_meta_capabilities',
 			static function () :array {
 				return [ 'Edit_Post', 'wpm custom meta', 'delete_post' => false ];
 			}
@@ -75,7 +75,7 @@ final class CapabilityContractsTest extends Wpm_Test_Case {
 
 	public function testMetaCapabilityRegistryIgnoresNonArrayFilterOutput() :void {
 		add_filter(
-			'mandate_app_security_meta_capabilities',
+			'mdpsc_meta_capabilities',
 			static fn() :string => 'not-a-list'
 		);
 

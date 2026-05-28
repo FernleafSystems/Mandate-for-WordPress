@@ -1,8 +1,8 @@
 #!/usr/bin/env php
 <?php declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ReleasePackageIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ReleasePackageIdentity;
 
 if ( !\defined( 'ABSPATH' ) ) {
 	\define( 'ABSPATH', \dirname( __DIR__ ).'/' );

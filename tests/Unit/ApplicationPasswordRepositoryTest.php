@@ -2,7 +2,7 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
 
 final class ApplicationPasswordRepositoryTest extends Wpm_Test_Case {
 

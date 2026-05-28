@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -19,7 +19,7 @@ if ( !defined( 'ABSPATH' ) ) {
  * @phpstan-type AdminSummaryDetailContract AdminSummaryDetailTextContract|AdminSummaryDetailExpirationContract|AdminSummaryDetailAdminLockContract
  * @phpstan-type AdminSummaryWarningContract array{classes:string,text:string,role_snapshot_status:'changed'}
  * @phpstan-type AdminSummaryContract array{is_visible:bool,title:string,title_id:string,title_placement:'inside'|'outside',container_id:string,details:list<AdminSummaryDetailContract>,warnings:list<AdminSummaryWarningContract>}
- * @phpstan-type AdminSelectionFormContract array{selected_user_id:int,selected_uuid:string,page_slug:string,role_summary:AdminRoleSummaryContract,password_options:list<AdminPasswordOptionContract>,password_info:AdminSummaryContract,mandate_rules:AdminSummaryContract}
+ * @phpstan-type AdminSelectionFormContract array{selected_user_id:int,selected_uuid:string,page_slug:string,role_summary:AdminRoleSummaryContract,password_options:list<AdminPasswordOptionContract>,password_info:AdminSummaryContract,scope_summary:AdminSummaryContract}
  * @phpstan-type AdminScopeActionContract array{name:string,value:string,label:string,classes:string,disabled:bool}
  * @phpstan-type AdminCapabilityGroupingModeContract array{key:'area'|'action',label:string,checked:bool}
  * @phpstan-type AdminCapabilityGroupingContract array{label:string,default_source:'wordpress',default_mode:'area',config_json:string,modes:list<AdminCapabilityGroupingModeContract>}

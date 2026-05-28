@@ -1,8 +1,8 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Tooling;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -245,8 +245,8 @@ class RuntimePackageBuilder {
 	private function addGithubUpdaterBootstrap( string $targetDir ) :void {
 		$initPath = Path::join( $targetDir, 'init.php' );
 		$content = $this->readPackageFile( $initPath );
-		$needle = "\t\trequire_once \$mandate_app_security_autoload;\n";
-		$replacement = $needle."\t\trequire_once __DIR__.'/github-updater.php';\n";
+		$needle = "\trequire_once \$mdpsc_autoload;\n";
+		$replacement = $needle."\trequire_once __DIR__.'/github-updater.php';\n";
 
 		if ( \str_contains( $content, "github-updater.php" ) ) {
 			throw new \RuntimeException( 'Packaged init.php already contains the GitHub updater bootstrap.' );

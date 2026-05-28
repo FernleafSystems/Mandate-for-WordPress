@@ -2,25 +2,26 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
-use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminRequest;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminScopeFormSecurity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminTrustedHtmlSanitizer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminUserRoleProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityDescriptionProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityGroupProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityScopeEnforcer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ApplicationPasswordExpirationReaper;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options\PluginOptionsRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 final class ExpirationTest extends Wpm_Test_Case {
 
@@ -267,11 +268,11 @@ final class ExpirationTest extends Wpm_Test_Case {
 			$xpath = new DOMXPath( $document );
 			$summary = $this->summaryDetailValue( $xpath, 'Restricted Scope' );
 			$expiration = $this->summaryDetailValue( $xpath, 'Expiration Date' );
-			$expirationButton = $this->firstElement( $xpath, '//*[@data-wpm-expiration-summary]' );
+			$expirationButton = $this->firstElement( $xpath, '//*[@data-mdpsc-expiration-summary]' );
 
 			$this->assertSame( $restrictionSummary, $summary, $case );
 			$this->assertSame( $expirationSummary, $expiration, $case );
-			$this->assertSame( $expirationState, $expirationButton->getAttribute( 'data-wpm-expiration-state' ), $case );
+			$this->assertSame( $expirationState, $expirationButton->getAttribute( 'data-mdpsc-expiration-state' ), $case );
 			$this->assertNull( $this->summaryDetailValueOrNull( $xpath, 'Current Roles' ), $case );
 		}
 	}
@@ -390,10 +391,10 @@ final class ExpirationTest extends Wpm_Test_Case {
 
 		$document = $this->renderAdminDocument( $repository );
 		$xpath = new DOMXPath( $document );
-		$inputs = $xpath->query( '//*[@data-wpm-expiration-input]' );
-		$summaryInputs = $xpath->query( '//*[@id="mandate-rules-summary"]//*[@data-wpm-expiration-input]' );
-		$scopeFormInputs = $xpath->query( '//*[@id="mandate-scope-form"]//*[@data-wpm-expiration-input]' );
-		$summaries = $xpath->query( '//*[@data-wpm-expiration-summary]' );
+		$inputs = $xpath->query( '//*[@data-mdpsc-expiration-input]' );
+		$summaryInputs = $xpath->query( '//*[@id="mdpsc-scope-summary"]//*[@data-mdpsc-expiration-input]' );
+		$scopeFormInputs = $xpath->query( '//*[@id="mdpsc-scope-form"]//*[@data-mdpsc-expiration-input]' );
+		$summaries = $xpath->query( '//*[@data-mdpsc-expiration-summary]' );
 		$roleCaps = $xpath->query( '//input[@name="allowed_caps[]" and @value="upload_files"]' );
 		$this->assertInstanceOf( DOMNodeList::class, $inputs );
 		$this->assertInstanceOf( DOMNodeList::class, $summaryInputs );
@@ -410,12 +411,12 @@ final class ExpirationTest extends Wpm_Test_Case {
 		$this->assertInstanceOf( DOMElement::class, $input );
 		$this->assertSame( 'date', $input->getAttribute( 'type' ) );
 		$this->assertSame( 'expiration_date', $input->getAttribute( 'name' ) );
-		$this->assertSame( 'mandate-scope-form', $input->getAttribute( 'form' ) );
+		$this->assertSame( 'mdpsc-scope-form', $input->getAttribute( 'form' ) );
 		$this->assertSame( 'Expiration Date', $input->getAttribute( 'aria-label' ) );
 		$this->assertSame( '2026-05-24', $input->getAttribute( 'value' ) );
 		$this->assertFalse( $input->hasAttribute( 'hidden' ) );
 		$this->assertInstanceOf( DOMElement::class, $summary );
-		$this->assertSame( 'date', $summary->getAttribute( 'data-wpm-expiration-state' ) );
+		$this->assertSame( 'date', $summary->getAttribute( 'data-mdpsc-expiration-state' ) );
 		$this->assertTrue( $summary->hasAttribute( 'hidden' ) );
 		$this->assertSame( $input->getAttribute( 'id' ), $summary->getAttribute( 'aria-controls' ) );
 		$this->assertInstanceOf( DOMElement::class, $roleCap );
@@ -548,10 +549,12 @@ final class ExpirationTest extends Wpm_Test_Case {
 		$metaRegistry = new MetaCapabilityRegistry();
 		$groupProvider = new CapabilityGroupProvider();
 		$expirationDatePolicy = new ExpirationDatePolicy();
+		$request = new AdminRequest();
 		$roleProvider = new AdminUserRoleProvider();
 		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
-		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
+		$formSecurity = new AdminScopeFormSecurity();
 		$viewDataBuilder = new AdminPageViewDataBuilder(
+			$request,
 			$repository,
 			$passwordRepository,
 			$candidateProvider,
@@ -571,6 +574,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 			$metaRegistry,
 			$this->pluginFile(),
 			$expirationDatePolicy,
+			$request,
 			$roleProvider,
 			$formSecurity,
 			$viewDataBuilder,
@@ -605,7 +609,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 			'expiration_date'   => $expirationDate,
 		];
 		if ( $withNonce ) {
-			$formSecurity = new AdminScopeFormSecurity( new AdminTrustedHtmlSanitizer() );
+			$formSecurity = new AdminScopeFormSecurity();
 			$nonceName = $formSecurity->nonceName( $action );
 			$_POST[ $nonceName ] = wpm_test_set_valid_nonce(
 				$nonceName,
@@ -669,7 +673,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 	private function summaryDetailValue( DOMXPath $xpath, string $label ) :string {
 		$value = $this->summaryDetailValueOrNull( $xpath, $label );
 		if ( $value === null ) {
-			throw new RuntimeException( 'Expected Mandate rules summary detail for '.$label.'.' );
+			throw new RuntimeException( 'Expected scope summary detail for '.$label.'.' );
 		}
 
 		return $value;
@@ -677,7 +681,7 @@ final class ExpirationTest extends Wpm_Test_Case {
 
 	private function summaryDetailValueOrNull( DOMXPath $xpath, string $label ) :?string {
 		$labelLiteral = json_encode( $label, JSON_THROW_ON_ERROR );
-		$nodes = $xpath->query( '//*[@id="mandate-rules-summary"]//dt[normalize-space(.) = '.$labelLiteral.']/following-sibling::dd[1]' );
+		$nodes = $xpath->query( '//*[@id="mdpsc-scope-summary"]//dt[normalize-space(.) = '.$labelLiteral.']/following-sibling::dd[1]' );
 		if ( !$nodes instanceof DOMNodeList || $nodes->length < 1 ) {
 			return null;
 		}

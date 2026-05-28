@@ -1,15 +1,16 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
-use FernleafSystems\Wordpress\Plugin\Mandate\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityDescriptionProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityGroupProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Plugin;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -38,9 +39,18 @@ if ( !defined( 'ABSPATH' ) ) {
  */
 class AdminPageViewDataBuilder {
 
-	private const SCOPE_FORM_ID = 'mandate-scope-form';
+	private const SCOPE_FORM_ID = PluginIdentity::HTML_PREFIX.'scope-form';
+	private const PASSWORD_INFO_TITLE_ID = PluginIdentity::HTML_PREFIX.'password-info-title';
+	private const PASSWORD_INFO_CONTAINER_ID = PluginIdentity::HTML_PREFIX.'password-info';
+	private const SCOPE_SUMMARY_TITLE_ID = PluginIdentity::HTML_PREFIX.'scope-summary-title';
+	private const SCOPE_SUMMARY_CONTAINER_ID = PluginIdentity::HTML_PREFIX.'scope-summary';
+	private const ADMIN_LOCK_INPUT_ID = PluginIdentity::HTML_PREFIX.'admin-locked';
+	private const EXPIRATION_INPUT_ID = PluginIdentity::HTML_PREFIX.'expiration-date';
+	private const USER_SELECT_ID = PluginIdentity::HTML_PREFIX.'user';
 	private const DEFAULT_CAPABILITY_SOURCE = CapabilityGroupProvider::SOURCE_WORDPRESS;
 	private const DEFAULT_CAPABILITY_GROUPING = CapabilityGroupProvider::MODE_AREA;
+
+	private AdminRequest $request;
 
 	private ScopeRepository $scopeRepository;
 
@@ -65,6 +75,7 @@ class AdminPageViewDataBuilder {
 	private AdminScopeAccessPolicy $accessPolicy;
 
 	public function __construct(
+		AdminRequest $request,
 		ScopeRepository $scopeRepository,
 		ApplicationPasswordRepository $passwordRepository,
 		CapabilityCandidateProvider $candidateProvider,
@@ -77,6 +88,7 @@ class AdminPageViewDataBuilder {
 		AdminTrustedHtmlSanitizer $trustedHtmlSanitizer,
 		?AdminScopeAccessPolicy $accessPolicy = null
 	) {
+		$this->request = $request;
 		$this->scopeRepository = $scopeRepository;
 		$this->passwordRepository = $passwordRepository;
 		$this->candidateProvider = $candidateProvider;
@@ -125,7 +137,7 @@ class AdminPageViewDataBuilder {
 				'show_scope_form' => $selectedUserId > 0 && $passwords !== [] && $selectedUuid !== '',
 			],
 			'classes' => [
-				'root' => 'wrap mandate',
+				'root' => 'wrap '.PluginIdentity::RUNTIME_PREFIX,
 			],
 			'vars'    => [
 				'message'        => $this->buildRequestMessage(),
@@ -180,7 +192,7 @@ class AdminPageViewDataBuilder {
 	 * @return AdminNoticeContract
 	 */
 	private function buildRequestMessage() :array {
-		$message = sanitize_key( $this->getScalar( AdminPage::MESSAGE_QUERY_KEY ) );
+		$message = sanitize_key( $this->request->getScalar( AdminPage::MESSAGE_QUERY_KEY ) );
 		$messages = [
 			'saved'                   => [ 'success', __( 'Scope saved.', 'mandate-app-security' ) ],
 			'reset'                   => [ 'success', __( 'Scope reset to defaults.', 'mandate-app-security' ) ],
@@ -248,7 +260,7 @@ class AdminPageViewDataBuilder {
 			'role_summary'     => $this->buildRoleSummary( $currentRoleSlugs ),
 			'password_options' => $this->buildPasswordOptions( $passwords, $selectedUuid ),
 			'password_info'    => $this->buildPasswordInfoSummary( $selectedPassword ),
-			'mandate_rules'    => $this->buildMandateRulesSummary(
+			'scope_summary'    => $this->buildScopeSummary(
 				$selectedPassword,
 				$scope,
 				$currentRoleSlugs,
@@ -301,9 +313,9 @@ class AdminPageViewDataBuilder {
 			return [
 				'is_visible'      => false,
 				'title'           => __( 'Selected Password Info', 'mandate-app-security' ),
-				'title_id'        => 'mandate-password-info-title',
+				'title_id'        => self::PASSWORD_INFO_TITLE_ID,
 				'title_placement' => 'inside',
-				'container_id'    => 'mandate-password-info',
+				'container_id'    => self::PASSWORD_INFO_CONTAINER_ID,
 				'details'         => [],
 				'warnings'        => [],
 			];
@@ -312,9 +324,9 @@ class AdminPageViewDataBuilder {
 		return [
 			'is_visible'      => true,
 			'title'           => __( 'Selected Password Info', 'mandate-app-security' ),
-			'title_id'        => 'mandate-password-info-title',
+			'title_id'        => self::PASSWORD_INFO_TITLE_ID,
 			'title_placement' => 'inside',
-			'container_id'    => 'mandate-password-info',
+			'container_id'    => self::PASSWORD_INFO_CONTAINER_ID,
 			'details'         => [
 				$this->textDetail( __( 'UUID', 'mandate-app-security' ), $password[ 'uuid' ] ),
 				$this->textDetail( __( 'Created', 'mandate-app-security' ), $this->formatTimestamp( $password[ 'created' ] ) ),
@@ -330,7 +342,7 @@ class AdminPageViewDataBuilder {
 	 * @param list<string> $currentRoleSlugs
 	 * @return AdminSummaryContract
 	 */
-	private function buildMandateRulesSummary(
+	private function buildScopeSummary(
 		?array $password,
 		?array $scope,
 		array $currentRoleSlugs,
@@ -342,10 +354,10 @@ class AdminPageViewDataBuilder {
 		if ( $password === null ) {
 			return [
 				'is_visible'      => false,
-				'title'           => __( 'Mandate Rules', 'mandate-app-security' ),
-				'title_id'        => 'mandate-rules-summary-title',
+				'title'           => __( 'Scope Summary', 'mandate-app-security' ),
+				'title_id'        => self::SCOPE_SUMMARY_TITLE_ID,
 				'title_placement' => 'outside',
-				'container_id'    => 'mandate-rules-summary',
+				'container_id'    => self::SCOPE_SUMMARY_CONTAINER_ID,
 				'details'         => [],
 				'warnings'        => [],
 			];
@@ -384,10 +396,10 @@ class AdminPageViewDataBuilder {
 
 		return [
 			'is_visible'      => true,
-			'title'           => __( 'Mandate Rules', 'mandate-app-security' ),
-			'title_id'        => 'mandate-rules-summary-title',
+			'title'           => __( 'Scope Summary', 'mandate-app-security' ),
+			'title_id'        => self::SCOPE_SUMMARY_TITLE_ID,
 			'title_placement' => 'outside',
-			'container_id'    => 'mandate-rules-summary',
+			'container_id'    => self::SCOPE_SUMMARY_CONTAINER_ID,
 			'details'         => $details,
 			'warnings'        => $warnings,
 		];
@@ -419,7 +431,7 @@ class AdminPageViewDataBuilder {
 			'label'     => __( 'Lock This Scope', 'mandate-app-security' ),
 			'help_text' => __( 'Prevent the application password owner from editing or resetting this scope.', 'mandate-app-security' ),
 			'input'     => [
-				'id'       => 'mandate-admin-locked',
+				'id'       => self::ADMIN_LOCK_INPUT_ID,
 				'name'     => 'admin_locked',
 				'value'    => '1',
 				'form'     => self::SCOPE_FORM_ID,
@@ -455,11 +467,11 @@ class AdminPageViewDataBuilder {
 			'kind'    => 'expiration',
 			'label'   => __( 'Expiration Date', 'mandate-app-security' ),
 			'value'   => $value,
-			'classes' => 'button-link mandate-expiration-summary'.( $expired ? ' is-expired' : '' ),
+			'classes' => 'button-link '.PluginIdentity::htmlIdentifier( 'expiration-summary' ).( $expired ? ' is-expired' : '' ),
 			'state'   => $state,
 			'disabled' => $disabled,
 			'input'   => [
-				'id'         => 'mandate-expiration-date',
+				'id'         => self::EXPIRATION_INPUT_ID,
 				'name'       => 'expiration_date',
 				'value'      => $expiresOn ?? '',
 				'form'       => self::SCOPE_FORM_ID,
@@ -813,7 +825,7 @@ class AdminPageViewDataBuilder {
 	}
 
 	private function capabilitySectionId( string $source, string $mode, string $section ) :string {
-		return 'mandate-'.$source.'-'.$mode.'-'.$section.'-capabilities';
+		return PluginIdentity::htmlIdentifier( $source.'-'.$mode.'-'.$section.'-capabilities' );
 	}
 
 	private function capabilityItemKey( string $type, string $name ) :string {
@@ -821,15 +833,15 @@ class AdminPageViewDataBuilder {
 	}
 
 	private function capabilityInputId( string $itemKey ) :string {
-		return 'mandate-capability-'.str_replace( ':', '-', $itemKey );
+		return PluginIdentity::htmlIdentifier( 'capability-'.str_replace( ':', '-', $itemKey ) );
 	}
 
 	private function capabilitySourcePanelId( string $source ) :string {
-		return 'mandate-capability-source-'.$source;
+		return PluginIdentity::htmlIdentifier( 'capability-source-'.$source );
 	}
 
 	private function capabilitySourceTabId( string $source ) :string {
-		return 'mandate-capability-source-tab-'.$source;
+		return PluginIdentity::htmlIdentifier( 'capability-source-tab-'.$source );
 	}
 
 	private function sourceLabel( string $source ) :string {
@@ -888,7 +900,7 @@ class AdminPageViewDataBuilder {
 	}
 
 	private function selectedUserId() :int {
-		return $this->accessPolicy->selectedUserId( $this->getScalar( 'user_id' ) );
+		return $this->accessPolicy->selectedUserId( $this->request->getScalar( 'user_id' ) );
 	}
 
 	/**
@@ -899,7 +911,7 @@ class AdminPageViewDataBuilder {
 			return '';
 		}
 
-		$requested = ApplicationPasswordRepository::normalizeUuid( $this->getScalar( 'app_password_uuid' ) );
+		$requested = ApplicationPasswordRepository::normalizeUuid( $this->request->getScalar( 'app_password_uuid' ) );
 		foreach ( $passwords as $password ) {
 			if ( $password[ 'uuid' ] === $requested ) {
 				return $password[ 'uuid' ];
@@ -913,9 +925,10 @@ class AdminPageViewDataBuilder {
 		if ( $this->accessPolicy->shouldRestrictUserSelection() ) {
 			return $this->trustedHtmlSanitizer->dropdown(
 				sprintf(
-					'<select name="user_id" id="mandate-user" disabled="disabled"><option value="%1$s" selected="selected">%2$s</option></select>',
+					'<select name="user_id" id="%3$s" disabled="disabled"><option value="%1$s" selected="selected">%2$s</option></select>',
 					esc_attr( (string)$selectedUserId ),
-					esc_html( $this->userOptionLabel( $selectedUserId ) )
+					esc_html( $this->userOptionLabel( $selectedUserId ) ),
+					esc_attr( self::USER_SELECT_ID )
 				)
 			);
 		}
@@ -923,7 +936,7 @@ class AdminPageViewDataBuilder {
 		return $this->trustedHtmlSanitizer->dropdown( (string)wp_dropdown_users(
 			[
 				'name'     => 'user_id',
-				'id'       => 'mandate-user',
+				'id'       => self::USER_SELECT_ID,
 				'selected' => $selectedUserId,
 				'show'     => 'display_name_with_login',
 				'echo'     => false,
@@ -949,27 +962,11 @@ class AdminPageViewDataBuilder {
 			return __( 'Never', 'mandate-app-security' );
 		}
 
-		return function_exists( 'wp_date' ) ? wp_date( 'Y-m-d H:i:s', $timestamp ) : gmdate( 'Y-m-d H:i:s', $timestamp );
+		return wp_date( 'Y-m-d H:i:s', $timestamp );
 	}
 
 	private function isSuperAdminUser( int $userId ) :bool {
-		return function_exists( 'is_multisite' )
-			&& is_multisite()
-			&& function_exists( 'is_super_admin' )
-			&& is_super_admin( $userId );
-	}
-
-	private function getScalar( string $key ) :string {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Sanitized non-mutating admin view-state query arg.
-		return $this->requestScalar( $_GET, $key );
-	}
-
-	/**
-	 * @param array<string,mixed> $source
-	 */
-	private function requestScalar( array $source, string $key ) :string {
-		$value = $source[ $key ] ?? '';
-		return is_scalar( $value ) ? sanitize_text_field( wp_unslash( $value ) ) : '';
+		return is_multisite() && is_super_admin( $userId );
 	}
 
 	/**

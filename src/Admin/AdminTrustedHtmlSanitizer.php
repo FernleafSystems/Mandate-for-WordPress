@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -25,34 +25,5 @@ class AdminTrustedHtmlSanitizer {
 				],
 			]
 		);
-	}
-
-	public function nonceFields( string $html ) :string {
-		$sanitized = \wp_kses(
-			$html,
-			[
-				'input' => [
-					'id'    => true,
-					'name'  => true,
-					'type'  => true,
-					'value' => true,
-				],
-			]
-		);
-
-		return $this->hiddenInputsOnly( $sanitized );
-	}
-
-	private function hiddenInputsOnly( string $html ) :string {
-		preg_match_all( '/<input\b[^>]*>/i', $html, $matches );
-
-		$hiddenInputs = [];
-		foreach ( $matches[ 0 ] as $input ) {
-			if ( preg_match( '/\stype\s*=\s*(["\'])hidden\1/i', $input ) === 1 ) {
-				$hiddenInputs[] = $input;
-			}
-		}
-
-		return implode( '', $hiddenInputs );
 	}
 }

@@ -4,24 +4,29 @@ if ( !defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Templates run inside AdminTemplateRenderer::render(), so these are local view variables.
+
+$mdpsc_role_summary = $mdpscTemplateData[ 'roleSummary' ];
+$mdpsc_strings = $mdpscTemplateData[ 'strings' ];
+
 ?>
-<div id="mandate-role-summary" class="mandate-role-summary mandate-summary-card">
-	<p class="mandate-role-summary-label"><?php echo esc_html( $roleSummary[ 'title' ] ); ?></p>
+<div id="mdpsc-role-summary" class="mdpsc-role-summary mdpsc-summary-card">
+	<p class="mdpsc-role-summary-label"><?php echo esc_html( $mdpsc_role_summary[ 'title' ] ); ?></p>
 	<?php
-	if ( !$roleSummary[ 'has_roles' ] ) {
+	if ( !$mdpsc_role_summary[ 'has_roles' ] ) {
 		?>
-		<p class="description"><?php echo esc_html( $roleSummary[ 'empty_text' ] ); ?></p>
+		<p class="description"><?php echo esc_html( $mdpsc_role_summary[ 'empty_text' ] ); ?></p>
 		<?php
 	}
 	else {
 		?>
 		<ul>
 			<?php
-			foreach ( $roleSummary[ 'rows' ] as $mandate_app_security_role ) {
+			foreach ( $mdpsc_role_summary[ 'rows' ] as $mdpsc_role ) {
 				?>
 				<li>
-					<?php echo esc_html( $mandate_app_security_role[ 'name' ] ); ?>
-					<span class="mandate-role-slug">(<?php echo esc_html( $strings[ 'role_slug_label' ] ); ?> <code><?php echo esc_html( $mandate_app_security_role[ 'slug' ] ); ?></code>)</span>
+					<?php echo esc_html( $mdpsc_role[ 'name' ] ); ?>
+					<span class="mdpsc-role-slug">(<?php echo esc_html( $mdpsc_strings[ 'role_slug_label' ] ); ?> <code><?php echo esc_html( $mdpsc_role[ 'slug' ] ); ?></code>)</span>
 				</li>
 				<?php
 			}

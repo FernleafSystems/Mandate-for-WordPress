@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Expiration;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -28,6 +28,6 @@ class ExpirationDatePolicy {
 	}
 
 	public function today() :string {
-		return function_exists( 'wp_date' ) ? wp_date( 'Y-m-d' ) : gmdate( 'Y-m-d' );
+		return wp_date( 'Y-m-d' );
 	}
 }

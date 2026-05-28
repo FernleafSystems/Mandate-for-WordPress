@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Tooling;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling;
 
 use Symfony\Component\Filesystem\Path;
 

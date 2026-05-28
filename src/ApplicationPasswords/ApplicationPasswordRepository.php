@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -15,7 +15,7 @@ class ApplicationPasswordRepository {
 	 * @return list<ApplicationPasswordRecord>
 	 */
 	public function forUser( int $userId ) :array {
-		if ( $userId < 1 || !class_exists( '\WP_Application_Passwords' ) ) {
+		if ( $userId < 1 ) {
 			return [];
 		}
 
@@ -99,13 +99,6 @@ class ApplicationPasswordRepository {
 
 	public static function normalizeUuid( string $uuid ) :string {
 		$uuid = strtolower( trim( $uuid ) );
-		if ( function_exists( 'wp_is_uuid' ) ) {
-			return wp_is_uuid( $uuid ) ? $uuid : '';
-		}
-
-		return preg_match(
-			'/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/',
-			$uuid
-		) === 1 ? $uuid : '';
+		return wp_is_uuid( $uuid ) ? $uuid : '';
 	}
 }

@@ -132,7 +132,7 @@ async function selectOptionWithDelayedNavigation( page, locator, value, expected
 				select.dispatchEvent( new Event( 'change', { bubbles: true } ) );
 
 				const form = select.form;
-				const status = form.querySelector( '[data-wpm-selection-status]' );
+				const status = form.querySelector( '[data-mdpsc-selection-status]' );
 				return {
 					ariaBusy: form.getAttribute( 'aria-busy' ),
 					selectedValue: select.value,
@@ -154,15 +154,15 @@ async function selectOptionWithDelayedNavigation( page, locator, value, expected
 }
 
 function primitiveCapInput( page, source, capability ) {
-	return page.locator( `[data-wpm-capability-source-panel][data-wpm-capability-source="${source}"] input[name="allowed_caps[]"][value="${capability}"]` );
+	return page.locator( `[data-mdpsc-capability-source-panel][data-mdpsc-capability-source="${source}"] input[name="allowed_caps[]"][value="${capability}"]` );
 }
 
 function capabilitySection( page, source, mode, section ) {
-	return page.locator( `#mandate-${source}-${mode}-${section}-capabilities` );
+	return page.locator( `#mdpsc-${source}-${mode}-${section}-capabilities` );
 }
 
 function capabilityItem( page, source, capability ) {
-	return page.locator( `[data-wpm-capability-source-panel][data-wpm-capability-source="${source}"] [data-wpm-capability-item][data-wpm-capability-name="${capability}"]` );
+	return page.locator( `[data-mdpsc-capability-source-panel][data-mdpsc-capability-source="${source}"] [data-mdpsc-capability-item][data-mdpsc-capability-name="${capability}"]` );
 }
 
 function primitiveCapSlug( page, source, capability ) {
@@ -170,15 +170,15 @@ function primitiveCapSlug( page, source, capability ) {
 }
 
 function primitiveCapInfoTarget( page, source, capability ) {
-	return capabilityItem( page, source, capability ).locator( '.mandate-capability-info' );
+	return capabilityItem( page, source, capability ).locator( '.mdpsc-capability-info' );
 }
 
 function capabilityActionBadge( page, source, capability ) {
-	return capabilityItem( page, source, capability ).locator( '.mandate-capability-action-badge' );
+	return capabilityItem( page, source, capability ).locator( '.mdpsc-capability-action-badge' );
 }
 
 function sectionBulkButton( page, source, mode, section, state ) {
-	return capabilitySection( page, source, mode, section ).locator( `[data-wpm-select-section][data-wpm-select-state="${state}"]` );
+	return capabilitySection( page, source, mode, section ).locator( `[data-mdpsc-select-section][data-mdpsc-select-state="${state}"]` );
 }
 
 function anyPrimitiveCapInput( page, capability ) {
@@ -186,7 +186,7 @@ function anyPrimitiveCapInput( page, capability ) {
 }
 
 async function primitiveCapabilityValues( page, source ) {
-	return page.locator( `[data-wpm-capability-source-panel][data-wpm-capability-source="${source}"] input[name="allowed_caps[]"]` )
+	return page.locator( `[data-mdpsc-capability-source-panel][data-mdpsc-capability-source="${source}"] input[name="allowed_caps[]"]` )
 		.evaluateAll( ( inputs ) => inputs.map( ( input ) => input.value ) );
 }
 
@@ -195,7 +195,7 @@ async function selectGroupingMode( page, mode ) {
 }
 
 async function selectCapabilitySource( page, source ) {
-	await page.locator( `[data-wpm-capability-source-tab][data-wpm-capability-source="${source}"]` ).click();
+	await page.locator( `[data-mdpsc-capability-source-tab][data-mdpsc-capability-source="${source}"]` ).click();
 }
 
 async function locatorRect( locator ) {
@@ -212,7 +212,7 @@ async function locatorRect( locator ) {
 }
 
 async function firstRowCapabilityColumns( section ) {
-	return section.locator( '.mandate-capability-list [data-wpm-capability-item]' ).evaluateAll( ( items ) => {
+	return section.locator( '.mdpsc-capability-list [data-mdpsc-capability-item]' ).evaluateAll( ( items ) => {
 		const positions = items.map( ( item ) => {
 			const rect = item.getBoundingClientRect();
 			return {
@@ -230,16 +230,16 @@ async function sectionHeadingLayout( section ) {
 	return section.evaluate( ( sectionElement ) => {
 		const legendElement = sectionElement.querySelector( 'legend' );
 		const legend = legendElement.getBoundingClientRect();
-		const title = legendElement.querySelector( '.mandate-capability-section-title span:first-child' ).getBoundingClientRect();
-		const count = legendElement.querySelector( '.mandate-capability-section-count' ).getBoundingClientRect();
-		const actions = legendElement.querySelector( '.mandate-capability-section-actions' ).getBoundingClientRect();
-		const selectAll = legendElement.querySelector( '[data-wpm-select-section][data-wpm-select-state="checked"]' ).getBoundingClientRect();
-		const separator = legendElement.querySelector( '.mandate-capability-section-action-separator' ).getBoundingClientRect();
-		const deselectAll = legendElement.querySelector( '[data-wpm-select-section][data-wpm-select-state="unchecked"]' ).getBoundingClientRect();
-		const scroll = sectionElement.closest( '.mandate-capability-scroll' ).getBoundingClientRect();
+		const title = legendElement.querySelector( '.mdpsc-capability-section-title span:first-child' ).getBoundingClientRect();
+		const count = legendElement.querySelector( '.mdpsc-capability-section-count' ).getBoundingClientRect();
+		const actions = legendElement.querySelector( '.mdpsc-capability-section-actions' ).getBoundingClientRect();
+		const selectAll = legendElement.querySelector( '[data-mdpsc-select-section][data-mdpsc-select-state="checked"]' ).getBoundingClientRect();
+		const separator = legendElement.querySelector( '.mdpsc-capability-section-action-separator' ).getBoundingClientRect();
+		const deselectAll = legendElement.querySelector( '[data-mdpsc-select-section][data-mdpsc-select-state="unchecked"]' ).getBoundingClientRect();
+		const scroll = sectionElement.closest( '.mdpsc-capability-scroll' ).getBoundingClientRect();
 		const sectionStyle = getComputedStyle( sectionElement );
 		const legendStyle = getComputedStyle( legendElement );
-		const countStyle = getComputedStyle( legendElement.querySelector( '.mandate-capability-section-count' ) );
+		const countStyle = getComputedStyle( legendElement.querySelector( '.mdpsc-capability-section-count' ) );
 		return {
 			leftOffset: Math.round( Math.abs( legend.left - scroll.left ) ),
 			widthOffset: Math.round( Math.abs( legend.width - scroll.width ) ),
@@ -247,7 +247,7 @@ async function sectionHeadingLayout( section ) {
 			actionsStartGap: Math.round( actions.left - count.right ),
 			selectSeparatorGap: Math.round( separator.left - selectAll.right ),
 			separatorDeselectGap: Math.round( deselectAll.left - separator.right ),
-			separatorText: legendElement.querySelector( '.mandate-capability-section-action-separator' ).textContent.trim(),
+			separatorText: legendElement.querySelector( '.mdpsc-capability-section-action-separator' ).textContent.trim(),
 			sectionBorderBottomWidth: sectionStyle.borderBottomWidth,
 			legendBackgroundColor: legendStyle.backgroundColor,
 			legendBorderTopWidth: legendStyle.borderTopWidth,
@@ -292,10 +292,10 @@ async function capabilityControlLayout( page, source, capability ) {
 		};
 		return {
 			input: rect( item.querySelector( 'input[type="checkbox"]' ) ),
-			code: rect( item.querySelector( '.mandate-capability-name code' ) ),
-			badge: rect( item.querySelector( '.mandate-capability-action-badge' ) ),
-			info: rect( item.querySelector( '.mandate-capability-info, .mandate-capability-info-space' ) ),
-			badgeDisplay: getComputedStyle( item.querySelector( '.mandate-capability-action-badge' ) ).display,
+			code: rect( item.querySelector( '.mdpsc-capability-name code' ) ),
+			badge: rect( item.querySelector( '.mdpsc-capability-action-badge' ) ),
+			info: rect( item.querySelector( '.mdpsc-capability-info, .mdpsc-capability-info-space' ) ),
+			badgeDisplay: getComputedStyle( item.querySelector( '.mdpsc-capability-action-badge' ) ).display,
 		};
 	} );
 }
@@ -330,31 +330,31 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	const otherPassword = otherUser.passwords.primary;
 
 	await page.goto( '/wp-admin/tools.php?page=mandate-app-security', { waitUntil: 'load' } );
-	const userSelect = page.locator( '#mandate-user' );
+	const userSelect = page.locator( '#mdpsc-user' );
 	await expect( userSelect ).toBeVisible();
 
 	await selectOptionAndWait( page, userSelect, primary.user_id );
-	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
-	await expect( page.locator( '#mandate-password' ) ).toHaveValue( primaryPassword.uuid );
+	await ensureSelectedOption( page, page.locator( '#mdpsc-password' ), primaryPassword.uuid );
+	await expect( page.locator( '#mdpsc-password' ) ).toHaveValue( primaryPassword.uuid );
 
 	await selectOptionWithDelayedNavigation(
 		page,
-		page.locator( '#mandate-password' ),
+		page.locator( '#mdpsc-password' ),
 		secondaryPassword.uuid,
 		`app_password_uuid=${secondaryPassword.uuid}`
 	);
 	expect( new URL( page.url() ).searchParams.get( 'app_password_uuid' ) ).toBe( secondaryPassword.uuid );
-	await expect( page.locator( '#mandate-password' ) ).toHaveValue( secondaryPassword.uuid );
+	await expect( page.locator( '#mdpsc-password' ) ).toHaveValue( secondaryPassword.uuid );
 
-	await selectOptionAndWait( page, page.locator( '#mandate-user' ), otherUser.user_id );
+	await selectOptionAndWait( page, page.locator( '#mdpsc-user' ), otherUser.user_id );
 	expect( new URL( page.url() ).searchParams.get( 'app_password_uuid' ) ).toBeNull();
-	await expect( page.locator( '#mandate-password' ) ).toHaveValue( otherPassword.uuid );
-	await expect( page.locator( '#mandate-rules-summary [data-wpm-admin-lock-input]' ) ).toBeDisabled();
+	await expect( page.locator( '#mdpsc-password' ) ).toHaveValue( otherPassword.uuid );
+	await expect( page.locator( '#mdpsc-scope-summary [data-mdpsc-admin-lock-input]' ) ).toBeDisabled();
 
-	await selectOptionAndWait( page, page.locator( '#mandate-user' ), primary.user_id );
-	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
-	await expect( page.locator( '#mandate-password' ) ).toHaveValue( primaryPassword.uuid );
-	const selectionColumns = await page.locator( '.mandate-selection-grid > .mandate-selection-column' )
+	await selectOptionAndWait( page, page.locator( '#mdpsc-user' ), primary.user_id );
+	await ensureSelectedOption( page, page.locator( '#mdpsc-password' ), primaryPassword.uuid );
+	await expect( page.locator( '#mdpsc-password' ) ).toHaveValue( primaryPassword.uuid );
+	const selectionColumns = await page.locator( '.mdpsc-selection-grid > .mdpsc-selection-column' )
 		.evaluateAll( ( columns ) => columns.map( ( column ) => {
 			const rect = column.getBoundingClientRect();
 			return {
@@ -368,38 +368,38 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	expect( Math.abs( selectionColumns[ 1 ].top - selectionColumns[ 2 ].top ) ).toBeLessThanOrEqual( 2 );
 	expect( selectionColumns[ 0 ].right ).toBeLessThanOrEqual( selectionColumns[ 1 ].left );
 	expect( selectionColumns[ 1 ].right ).toBeLessThanOrEqual( selectionColumns[ 2 ].left );
-	const selectionTitleTops = await page.locator( '.mandate-selection-grid' ).evaluate( ( grid ) => (
-		Array.from( grid.querySelectorAll( '.mandate-field-title' ) )
+	const selectionTitleTops = await page.locator( '.mdpsc-selection-grid' ).evaluate( ( grid ) => (
+		Array.from( grid.querySelectorAll( '.mdpsc-field-title' ) )
 			.map( ( title ) => Math.round( title.getBoundingClientRect().top ) )
 	) );
 	expect( selectionTitleTops ).toHaveLength( 3 );
 	expect( Math.abs( selectionTitleTops[ 0 ] - selectionTitleTops[ 1 ] ) ).toBeLessThanOrEqual( 2 );
 	expect( Math.abs( selectionTitleTops[ 1 ] - selectionTitleTops[ 2 ] ) ).toBeLessThanOrEqual( 2 );
-	await expect( page.locator( '#mandate-rules-summary #mandate-rules-summary-title' ) ).toHaveCount( 0 );
-	const passwordInfoPlacement = await page.locator( '#mandate-password' ).evaluate( ( passwordSelect ) => {
-		const passwordInfo = document.querySelector( '#mandate-password-info' );
-		const rulesSummary = document.querySelector( '#mandate-rules-summary' );
+	await expect( page.locator( '#mdpsc-scope-summary #mdpsc-scope-summary-title' ) ).toHaveCount( 0 );
+	const passwordInfoPlacement = await page.locator( '#mdpsc-password' ).evaluate( ( passwordSelect ) => {
+		const passwordInfo = document.querySelector( '#mdpsc-password-info' );
+		const scopeSummary = document.querySelector( '#mdpsc-scope-summary' );
 		const passwordRect = passwordSelect.getBoundingClientRect();
 		const infoRect = passwordInfo.getBoundingClientRect();
-		const rulesRect = rulesSummary.getBoundingClientRect();
+		const scopeRect = scopeSummary.getBoundingClientRect();
 
 		return {
 			infoLeft: Math.round( infoRect.left ),
 			infoTop: Math.round( infoRect.top ),
 			passwordBottom: Math.round( passwordRect.bottom ),
 			passwordLeft: Math.round( passwordRect.left ),
-			rulesLeft: Math.round( rulesRect.left ),
-			rulesTop: Math.round( rulesRect.top ),
+			scopeLeft: Math.round( scopeRect.left ),
+			scopeTop: Math.round( scopeRect.top ),
 		};
 	} );
 	expect( passwordInfoPlacement.infoTop ).toBeGreaterThan( passwordInfoPlacement.passwordBottom );
 	expect( Math.abs( passwordInfoPlacement.infoLeft - passwordInfoPlacement.passwordLeft ) ).toBeLessThanOrEqual( 2 );
-	expect( passwordInfoPlacement.rulesLeft ).toBeGreaterThan( passwordInfoPlacement.infoLeft );
-	expect( passwordInfoPlacement.rulesTop ).toBeLessThan( passwordInfoPlacement.infoTop );
-	const summaryCardStyles = await page.locator( '#mandate-role-summary' ).evaluate( ( roleSummary ) => {
+	expect( passwordInfoPlacement.scopeLeft ).toBeGreaterThan( passwordInfoPlacement.infoLeft );
+	expect( passwordInfoPlacement.scopeTop ).toBeLessThan( passwordInfoPlacement.infoTop );
+	const summaryCardStyles = await page.locator( '#mdpsc-role-summary' ).evaluate( ( roleSummary ) => {
 		const summaryCards = [
-			document.querySelector( '#mandate-password-info' ),
-			document.querySelector( '#mandate-rules-summary' ),
+			document.querySelector( '#mdpsc-password-info' ),
+			document.querySelector( '#mdpsc-scope-summary' ),
 		];
 		const properties = [
 			'backgroundColor',
@@ -423,7 +423,7 @@ test( 'admin can manage grouped application password scopes with progressive enh
 		expect( roleValue ).toBe( passwordValue );
 	} );
 	await page.setViewportSize( { width: 760, height: 900 } );
-	const mobileSelectionColumns = await page.locator( '.mandate-selection-grid > .mandate-selection-column' )
+	const mobileSelectionColumns = await page.locator( '.mdpsc-selection-grid > .mdpsc-selection-column' )
 		.evaluateAll( ( columns ) => columns.map( ( column ) => {
 			const rect = column.getBoundingClientRect();
 			return {
@@ -440,19 +440,19 @@ test( 'admin can manage grouped application password scopes with progressive enh
 
 	await expect( page.locator( 'input[name="capability_grouping_mode"][value="area"]' ) ).toBeChecked();
 	await expect( page.locator( 'input[name="capability_grouping_mode"][value="action"]' ) ).not.toBeChecked();
-	await expect( page.locator( '[data-wpm-capability-groups]' ) ).toHaveAttribute( 'data-wpm-capability-source', 'wordpress' );
-	await expect( page.locator( '[data-wpm-capability-source-tab][data-wpm-capability-source="wordpress"]' ) ).toHaveAttribute( 'aria-selected', 'true' );
-	await expect( page.locator( '[data-wpm-capability-source-panel][data-wpm-capability-source="third_party"]' ) ).toBeHidden();
+	await expect( page.locator( '[data-mdpsc-capability-groups]' ) ).toHaveAttribute( 'data-mdpsc-capability-source', 'wordpress' );
+	await expect( page.locator( '[data-mdpsc-capability-source-tab][data-mdpsc-capability-source="wordpress"]' ) ).toHaveAttribute( 'aria-selected', 'true' );
+	await expect( page.locator( '[data-mdpsc-capability-source-panel][data-mdpsc-capability-source="third_party"]' ) ).toBeHidden();
 	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 
-	const wordpressPanel = page.locator( '[data-wpm-capability-panel="wordpress"]' );
-	await expect( wordpressPanel.locator( '.mandate-capability-toolbar' ) ).toBeVisible();
-	await expect( wordpressPanel.locator( '.mandate-capability-toolbar h3' ) ).toHaveCount( 0 );
-	await expect( wordpressPanel.locator( '[data-wpm-capability-section-index]' ) ).toBeVisible();
-	const scrollRegion = wordpressPanel.locator( '.mandate-capability-scroll' );
-	const actionRow = wordpressPanel.locator( '.mandate-panel-actions' );
-	const indexLinkStyle = await wordpressPanel.locator( '[data-wpm-capability-section-index] a' ).first().evaluate( ( link ) => {
+	const wordpressPanel = page.locator( '[data-mdpsc-capability-panel="wordpress"]' );
+	await expect( wordpressPanel.locator( '.mdpsc-capability-toolbar' ) ).toBeVisible();
+	await expect( wordpressPanel.locator( '.mdpsc-capability-toolbar h3' ) ).toHaveCount( 0 );
+	await expect( wordpressPanel.locator( '[data-mdpsc-capability-section-index]' ) ).toBeVisible();
+	const scrollRegion = wordpressPanel.locator( '.mdpsc-capability-scroll' );
+	const actionRow = wordpressPanel.locator( '.mdpsc-panel-actions' );
+	const indexLinkStyle = await wordpressPanel.locator( '[data-mdpsc-capability-section-index] a' ).first().evaluate( ( link ) => {
 		const style = getComputedStyle( link );
 		return {
 			backgroundColor: style.backgroundColor,
@@ -478,9 +478,9 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	expectLeftAlignedSectionActions( await sectionHeadingLayout( postsSection ) );
 	await expect( sectionBulkButton( page, 'wordpress', 'area', 'posts', 'checked' ) ).toBeVisible();
 	await expect( sectionBulkButton( page, 'wordpress', 'area', 'posts', 'unchecked' ) ).toBeVisible();
-	const postsItemOrder = await postsSection.locator( '[data-wpm-capability-item]' ).evaluateAll( ( items ) => items.map( ( item ) => item.dataset.wpmCapabilityName ) );
+	const postsItemOrder = await postsSection.locator( '[data-mdpsc-capability-item]' ).evaluateAll( ( items ) => items.map( ( item ) => item.dataset.mdpscCapabilityName ) );
 	expect( postsItemOrder ).toEqual( [ 'read_post', 'edit_post', 'edit_posts', 'delete_post' ] );
-	const postsActionBadges = await postsSection.locator( '.mandate-capability-action-badge' ).evaluateAll( ( badges ) => badges.map( ( badge ) => badge.textContent.trim() ) );
+	const postsActionBadges = await postsSection.locator( '.mdpsc-capability-action-badge' ).evaluateAll( ( badges ) => badges.map( ( badge ) => badge.textContent.trim() ) );
 	expect( postsActionBadges ).toEqual( [ 'R', 'W', 'W', 'D' ] );
 	expectAreaControlLayout( await capabilityControlLayout( page, 'wordpress', 'upload_files' ) );
 	expect( await firstRowCapabilityColumns( postsSection ) ).toHaveLength( 3 );
@@ -496,32 +496,32 @@ test( 'admin can manage grouped application password scopes with progressive enh
 		scroll.scrollTop = scroll.scrollHeight;
 		const originalScrollTo = scroll.scrollTo.bind( scroll );
 		scroll.scrollTo = ( options ) => {
-			scroll.dataset.wpmLastScrollBehavior = typeof options === 'object' ? options.behavior : '';
+			scroll.dataset.mdpscLastScrollBehavior = typeof options === 'object' ? options.behavior : '';
 			originalScrollTo( options );
 		};
 	} );
-	await expect( wordpressPanel.locator( '[data-wpm-capability-section-index]' ) ).toBeVisible();
-	await wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-area-posts-capabilities"]' ).click();
-	await expect( scrollRegion ).toHaveAttribute( 'data-wpm-last-scroll-behavior', 'smooth' );
+	await expect( wordpressPanel.locator( '[data-mdpsc-capability-section-index]' ) ).toBeVisible();
+	await wordpressPanel.locator( '[data-mdpsc-capability-section-target="mdpsc-wordpress-area-posts-capabilities"]' ).click();
+	await expect( scrollRegion ).toHaveAttribute( 'data-mdpsc-last-scroll-behavior', 'smooth' );
 	await expect.poll( async () => postsSection.evaluate( ( section ) => {
-		const scroll = section.closest( '.mandate-capability-scroll' ).getBoundingClientRect();
+		const scroll = section.closest( '.mdpsc-capability-scroll' ).getBoundingClientRect();
 		const rect = section.getBoundingClientRect();
 		return Math.round( Math.abs( rect.top - scroll.top ) );
 	} ) ).toBeLessThanOrEqual( 20 );
 	await page.emulateMedia( { reducedMotion: 'reduce' } );
 	await scrollRegion.evaluate( ( scroll ) => {
 		scroll.scrollTop = scroll.scrollHeight;
-		scroll.dataset.wpmLastScrollBehavior = '';
+		scroll.dataset.mdpscLastScrollBehavior = '';
 	} );
-	await wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-area-posts-capabilities"]' ).click();
-	await expect( scrollRegion ).toHaveAttribute( 'data-wpm-last-scroll-behavior', 'auto' );
+	await wordpressPanel.locator( '[data-mdpsc-capability-section-target="mdpsc-wordpress-area-posts-capabilities"]' ).click();
+	await expect( scrollRegion ).toHaveAttribute( 'data-mdpsc-last-scroll-behavior', 'auto' );
 	await page.emulateMedia( { reducedMotion: 'no-preference' } );
 
 	await selectGroupingMode( page, 'action' );
-	await expect( page.locator( '[data-wpm-capability-groups]' ) ).toHaveAttribute( 'data-wpm-capability-mode', 'action' );
-	await expect( wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-action-read-capabilities"]' ) ).toBeVisible();
+	await expect( page.locator( '[data-mdpsc-capability-groups]' ) ).toHaveAttribute( 'data-mdpsc-capability-mode', 'action' );
+	await expect( wordpressPanel.locator( '[data-mdpsc-capability-section-target="mdpsc-wordpress-action-read-capabilities"]' ) ).toBeVisible();
 	expectLeftAlignedSectionActions( await sectionHeadingLayout( capabilitySection( page, 'wordpress', 'action', 'read' ) ) );
-	await expect( wordpressPanel.locator( '[data-wpm-capability-section-target="mandate-wordpress-area-posts-capabilities"]' ) ).toHaveCount( 0 );
+	await expect( wordpressPanel.locator( '[data-mdpsc-capability-section-target="mdpsc-wordpress-area-posts-capabilities"]' ) ).toHaveCount( 0 );
 	await expect( capabilityActionBadge( page, 'wordpress', 'upload_files' ) ).toBeHidden();
 	expectActionControlLayout( await capabilityControlLayout( page, 'wordpress', 'upload_files' ) );
 	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
@@ -530,32 +530,32 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await selectGroupingMode( page, 'area' );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await selectCapabilitySource( page, 'third_party' );
-	await expect( page.locator( '[data-wpm-capability-groups]' ) ).toHaveAttribute( 'data-wpm-capability-source', 'third_party' );
-	await expect( page.locator( '[data-wpm-capability-source-tab][data-wpm-capability-source="third_party"]' ) ).toHaveAttribute( 'aria-selected', 'true' );
+	await expect( page.locator( '[data-mdpsc-capability-groups]' ) ).toHaveAttribute( 'data-mdpsc-capability-source', 'third_party' );
+	await expect( page.locator( '[data-mdpsc-capability-source-tab][data-mdpsc-capability-source="third_party"]' ) ).toHaveAttribute( 'aria-selected', 'true' );
 	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
 	await expect( page.locator( 'input[name="allowed_caps[]"][value="upload_files"]' ) ).toHaveCount( 1 );
 	await selectCapabilitySource( page, 'wordpress' );
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).check();
-	await expect( page.locator( '#mandate-rules-summary [data-wpm-expiration-input]' ) ).toHaveCount( 1 );
-	await expect( page.locator( '#mandate-scope-form [data-wpm-expiration-input]' ) ).toHaveCount( 0 );
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'never' );
-	await page.locator( '[data-wpm-expiration-summary]' ).click();
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeHidden();
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeVisible();
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeFocused();
+	await expect( page.locator( '#mdpsc-scope-summary [data-mdpsc-expiration-input]' ) ).toHaveCount( 1 );
+	await expect( page.locator( '#mdpsc-scope-form [data-mdpsc-expiration-input]' ) ).toHaveCount( 0 );
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toHaveValue( '' );
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toBeHidden();
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toBeVisible();
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toHaveAttribute( 'data-mdpsc-expiration-state', 'never' );
+	await page.locator( '[data-mdpsc-expiration-summary]' ).click();
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toBeHidden();
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toBeVisible();
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toBeFocused();
 
-	await page.locator( '[data-wpm-expiration-input]' ).fill( fixture.expiration_dates.future );
+	await page.locator( '[data-mdpsc-expiration-input]' ).fill( fixture.expiration_dates.future );
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ).click(),
+		page.locator( 'button[name="mdpsc_action"][value="save_scope"]' ).click(),
 	] );
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( fixture.expiration_dates.future );
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'date' );
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toHaveValue( fixture.expiration_dates.future );
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toBeHidden();
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toBeVisible();
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toHaveAttribute( 'data-mdpsc-expiration-state', 'date' );
 
 	expect( new Set( await primitiveCapabilityValues( page, 'wordpress' ) ) ).toEqual( new Set( [ 'read', 'edit_posts', 'upload_files' ] ) );
 	expect( new Set( await primitiveCapabilityValues( page, 'third_party' ) ) ).toEqual( new Set( [ 'wpm_manage_widget' ] ) );
@@ -564,25 +564,25 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await expect( anyPrimitiveCapInput( page, fixture.unassigned_role_cap ) ).toHaveCount( 0 );
 
 	const uploadFilesSlug = primitiveCapSlug( page, 'wordpress', 'upload_files' );
-	await expect( uploadFilesSlug ).not.toHaveAttribute( 'data-wpm-tooltip', '' );
+	await expect( uploadFilesSlug ).not.toHaveAttribute( 'data-mdpsc-tooltip', '' );
 	await uploadFilesSlug.hover();
-	await expect( page.locator( '#mandate-capability-tooltip' ) ).toHaveCount( 0 );
+	await expect( page.locator( '#mdpsc-capability-tooltip' ) ).toHaveCount( 0 );
 	const uploadFilesInfo = primitiveCapInfoTarget( page, 'wordpress', 'upload_files' );
 	await expect( uploadFilesInfo ).toHaveCount( 1 );
 	await uploadFilesInfo.hover();
-	await expect( page.locator( '#mandate-capability-tooltip' ) ).toBeVisible();
+	await expect( page.locator( '#mdpsc-capability-tooltip' ) ).toBeVisible();
 	await page.keyboard.press( 'Escape' );
 	await uploadFilesInfo.focus();
-	await expect( page.locator( '#mandate-capability-tooltip' ) ).toBeVisible();
+	await expect( page.locator( '#mdpsc-capability-tooltip' ) ).toBeVisible();
 	await page.keyboard.press( 'Escape' );
 	await expect( primitiveCapInfoTarget( page, 'third_party', 'wpm_manage_widget' ) ).toHaveCount( 0 );
 	const uploadFilesActionBadge = capabilityActionBadge( page, 'wordpress', 'upload_files' );
 	await expect( uploadFilesActionBadge ).toHaveText( 'W' );
 	await uploadFilesActionBadge.hover();
-	await expect( page.locator( '#mandate-capability-tooltip' ) ).toHaveText( 'Write' );
+	await expect( page.locator( '#mdpsc-capability-tooltip' ) ).toHaveText( 'Write' );
 	await page.keyboard.press( 'Escape' );
 	await uploadFilesActionBadge.focus();
-	await expect( page.locator( '#mandate-capability-tooltip' ) ).toHaveText( 'Write' );
+	await expect( page.locator( '#mdpsc-capability-tooltip' ) ).toHaveText( 'Write' );
 	await page.keyboard.press( 'Escape' );
 
 	const scopedRequest = await request.newContext( {
@@ -611,27 +611,27 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	await expect( primitiveCapInput( page, 'wordpress', 'edit_posts' ) ).toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 
-	await page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-panel][data-wpm-select-state="unchecked"]' ).click();
+	await page.locator( '[data-mdpsc-capability-panel="wordpress"] [data-mdpsc-select-panel][data-mdpsc-select-state="unchecked"]' ).click();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
 
-	await page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-panel][data-wpm-select-state="checked"]' ).click();
+	await page.locator( '[data-mdpsc-capability-panel="wordpress"] [data-mdpsc-select-panel][data-mdpsc-select-state="checked"]' ).click();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).toBeChecked();
 
 	await selectCapabilitySource( page, 'third_party' );
-	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-panel][data-wpm-select-state="unchecked"]' ).click();
+	await page.locator( '[data-mdpsc-capability-panel="third_party"] [data-mdpsc-select-panel][data-mdpsc-select-state="unchecked"]' ).click();
 	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'read' ) ).toBeChecked();
-	await page.locator( '[data-wpm-capability-panel="third_party"] [data-wpm-select-panel][data-wpm-select-state="checked"]' ).click();
+	await page.locator( '[data-mdpsc-capability-panel="third_party"] [data-mdpsc-select-panel][data-mdpsc-select-state="checked"]' ).click();
 	await expect( primitiveCapInput( page, 'third_party', 'wpm_manage_widget' ) ).toBeChecked();
 
 	await selectCapabilitySource( page, 'wordpress' );
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ).click(),
+		page.locator( 'button[name="mdpsc_action"][value="save_scope"]' ).click(),
 	] );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'edit_posts' ) ).toBeChecked();
@@ -649,13 +649,13 @@ test( 'admin can manage grouped application password scopes with progressive enh
 
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_app_security_action"][value="clear_scope"]' ).click(),
+		page.locator( 'button[name="mdpsc_action"][value="clear_scope"]' ).click(),
 	] );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeChecked();
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toHaveValue( '' );
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeHidden();
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toBeVisible();
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'never' );
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toHaveValue( '' );
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toBeHidden();
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toBeVisible();
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toHaveAttribute( 'data-mdpsc-expiration-state', 'never' );
 
 	capabilityResponse = await scopedRequest.get( '/wp-json/mandate-test/v1/caps' );
 	expect( capabilityResponse.ok() ).toBeTruthy();
@@ -684,8 +684,8 @@ test( 'admin can manage grouped application password scopes with progressive enh
 	expect( expirationResponse.ok() ).toBeTruthy();
 	expect( ( await expirationResponse.json() ).saved ).toBe( true );
 	await page.goto( `/wp-admin/tools.php?page=mandate-app-security&user_id=${primary.user_id}&app_password_uuid=${secondaryPassword.uuid}`, { waitUntil: 'load' } );
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveAttribute( 'data-wpm-expiration-state', 'expired' );
-	await expect( page.locator( '[data-wpm-expiration-summary]' ) ).toHaveCSS( 'color', 'rgb(179, 45, 46)' );
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toHaveAttribute( 'data-mdpsc-expiration-state', 'expired' );
+	await expect( page.locator( '[data-mdpsc-expiration-summary]' ) ).toHaveCSS( 'color', 'rgb(179, 45, 46)' );
 
 	let authResponse = await secondaryRequest.get( '/wp-json/mandate-test/v1/auth' );
 	expect( authResponse.ok() ).toBeTruthy();
@@ -725,18 +725,18 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 	const primaryPassword = primary.passwords.primary;
 
 	await page.goto( '/wp-admin/tools.php?page=mandate-app-security', { waitUntil: 'load' } );
-	await ensureSelectedOption( page, page.locator( '#mandate-user' ), primary.user_id );
-	await ensureSelectedOption( page, page.locator( '#mandate-password' ), primaryPassword.uuid );
+	await ensureSelectedOption( page, page.locator( '#mdpsc-user' ), primary.user_id );
+	await ensureSelectedOption( page, page.locator( '#mdpsc-password' ), primaryPassword.uuid );
 	await primitiveCapInput( page, 'wordpress', 'upload_files' ).uncheck();
-	const adminLockInput = page.locator( '#mandate-rules-summary [data-wpm-admin-lock-input]' );
+	const adminLockInput = page.locator( '#mdpsc-scope-summary [data-mdpsc-admin-lock-input]' );
 	await expect( adminLockInput ).toHaveCount( 1 );
-	await expect( page.locator( '#mandate-scope-form [data-wpm-admin-lock-input]' ) ).toHaveCount( 0 );
+	await expect( page.locator( '#mdpsc-scope-form [data-mdpsc-admin-lock-input]' ) ).toHaveCount( 0 );
 	await adminLockInput.check();
 	await Promise.all( [
 		page.waitForNavigation( { waitUntil: 'load' } ),
-		page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ).click(),
+		page.locator( 'button[name="mdpsc_action"][value="save_scope"]' ).click(),
 	] );
-	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
+	await expect( page.locator( '#mdpsc-scope-form' ) ).toHaveAttribute( 'data-mdpsc-admin-lock-status', 'locked' );
 	await expect( adminLockInput ).toBeChecked();
 
 	await loginAsFixtureUser( page, primary.user_login );
@@ -745,23 +745,23 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 		{ waitUntil: 'load' }
 	);
 
-	await expect( page.locator( '#mandate-user' ) ).toBeDisabled();
-	await expect( page.locator( '#mandate-user' ) ).toHaveValue( String( primary.user_id ) );
-	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
-	await expect( page.locator( '[data-wpm-admin-lock-input]' ) ).toHaveCount( 0 );
+	await expect( page.locator( '#mdpsc-user' ) ).toBeDisabled();
+	await expect( page.locator( '#mdpsc-user' ) ).toHaveValue( String( primary.user_id ) );
+	await expect( page.locator( '#mdpsc-scope-form' ) ).toHaveAttribute( 'data-mdpsc-admin-lock-status', 'locked' );
+	await expect( page.locator( '[data-mdpsc-admin-lock-input]' ) ).toHaveCount( 0 );
 	await expect( page.locator( 'input[name="admin_locked"]' ) ).toHaveCount( 0 );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).toBeDisabled();
-	await expect( page.locator( '[data-wpm-expiration-input]' ) ).toBeDisabled();
-	await expect( page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-panel][data-wpm-select-state="unchecked"]' ) ).toBeDisabled();
-	await expect( page.locator( '[data-wpm-capability-panel="wordpress"] [data-wpm-select-section]:disabled' ) ).toHaveCount( 12 );
-	await expect( page.locator( 'button[name="mandate_app_security_action"][value="save_scope"]' ) ).toBeDisabled();
-	await expect( page.locator( 'button[name="mandate_app_security_action"][value="clear_scope"]' ) ).toBeDisabled();
+	await expect( page.locator( '[data-mdpsc-expiration-input]' ) ).toBeDisabled();
+	await expect( page.locator( '[data-mdpsc-capability-panel="wordpress"] [data-mdpsc-select-panel][data-mdpsc-select-state="unchecked"]' ) ).toBeDisabled();
+	await expect( page.locator( '[data-mdpsc-capability-panel="wordpress"] [data-mdpsc-select-section]:disabled' ) ).toHaveCount( 12 );
+	await expect( page.locator( 'button[name="mdpsc_action"][value="save_scope"]' ) ).toBeDisabled();
+	await expect( page.locator( 'button[name="mdpsc_action"][value="clear_scope"]' ) ).toBeDisabled();
 
-	const forged = await page.locator( '#mandate-scope-form' ).evaluate( async ( form ) => {
+	const forged = await page.locator( '#mdpsc-scope-form' ).evaluate( async ( form ) => {
 		const params = new URLSearchParams();
 		new FormData( form ).forEach( ( value, key ) => params.append( key, value ) );
-		params.set( 'mandate_app_security_action', 'save_scope' );
+		params.set( 'mdpsc_action', 'save_scope' );
 		params.append( 'allowed_caps[]', 'read' );
 		params.append( 'allowed_caps[]', 'edit_posts' );
 		params.append( 'allowed_caps[]', 'upload_files' );
@@ -781,9 +781,9 @@ test( 'admin can lock a scope and the owner cannot edit it from UI or forged POS
 		};
 	} );
 	expect( forged.status ).toBe( 200 );
-	expect( new URL( forged.url ).searchParams.get( 'mandate_app_security_message' ) ).toBe( 'locked' );
+	expect( new URL( forged.url ).searchParams.get( 'mdpsc_message' ) ).toBe( 'locked' );
 
 	await page.reload( { waitUntil: 'load' } );
 	await expect( primitiveCapInput( page, 'wordpress', 'upload_files' ) ).not.toBeChecked();
-	await expect( page.locator( '#mandate-scope-form' ) ).toHaveAttribute( 'data-wpm-admin-lock-status', 'locked' );
+	await expect( page.locator( '#mdpsc-scope-form' ) ).toHaveAttribute( 'data-mdpsc-admin-lock-status', 'locked' );
 } );

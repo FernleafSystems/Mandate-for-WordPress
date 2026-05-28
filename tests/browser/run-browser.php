@@ -2,7 +2,7 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ProcessRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ProcessRunner;
 
 const WPM_BROWSER_READY_MARKER = '/var/www/html/wp-content/.mandate-browser-lane-ready.json';
 const WPM_BROWSER_READY_SCHEMA_VERSION = 1;

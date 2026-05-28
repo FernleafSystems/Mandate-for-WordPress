@@ -1,26 +1,28 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity;
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPage;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminPageViewDataBuilder;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeAccessPolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminScopeFormSecurity;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTemplateRenderer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminTrustedHtmlSanitizer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\AdminUserRoleProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Admin\ApplicationPasswordScopeColumn;
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\ApplicationPasswordRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\ApplicationPasswords\CurrentApplicationPasswordContext;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityCandidateProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityDescriptionProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityGroupProvider;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\CapabilityScopeEnforcer;
-use FernleafSystems\Wordpress\Plugin\Mandate\Capabilities\ScopeRepository;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ApplicationPasswordExpirationReaper;
-use FernleafSystems\Wordpress\Plugin\Mandate\Expiration\ExpirationDatePolicy;
-use FernleafSystems\Wordpress\Plugin\Mandate\MetaCaps\MetaCapabilityRegistry;
-use FernleafSystems\Wordpress\Plugin\Mandate\Options\PluginOptionsRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminPage;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminPageViewDataBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminProfileContext;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminRequest;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminScopeAccessPolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminScopeFormSecurity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminTemplateRenderer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminTrustedHtmlSanitizer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\AdminUserRoleProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin\ApplicationPasswordScopeColumn;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\ApplicationPasswordRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\ApplicationPasswords\CurrentApplicationPasswordContext;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityCandidateProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityDescriptionProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityGroupProvider;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\CapabilityScopeEnforcer;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities\ScopeRepository;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ApplicationPasswordExpirationReaper;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Expiration\ExpirationDatePolicy;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\MetaCaps\MetaCapabilityRegistry;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Options\PluginOptionsRepository;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -50,7 +52,11 @@ final class PluginServices {
 
 	private ?ApplicationPasswordExpirationReaper $expirationReaper = null;
 
+	private ?AdminRequest $adminRequest = null;
+
 	private ?AdminScopeAccessPolicy $adminScopeAccessPolicy = null;
+
+	private ?AdminProfileContext $adminProfileContext = null;
 
 	private ?AdminPage $adminPage = null;
 
@@ -116,8 +122,19 @@ final class PluginServices {
 		);
 	}
 
+	public function adminRequest() :AdminRequest {
+		return $this->adminRequest ??= new AdminRequest();
+	}
+
 	public function adminScopeAccessPolicy() :AdminScopeAccessPolicy {
 		return $this->adminScopeAccessPolicy ??= new AdminScopeAccessPolicy();
+	}
+
+	public function adminProfileContext() :AdminProfileContext {
+		return $this->adminProfileContext ??= new AdminProfileContext(
+			$this->adminRequest(),
+			$this->adminScopeAccessPolicy()
+		);
 	}
 
 	public function adminPage() :AdminPage {
@@ -126,9 +143,10 @@ final class PluginServices {
 		}
 
 		$trustedHtmlSanitizer = new AdminTrustedHtmlSanitizer();
-		$formSecurity = new AdminScopeFormSecurity( $trustedHtmlSanitizer );
+		$formSecurity = new AdminScopeFormSecurity();
 		$roleProvider = new AdminUserRoleProvider();
 		$viewDataBuilder = new AdminPageViewDataBuilder(
+			$this->adminRequest(),
 			$this->scopeRepository(),
 			$this->passwordRepository(),
 			$this->capabilityCandidateProvider(),
@@ -149,6 +167,7 @@ final class PluginServices {
 			$this->metaCapabilityRegistry(),
 			$this->pluginFile(),
 			$this->expirationDatePolicy(),
+			$this->adminRequest(),
 			$roleProvider,
 			$formSecurity,
 			$viewDataBuilder,
@@ -158,6 +177,9 @@ final class PluginServices {
 	}
 
 	public function applicationPasswordScopeColumn() :ApplicationPasswordScopeColumn {
-		return $this->applicationPasswordScopeColumn ??= new ApplicationPasswordScopeColumn( $this->adminScopeAccessPolicy() );
+		return $this->applicationPasswordScopeColumn ??= new ApplicationPasswordScopeColumn(
+			$this->adminScopeAccessPolicy(),
+			$this->adminProfileContext()
+		);
 	}
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 - 2026-05-27
+
+- Cleaned runtime identifiers, admin request handling, template rendering, and WordPress.org review prefixes.
+
 ## 0.4.1 - 2026-05-27
 
 Mandate App Security tightens release packaging metadata after the 0.4.0 release.
@@ -26,7 +30,7 @@ Mandate App Security now supports owner-managed scopes, administrator locks, and
 
 ### Changed
 
-- The selected password summary now separates password details from Mandate rules.
+- The selected password summary now separates password details from scope details.
 
 ### Security and Maintenance
 

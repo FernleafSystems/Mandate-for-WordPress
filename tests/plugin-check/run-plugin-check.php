@@ -2,10 +2,10 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ProcessRunner;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ProcessRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\TemporaryDirectoryManager;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 

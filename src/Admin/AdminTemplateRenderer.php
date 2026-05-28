@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Admin;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Admin;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -21,19 +21,6 @@ class AdminTemplateRenderer {
 		'partials/summary.php' => true,
 	];
 
-	private const RESERVED_DATA_KEYS = [
-		'GLOBALS' => true,
-		'_COOKIE' => true,
-		'_ENV' => true,
-		'_FILES' => true,
-		'_GET' => true,
-		'_POST' => true,
-		'_REQUEST' => true,
-		'_SERVER' => true,
-		'_SESSION' => true,
-		'this' => true,
-	];
-
 	private string $baseDirectory;
 
 	public function __construct() {
@@ -50,11 +37,10 @@ class AdminTemplateRenderer {
 	 */
 	public function render( string $template, array $data ) :string {
 		$templatePath = $this->resolveTemplatePath( $template );
-		$this->assertValidDataKeys( $data );
 
 		ob_start();
 		try {
-			extract( $data, EXTR_SKIP );
+			$mdpscTemplateData = $data;
 			require $templatePath;
 			return (string)ob_get_clean();
 		}
@@ -79,39 +65,39 @@ class AdminTemplateRenderer {
 			'aria-labelledby'                => true,
 			'aria-selected'                  => true,
 			'aria-controls'                  => true,
-			'data-wpm-admin-lock-input'      => true,
-			'data-wpm-admin-lock-status'     => true,
-			'data-wpm-capability-action'     => true,
-			'data-wpm-capability-area'       => true,
-			'data-wpm-capability-groups'     => true,
-			'data-wpm-capability-grouping'   => true,
-			'data-wpm-capability-grouping-config' => true,
-			'data-wpm-capability-grouping-mode'   => true,
-			'data-wpm-capability-index-link' => true,
-			'data-wpm-capability-item'       => true,
-			'data-wpm-capability-key'        => true,
-			'data-wpm-capability-mode'       => true,
-			'data-wpm-capability-name'       => true,
-			'data-wpm-capability-panel'      => true,
-			'data-wpm-capability-section-index'  => true,
-			'data-wpm-capability-section'    => true,
-			'data-wpm-capability-section-target' => true,
-			'data-wpm-capability-source'     => true,
-			'data-wpm-capability-source-panel' => true,
-			'data-wpm-capability-source-tab' => true,
-			'data-wpm-capability-source-tabs' => true,
-			'data-wpm-capability-type'       => true,
-			'data-wpm-expiration-input'      => true,
-			'data-wpm-expiration-state'      => true,
-			'data-wpm-expiration-summary'    => true,
-			'data-wpm-role-snapshot-status'  => true,
-			'data-wpm-select-panel'          => true,
-			'data-wpm-select-section'        => true,
-			'data-wpm-select-state'          => true,
-			'data-wpm-selection-form'        => true,
-			'data-wpm-selection-status'      => true,
-			'data-wpm-tooltip'               => true,
-			'data-wpm-tooltip-text'          => true,
+			'data-mdpsc-admin-lock-input'      => true,
+			'data-mdpsc-admin-lock-status'     => true,
+			'data-mdpsc-capability-action'     => true,
+			'data-mdpsc-capability-area'       => true,
+			'data-mdpsc-capability-groups'     => true,
+			'data-mdpsc-capability-grouping'   => true,
+			'data-mdpsc-capability-grouping-config' => true,
+			'data-mdpsc-capability-grouping-mode'   => true,
+			'data-mdpsc-capability-index-link' => true,
+			'data-mdpsc-capability-item'       => true,
+			'data-mdpsc-capability-key'        => true,
+			'data-mdpsc-capability-mode'       => true,
+			'data-mdpsc-capability-name'       => true,
+			'data-mdpsc-capability-panel'      => true,
+			'data-mdpsc-capability-section-index'  => true,
+			'data-mdpsc-capability-section'    => true,
+			'data-mdpsc-capability-section-target' => true,
+			'data-mdpsc-capability-source'     => true,
+			'data-mdpsc-capability-source-panel' => true,
+			'data-mdpsc-capability-source-tab' => true,
+			'data-mdpsc-capability-source-tabs' => true,
+			'data-mdpsc-capability-type'       => true,
+			'data-mdpsc-expiration-input'      => true,
+			'data-mdpsc-expiration-state'      => true,
+			'data-mdpsc-expiration-summary'    => true,
+			'data-mdpsc-role-snapshot-status'  => true,
+			'data-mdpsc-select-panel'          => true,
+			'data-mdpsc-select-section'        => true,
+			'data-mdpsc-select-state'          => true,
+			'data-mdpsc-selection-form'        => true,
+			'data-mdpsc-selection-status'      => true,
+			'data-mdpsc-tooltip'               => true,
+			'data-mdpsc-tooltip-text'          => true,
 		];
 
 		$tags = [
@@ -205,20 +191,6 @@ class AdminTemplateRenderer {
 
 		if ( !isset( self::ALLOWED_TEMPLATES[ $template ] ) ) {
 			throw new \RuntimeException( 'Admin template is not registered.' );
-		}
-	}
-
-	/**
-	 * @param array<string,mixed> $data
-	 */
-	private function assertValidDataKeys( array $data ) :void {
-		foreach ( array_keys( $data ) as $key ) {
-			if ( !is_string( $key )
-				|| preg_match( '/^[A-Za-z_][A-Za-z0-9_]*$/', $key ) !== 1
-				|| isset( self::RESERVED_DATA_KEYS[ $key ] )
-			) {
-				throw new \RuntimeException( 'Invalid admin template data key.' );
-			}
 		}
 	}
 

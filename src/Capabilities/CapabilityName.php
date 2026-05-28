@@ -1,6 +1,6 @@
 <?php declare( strict_types=1 );
 
-namespace FernleafSystems\Wordpress\Plugin\Mandate\Capabilities;
+namespace FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Capabilities;
 
 if ( !defined( 'ABSPATH' ) ) {
 	exit;
@@ -14,12 +14,7 @@ class CapabilityName {
 			return '';
 		}
 
-		if ( function_exists( 'sanitize_key' ) ) {
-			$capability = sanitize_key( $capability );
-		}
-		else {
-			$capability = strtolower( preg_replace( '/[^a-zA-Z0-9_\-]/', '', $capability ) ?? '' );
-		}
+		$capability = sanitize_key( $capability );
 
 		return preg_match( '/^[a-z0-9_\-]+$/', $capability ) === 1 ? $capability : '';
 	}

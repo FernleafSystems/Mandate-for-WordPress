@@ -2,13 +2,13 @@
 
 declare( strict_types=1 );
 
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\CommandRunner;
-use FernleafSystems\Wordpress\Plugin\Mandate\PluginIdentity;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ProcessRunner;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ReleasePackageIdentity;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\RuntimePackageBuilder;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\TemporaryDirectoryManager;
-use FernleafSystems\Wordpress\Plugin\Mandate\Tooling\ZipBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\CommandRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\PluginIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ProcessRunner;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ReleasePackageIdentity;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\RuntimePackageBuilder;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\TemporaryDirectoryManager;
+use FernleafSystems\Wordpress\Plugin\MandateAppSecurity\Tooling\ZipBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Process\Process;
@@ -808,7 +808,7 @@ final class ToolingTest extends Wpm_Test_Case {
 		] );
 
 		$filesystem->dumpFile( Path::join( $fixtureRoot, RuntimePackageBuilder::MAIN_PLUGIN_FILE ), "<?php\n/*\n * Plugin Name: Fixture\n * Plugin URI: https://example.test\n * Version: 1.0.0\n */\n" );
-		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\\call_user_func( function () {\n\t\$mandate_app_security_autoload = __DIR__.'/vendor/autoload.php';\n\tif ( \\is_file( \$mandate_app_security_autoload ) ) {\n\t\trequire_once \$mandate_app_security_autoload;\n\t\tPlugin::boot( __DIR__.'/".RuntimePackageBuilder::MAIN_PLUGIN_FILE."' );\n\t}\n} );\n" );
+		$filesystem->dumpFile( Path::join( $fixtureRoot, 'init.php' ), "<?php declare( strict_types=1 );\n\nuse Fixture\\Plugin;\n\n\$mdpsc_autoload = __DIR__.'/vendor/autoload.php';\nif ( \\is_file( \$mdpsc_autoload ) ) {\n\trequire_once \$mdpsc_autoload;\n\tPlugin::boot( __DIR__.'/".RuntimePackageBuilder::MAIN_PLUGIN_FILE."' );\n}\n" );
 		$filesystem->dumpFile( Path::join( $fixtureRoot, 'infrastructure/templates/github-updater.php' ), "<?php\nuse YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory;\n// {{MANDATE_GITHUB_ASSET_PREFIX}}\n" );
 
 		foreach ( [
