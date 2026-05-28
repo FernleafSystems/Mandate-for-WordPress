@@ -606,7 +606,7 @@ class AdminPageViewDataBuilder {
 				'defaultMode'   => self::DEFAULT_CAPABILITY_GROUPING,
 				'sources'       => $this->capabilitySourceConfig( $capabilityGroups[ 'sources' ], $isReadOnly ),
 			],
-			JSON_THROW_ON_ERROR
+			\JSON_THROW_ON_ERROR
 		);
 	}
 

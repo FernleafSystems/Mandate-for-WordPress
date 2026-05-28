@@ -10,7 +10,7 @@ if ( !defined( 'ABSPATH' ) ) {
 
 class Plugin {
 
-	public const VERSION = '0.4.2';
+	public const VERSION = '0.5.0';
 	public const MENU_SLUG = PluginIdentity::SLUG;
 
 	public static function boot( string $pluginFile ) :void {
