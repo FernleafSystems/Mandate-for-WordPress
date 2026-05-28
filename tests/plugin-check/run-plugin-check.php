@@ -93,48 +93,44 @@ try {
 		$composeEnv
 	);
 
-	$result = wpm_plugin_check_run_capture(
-		array_merge(
-			$compose,
-			[
-				'run',
-				'--rm',
-				'-T',
-				'wp-cli',
-				'wp',
-				'plugin',
-				'check',
-				'mandate-app-security',
-				'--format=json',
-				'--require=./wp-content/plugins/plugin-check/cli.php',
-				'--slug=mandate-app-security',
-				'--allow-root',
-			]
-		),
-		$rootDir,
-		$composeEnv
-	);
+	$findings = [];
+	foreach ( [
+		'new',
+		'update',
+	] as $pluginCheckMode ) {
+		echo 'Running Plugin Check strict profile for mode: '.$pluginCheckMode.PHP_EOL;
+		$result = wpm_plugin_check_run_capture(
+			wpm_plugin_check_command( $compose, $pluginCheckMode ),
+			$rootDir,
+			$composeEnv
+		);
 
-	if ( $result[ 'exit_code' ] !== 0 ) {
-		echo $result[ 'stdout' ];
-		fwrite( STDERR, $result[ 'stderr' ] );
-		throw new RuntimeException( 'Plugin Check command failed with exit code '.$result[ 'exit_code' ].'.' );
+		if ( $result[ 'exit_code' ] !== 0 ) {
+			echo $result[ 'stdout' ];
+			fwrite( STDERR, $result[ 'stderr' ] );
+			throw new RuntimeException( 'Plugin Check command failed with exit code '.$result[ 'exit_code' ].' for mode '.$pluginCheckMode.'.' );
+		}
+
+		$profileFindings = wpm_plugin_check_parse_findings( $result[ 'stdout' ], $pluginCheckMode );
+		wpm_plugin_check_print_findings( $profileFindings );
+		$findings = [ ...$findings, ...$profileFindings ];
 	}
 
-	$findings = wpm_plugin_check_parse_findings( $result[ 'stdout' ] );
 	$errorCount = wpm_plugin_check_count_type( $findings, 'ERROR' );
 	$warningCount = wpm_plugin_check_count_type( $findings, 'WARNING' );
+	$otherCount = max( 0, count( $findings ) - $errorCount - $warningCount );
 
-	wpm_plugin_check_print_findings( $findings );
 	echo sprintf(
-		"Plugin Check completed with %d error%s and %d warning%s.\n",
+		"Plugin Check strict profiles completed with %d error%s, %d warning%s, and %d other finding%s.\n",
 		$errorCount,
 		$errorCount === 1 ? '' : 's',
 		$warningCount,
-		$warningCount === 1 ? '' : 's'
+		$warningCount === 1 ? '' : 's',
+		$otherCount,
+		$otherCount === 1 ? '' : 's'
 	);
 
-	$exitCode = $errorCount > 0 ? 1 : 0;
+	$exitCode = count( $findings ) > 0 ? 1 : 0;
 }
 catch ( Throwable $throwable ) {
 	fwrite( STDERR, 'Plugin Check failed: '.$throwable->getMessage().PHP_EOL );
@@ -173,6 +169,34 @@ function wpm_plugin_check_build_package( string $rootDir, string $temporaryRoot,
 }
 
 /**
+ * @param string[] $compose
+ * @return string[]
+ */
+function wpm_plugin_check_command( array $compose, string $pluginCheckMode ) :array {
+	return array_merge(
+		$compose,
+		[
+			'run',
+			'--rm',
+			'-T',
+			'wp-cli',
+			'wp',
+			'plugin',
+			'check',
+			'mandate-app-security',
+			'--format=json',
+			'--require=./wp-content/plugins/plugin-check/cli.php',
+			'--slug=mandate-app-security',
+			'--include-experimental',
+			'--include-low-severity-errors',
+			'--include-low-severity-warnings',
+			'--mode='.$pluginCheckMode,
+			'--allow-root',
+		]
+	);
+}
+
+/**
  * @param string[] $command
  * @param array<string,string> $env
  */
@@ -202,9 +226,9 @@ function wpm_plugin_check_run_capture( array $command, string $cwd, array $env =
 }
 
 /**
- * @return array<int,array{file:string,line:int,column:int,type:string,code:string,message:string,docs:string}>
+ * @return array<int,array{profile:string,file:string,line:int,column:int,type:string,code:string,message:string,docs:string}>
  */
-function wpm_plugin_check_parse_findings( string $output ) :array {
+function wpm_plugin_check_parse_findings( string $output, string $profile ) :array {
 	$findings = [];
 	$currentFile = 'unknown';
 	foreach ( preg_split( '/\R/', $output ) ?: [] as $line ) {
@@ -229,6 +253,7 @@ function wpm_plugin_check_parse_findings( string $output ) :array {
 			}
 
 			$findings[] = [
+				'profile' => $profile,
 				'file'    => $currentFile,
 				'line'    => isset( $item[ 'line' ] ) ? (int)$item[ 'line' ] : 0,
 				'column'  => isset( $item[ 'column' ] ) ? (int)$item[ 'column' ] : 0,
@@ -256,7 +281,7 @@ function wpm_plugin_check_count_type( array $findings, string $type ) :int {
 }
 
 /**
- * @param array<int,array{file:string,line:int,column:int,type:string,code:string,message:string,docs:string}> $findings
+ * @param array<int,array{profile:string,file:string,line:int,column:int,type:string,code:string,message:string,docs:string}> $findings
  */
 function wpm_plugin_check_print_findings( array $findings ) :void {
 	foreach ( $findings as $finding ) {
@@ -269,7 +294,8 @@ function wpm_plugin_check_print_findings( array $findings ) :void {
 		}
 
 		echo sprintf(
-			"[%s] %s %s - %s\n",
+			"[%s:%s] %s %s - %s\n",
+			$finding[ 'profile' ],
 			strtoupper( $finding[ 'type' ] ),
 			$location,
 			$finding[ 'code' ],

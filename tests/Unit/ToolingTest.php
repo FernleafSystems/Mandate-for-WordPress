@@ -579,6 +579,11 @@ final class ToolingTest extends Wpm_Test_Case {
 		$pluginCheckRunner = $this->readProjectFile( 'tests/plugin-check/run-plugin-check.php' );
 		$this->assertStringContainsString( "'".PluginIdentity::SLUG."'", $pluginCheckRunner );
 		$this->assertStringContainsString( "'--slug=".PluginIdentity::SLUG."'", $pluginCheckRunner );
+		$this->assertStringContainsString( "'--include-experimental'", $pluginCheckRunner );
+		$this->assertStringContainsString( "'--include-low-severity-errors'", $pluginCheckRunner );
+		$this->assertStringContainsString( "'--include-low-severity-warnings'", $pluginCheckRunner );
+		$this->assertStringContainsString( "'--mode='.\$pluginCheckMode", $pluginCheckRunner );
+		$this->assertStringContainsString( "'update'", $pluginCheckRunner );
 		$this->assertStringContainsString( 'ProcessRunner', $pluginCheckRunner );
 		$this->assertStringNotContainsString( 'proc_open', $pluginCheckRunner );
 		$this->assertStringNotContainsString( 'stream_get_contents', $pluginCheckRunner );
