@@ -15,6 +15,9 @@ class CapabilityName {
 		}
 
 		$capability = sanitize_key( $capability );
+		if ( self::wouldBecomeIntegerArrayKey( $capability ) ) {
+			return '';
+		}
 
 		return preg_match( '/^[a-z0-9_\-]+$/', $capability ) === 1 ? $capability : '';
 	}
@@ -43,5 +46,11 @@ class CapabilityName {
 
 		ksort( $normalized, SORT_NATURAL );
 		return $normalized;
+	}
+
+	private static function wouldBecomeIntegerArrayKey( string $capability ) :bool {
+		$probe = [];
+		$probe[ $capability ] = true;
+		return is_int( array_key_first( $probe ) );
 	}
 }
