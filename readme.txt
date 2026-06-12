@@ -4,7 +4,7 @@ Tags: application passwords, rest api, access control, security, capabilities
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.5.0
+Stable tag: 0.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -91,6 +91,10 @@ Mandate App Security is available at https://wpmandate.com.
 The public development repository, release packages, and build documentation are at https://github.com/FernleafSystems/Mandate-for-WordPress.
 
 == Changelog ==
+
+= 0.5.1 =
+* Fixes an admin page crash that could happen when a role or integration registered malformed capability data.
+* Keeps capability lists safe by ignoring invalid capability names before they are shown or saved.
 
 = 0.5.0 =
 * Improves WordPress.org compatibility for plugin storage, hooks, nonces, admin selectors, and runtime identifiers.

@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.6.0 - Unreleased
+## 0.5.1 - 2026-06-12
+
+### Fixed
+
+- Capability normalization now drops names that PHP would store as integer array keys, preventing admin capability grouping fatals when malformed role or meta-capability data is present.
 
 ## 0.5.0 - 2026-05-28
 
